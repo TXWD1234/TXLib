@@ -1,0 +1,226 @@
+#include "Project.hpp"
+#include "stb_image.h"
+
+class Application {
+private:
+	struct UpdateFunc {
+		Application* ptr;
+		inline void operator()() {
+			ptr->update();
+		}
+	};
+	struct RenderFunc {
+		Application* ptr;
+		inline void operator()() {
+			ptr->render();
+		}
+	};
+	tx::RE::Framework<tx::RE::Mode::Release, UpdateFunc, RenderFunc> framework;
+
+	bool initGLFW() {
+		std::cout << "Initializing GLFW...\n";
+		if (!glfwInit()) {
+			std::cerr << "[FatalError]: Failed to init GLFW\n";
+			return false;
+		}
+		return true;
+	}
+	bool initGLAD() {
+		std::cout << "Initializing GLAD...\n";
+		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+			std::cerr << "[FatalError]: Failed to init GLAD\n";
+			return false;
+		}
+		return true;
+	}
+
+	bool m_valid = 0;
+
+public:
+	Application() {
+		if (!initGLFW()) return;
+		framework = decltype(framework){
+			UpdateFunc{ this },
+			RenderFunc{ this }
+		};
+		if (!framework.valid()) return;
+		if (!initGLAD()) return;
+		if (!init()) return;
+		m_valid = 1;
+	}
+	~Application() {
+		glfwTerminate();
+	}
+
+	void run() { this->framework.run(); }
+	bool valid() const { return m_valid; }
+
+private:
+	void onKeyEvent(GLFWwindow* window, int key, int scancode, int action, int mods) {
+		if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+			switch (key) {
+			}
+		}
+	}
+
+	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Program;
+
+	re::DrawCallManager<smtype> dcm;
+	re::ShaderManager<smtype> sm;
+	re::VertexAttributeManager vam;
+	vector<re::StaticBufferObject<tx::vec2>> staticBuffers;
+	re::RingBufferObject<tx::u32> animStateBuffer;
+	re::RingBufferObject<tx::vec2> UVBuffer;
+	re::TextureArray ta;
+
+
+private:
+	bool init() {
+		tx::glfwSetKeyCallback<Application, &Application::onKeyEvent>(framework.getWindow(), this);
+		tx::glEnableTransparent();
+
+		vector<tx::vec2> squarePos = {
+			{ 0.5, -0.5 },
+			{ -0.5, -0.5 },
+			{ 0.5, 0.5 },
+			{ -0.5, -0.5 },
+			{ 0.5, 0.5 },
+			{ -0.5, 0.5 }
+		};
+		// vector<tx::vec2> squareUV = {
+		// 	{ 3.0, 0.0 },
+		// 	{ 0.0, 0.0 },
+		// 	{ 3.0, 3.0 },
+		// 	{ 0.0, 0.0 },
+		// 	{ 3.0, 3.0 },
+		// 	{ 0.0, 3.0 }
+		// };
+		vector<tx::vec2> positions = {
+			{ -0.5, -0.5 },
+			{ 0.5, 0.5 },
+			{ 0.5, -0.5 },
+			{ -0.5, 0.5 }
+		};
+
+		staticBuffers.reserve(3);
+		tx::RE::StaticBufferObject<tx::vec2>& squarePosBuffer = staticBuffers.emplace_back(6, squarePos.data());
+		//tx::RE::StaticBufferObject<tx::vec2>& squareUVBuffer = staticBuffers.emplace_back(6, squareUV.data());
+		tx::RE::StaticBufferObject<tx::vec2>& instanceBuffer = staticBuffers.emplace_back(4, positions.data());
+
+		animStateBuffer.alloc();
+		vam = tx::RE::VertexAttributeManager([&](tx::RE::VAMIniter& initer) {
+			initer.addBuffer(squarePosBuffer);
+			UVBufferId = initer.addBuffer(UVBuffer);
+			animStateBufferId = initer.addInstanceBuffer(animStateBuffer);
+			initer.addInstanceBuffer(instanceBuffer);
+		});
+
+		bool success = 1;
+		tx::RE::ProgramId activeShaders;
+		sm = tx::RE::ShaderManager<smtype>([&](re::SMIniter<smtype>& initer) {
+			success = re::addShaderPair<smtype>("vertex", "fragment", initer, activeShaders);
+		});
+		if (!success) return 0;
+
+		stbi_set_flip_vertically_on_load(true);
+		int width, height, channels;
+		std::vector<tx::u8*> data;
+		data.reserve(11);
+
+		for (int i = 1; i <= 12; i++) {
+			if (i == 4) continue; // watch who ever is reading this code be so confusing...
+			std::ostringstream oss;
+			oss << "/home/TX_Jerry/Desktop/mpv-shot00" << std::setw(2) << std::setfill('0') << i << ".jpg";
+			std::string path = oss.str();
+			data.push_back(stbi_load(path.c_str(), &width, &height, &channels, 4));
+			if (!data.back()) {
+				std::cerr << "[Error]: stb_image failed to load image in frame: " << i << endl;
+				return 0;
+			}
+		}
+		tx::u32 length = width * height * 4;
+
+		ta = re::TextureArray(re::TextureFormat::RGBA, { width, height }, data.size(), 0);
+		ta.setTextureRule(re::TextureRule::Linear, re::TextureRule::Repeat);
+		for (int i = 0; i < data.size(); i++) {
+			ta.setLayer(i, std::bitSpan(data[i], length));
+			if (data[i]) stbi_image_free(data[i]);
+		}
+
+		dcm = tx::RE::DrawCallManager(sm, vam);
+		dcm.setShaders(activeShaders);
+		dcm.setTexture(0, ta);
+
+		return 1;
+	}
+
+	tx::u32 animStateBufferId;
+	tx::u32 UVBufferId;
+	tx::u32 frameCounter = 0;
+	tx::u32 imageCount = 15;
+
+	vector<tx::vec2> squareUV = {
+		{ 1.0, 0.0 },
+		{ 0.0, 0.0 },
+		{ 1.0, 1.0 },
+		{ 0.0, 0.0 },
+		{ 1.0, 1.0 },
+		{ 0.0, 1.0 }
+	};
+
+
+	tx::u64 tickCounter = 0;
+	void update() {
+		if (!(tickCounter % 3)) {
+			re::BufferInputHandle<tx::u32> animStateInput = animStateBuffer.getStagingBuffer();
+			for (int i = 0; i < 4; i++)
+				animStateInput.push_back(frameCounter);
+			animStateBuffer.finish();
+
+			re::BufferInputHandle<tx::vec2> uvInput = UVBuffer.getStagingBuffer();
+			for (int i = 0; i < 6; i++) {
+				uvInput.push_back(squareUV[i] * imageCount);
+			}
+			UVBuffer.finish();
+
+			frameCounter++;
+			if (frameCounter >= 11) {
+				frameCounter = 0;
+			}
+		}
+		if (tickCounter >= 10) {
+			imageCount--;
+			if (imageCount == 0) {
+				imageCount = 15;
+			}
+			tickCounter = 0;
+		}
+		tickCounter++;
+	}
+	void render() {
+		//tx::Time::Timer timer;
+		vam.setBuffer(animStateBufferId, animStateBuffer, animStateBuffer.getNext());
+		vam.setBuffer(UVBufferId, UVBuffer, UVBuffer.getNext());
+		dcm.drawInstanced(0, 6, 4);
+		//cout << timer.duration() << "ms" << endl;
+	}
+};
+
+// Things to add:
+// 1. reconstruction of all "baked" class -> can "interit" the data from previous instance
+// 2. DrawCallMan: error if not all dynamic buffer have same range
+
+int main() {
+	std::cout << "Initializing Application...\n";
+	Application app;
+	if (!app.valid()) {
+		std::cerr << "[FatalError]: Failed to init Application\n";
+		return 1;
+	}
+
+	std::cout << "[Status]: Main Loop Starts\n";
+	app.run();
+
+	std::cout << "[Status]: Terminating...\n";
+	return 0;
+}
