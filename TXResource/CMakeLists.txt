@@ -18,7 +18,7 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXResource STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/resource.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/detail.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/detail.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/detail.cpp"
 )
 tx_add_release_ops(TXResource)

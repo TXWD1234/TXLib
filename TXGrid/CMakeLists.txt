@@ -16,11 +16,11 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXGrid STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/grid.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/grid_system.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/grid_system.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/grid_system.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/grid_utils.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/grid_utils.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/grid_utils.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/coord_map.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/coord_map.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/coord_map.cpp"
 )
 tx_add_release_ops(TXGrid)

@@ -4,8 +4,8 @@
 // File: geom_util_classes.h
 
 #pragma once
-#include "impl/basic_utils.h"
-#include "impl/geometry.h"
+#include "impl/basic_utils.hpp"
+#include "impl/geometry.hpp"
 
 namespace tx {
 

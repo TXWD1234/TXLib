@@ -4,11 +4,11 @@
 // File: grid_utils.h
 
 #pragma once
-#include "impl/coord_map.h"
-#include "impl/geom_utils.h"
-#include "impl/geometry.h"
-#include "impl/grid_system.h"
-#include "impl/math_line.h"
+#include "impl/coord_map.hpp"
+#include "impl/geom_utils.hpp"
+#include "impl/geometry.hpp"
+#include "impl/grid_system.hpp"
+#include "impl/math_line.hpp"
 #include <vector>
 
 namespace tx {

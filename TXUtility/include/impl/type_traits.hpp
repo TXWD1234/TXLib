@@ -4,7 +4,7 @@
 // File: type_traits.h
 
 #pragma once
-#include "impl/basic_utils.h"
+#include "impl/basic_utils.hpp"
 #include <type_traits>
 
 namespace tx {

@@ -3,6 +3,6 @@
 // Module: TXGrid
 
 #pragma once
-#include "impl/coord_map.h"
-#include "impl/grid_system.h"
-#include "impl/grid_utils.h"
+#include "impl/coord_map.hpp"
+#include "impl/grid_system.hpp"
+#include "impl/grid_utils.hpp"

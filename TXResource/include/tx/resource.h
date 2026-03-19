@@ -4,4 +4,4 @@
 // File: resource.h
 
 #pragma once
-#include "impl/detail.h"
+#include "impl/detail.hpp"

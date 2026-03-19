@@ -3,7 +3,7 @@
 // Module: TXGrid
 // File: coord_map.cpp
 
-#include "impl/coord_map.h"
+#include "impl/coord_map.hpp"
 
 namespace tx {
 

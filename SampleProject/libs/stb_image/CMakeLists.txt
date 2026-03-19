@@ -9,7 +9,7 @@ if(TARGET stb_image)
 endif()
 
 add_library(stb_image STATIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/stb_image.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/stb_image.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/stb_image.cpp"
 )
 

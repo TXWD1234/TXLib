@@ -17,7 +17,7 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXJson STATIC
 "${CMAKE_CURRENT_SOURCE_DIR}/include/tx/json.h"
-"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/json_parser.h"
+"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/json_parser.hpp"
 "${CMAKE_CURRENT_SOURCE_DIR}/src/json_parser.cpp"
 )
 tx_add_release_ops(TXJson)

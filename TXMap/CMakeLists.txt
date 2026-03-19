@@ -16,8 +16,8 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXMap INTERFACE
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/map.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/kvmap.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/set_view.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/kvmap.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/set_view.hpp"
 )
 tx_add_release_ops_interface(TXMap)
 

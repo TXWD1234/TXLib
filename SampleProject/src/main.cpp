@@ -1,5 +1,5 @@
 #include "Project.hpp"
-#include "stb_image.h"
+#include "stb_image.hpp"
 
 class Application {
 private:

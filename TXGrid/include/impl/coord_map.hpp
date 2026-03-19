@@ -4,9 +4,9 @@
 // File: coord_map.h
 
 #pragma once
-#include "impl/geom_util_classes.h"
-#include "impl/geom_utils.h"
-#include "impl/geometry.h"
+#include "impl/geom_util_classes.hpp"
+#include "impl/geom_utils.hpp"
+#include "impl/geometry.hpp"
 #include <algorithm>
 
 namespace tx {

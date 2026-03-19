@@ -4,9 +4,9 @@
 // File: math_line.h
 
 #pragma once
-#include "impl/basic_utils.h"
-#include "impl/geom_utils.h"
-#include "impl/geometry.h"
+#include "impl/basic_utils.hpp"
+#include "impl/geom_utils.hpp"
+#include "impl/geometry.hpp"
 #include <cmath>
 
 

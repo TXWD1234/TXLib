@@ -18,7 +18,7 @@ include("${CMakeUtils}/optimization.cmake")
 add_subdirectory("${TXLib}/TXGraphics")
 
 add_library(TXPixels STATIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/pixels.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/pixels.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/pixels.cpp"
 )
 tx_add_release_ops(TXPixels)

@@ -16,7 +16,7 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXData STATIC
 "${CMAKE_CURRENT_SOURCE_DIR}/include/tx/data.h"
-"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/parted_arr.h"
+"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/parted_arr.hpp"
 "${CMAKE_CURRENT_SOURCE_DIR}/src/parted_arr.cpp"
 )
 tx_add_release_ops(TXData)

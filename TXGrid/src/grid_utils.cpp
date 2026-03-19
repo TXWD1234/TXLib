@@ -3,7 +3,7 @@
 // Module: TXGrid
 // File: grid_utils.cpp
 
-#include "impl/grid_utils.h"
+#include "impl/grid_utils.hpp"
 
 namespace tx {
 

@@ -3,7 +3,7 @@
 // Module: TXResource
 // File: resource.cpp
 
-#include "impl/detail.h"
+#include "impl/detail.hpp"
 #include <fstream>
 
 namespace tx {

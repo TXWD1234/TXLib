@@ -4,9 +4,9 @@
 // File: grid_system.h
 
 #pragma once
-#include "impl/basic_utils.h"
-#include "impl/coord_map.h"
-#include "impl/geometry.h"
+#include "impl/basic_utils.hpp"
+#include "impl/coord_map.hpp"
+#include "impl/geometry.hpp"
 #include <type_traits>
 #include <vector>
 
