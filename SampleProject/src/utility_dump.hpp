@@ -23,16 +23,15 @@ namespace RenderEngine {
 const std::fs::path shaderPath = tx::getExeDir() / "assets/shaders";
 
 template <SMStyle style>
-bool addShaderPair(const std::string& vertName, const std::string& fragName, SMIniter<style>& initer, ShaderPair& output) {
-	tx::RE::ShaderId vertId = initer.addVertexShader(tx::readWholeFileText(shaderPath / "vertex.vert"));
+bool addShaderPair(const std::string& vertName, const std::string& fragName, ShaderManager<style>& sm, ProgramId output) {
+	tx::RE::ShaderId vertId = sm.addVertexShader(tx::readWholeFileText(shaderPath / "vertex.vert"));
 	if (!vertId.valid()) return 0;
 
-	tx::RE::ShaderId fragId = initer.addFragmentShader(tx::readWholeFileText(shaderPath / "fragment.frag"));
+	tx::RE::ShaderId fragId = sm.addFragmentShader(tx::readWholeFileText(shaderPath / "fragment.frag"));
 	if (!fragId.valid()) return 0;
 
-	output = { vertId.id, fragId.id };
-	initer.linkShaders(output);
-	if (!initer.linkSucceed(output)) return 0;
+	output = sm.linkShaders(vertId, fragId);
+	if (!output.valid()) return 0;
 
 	return 1;
 }

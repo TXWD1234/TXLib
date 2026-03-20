@@ -25,6 +25,7 @@ add_library(TXGraphics STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/basic_gl_utils.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/buffer_manager.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/vertex_attribute_manager.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader_manager.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/draw_call_manager.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/texture_manager.hpp"

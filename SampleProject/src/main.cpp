@@ -65,7 +65,7 @@ private:
 
 	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Program;
 
-	re::DrawCallManager<smtype> dcm;
+	re::DrawCallManager dcm;
 	re::ShaderManager<smtype> sm;
 	re::VertexAttributeManager vam;
 	vector<re::StaticBufferObject<tx::vec2>> staticBuffers;
@@ -115,12 +115,8 @@ private:
 			initer.addInstanceBuffer(instanceBuffer);
 		});
 
-		bool success = 1;
-		tx::RE::ProgramId activeShaders;
-		sm = tx::RE::ShaderManager<smtype>([&](re::SMIniter<smtype>& initer) {
-			success = re::addShaderPair<smtype>("vertex", "fragment", initer, activeShaders);
-		});
-		if (!success) return 0;
+		re::ProgramId activeShaders;
+		re::addShaderPair<smtype>("vertex", "fragment", sm, activeShaders);
 
 		stbi_set_flip_vertically_on_load(true);
 		int width, height, channels;
@@ -147,8 +143,8 @@ private:
 			if (data[i]) stbi_image_free(data[i]);
 		}
 
-		dcm = tx::RE::DrawCallManager(sm, vam);
-		dcm.setShaders(activeShaders);
+		dcm = tx::RE::DrawCallManager(vam);
+		dcm.setShaderProgram(sm.getShaderProgram(activeShaders));
 		dcm.setTexture(0, ta);
 
 		return 1;
