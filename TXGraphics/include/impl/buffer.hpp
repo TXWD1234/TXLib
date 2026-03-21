@@ -285,8 +285,4 @@ private:
 	std::vector<gid> deleteId;
 	bool m_allocated = false;
 };
-template <class T>
-using RBOHandle = std::vector<T>&;
-template <class T>
-using BufferInputHandle = std::vector<T>&;
 } // namespace tx::RenderEngine
