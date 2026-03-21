@@ -147,6 +147,7 @@ private:
 		}
 
 		dcm = tx::RE::DrawCallManager(vam);
+		//dcm.setVAM(vam);
 		dcm.setShaderPipeline(sm.getShaderPipeline(activeShaders));
 		dcm.setTexture(0, ta);
 
@@ -171,12 +172,12 @@ private:
 	tx::u64 tickCounter = 0;
 	void update() {
 		if (!(tickCounter % 3)) {
-			re::BufferInputHandle<tx::u32> animStateInput = animStateBuffer.getStagingBuffer();
+			std::vector<tx::u32>& animStateInput = animStateBuffer.getStagingBuffer();
 			for (int i = 0; i < 4; i++)
 				animStateInput.push_back(frameCounter);
 			animStateBuffer.finish();
 
-			re::BufferInputHandle<tx::vec2> uvInput = UVBuffer.getStagingBuffer();
+			std::vector<tx::vec2>& uvInput = UVBuffer.getStagingBuffer();
 			for (int i = 0; i < 6; i++) {
 				uvInput.push_back(squareUV[i] * imageCount);
 			}
