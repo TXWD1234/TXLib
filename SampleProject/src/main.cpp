@@ -116,7 +116,10 @@ private:
 		});
 
 		re::ProgramId activeShaders;
-		re::addShaderPair<smtype>("vertex", "fragment", sm, activeShaders);
+		if (!re::addShaderPair("vertex", "fragment", sm, activeShaders)) {
+			std::cerr << "[Error]: failed to add shaders.\n";
+			return 0;
+		}
 
 		stbi_set_flip_vertically_on_load(true);
 		int width, height, channels;

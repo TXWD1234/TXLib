@@ -13,17 +13,13 @@ namespace RenderEngine {
 struct ShaderId {
 	ShaderType type;
 	u32 id;
-	bool valid() const { return type != ShaderType::Invalid; }
 };
 
 struct ShaderPair {
 	u32 vertId = 0, fragId = 0;
-	bool m_valid = false;
 	ShaderPair() = default;
-	ShaderPair(u32 vert, u32 frag, bool valid = 1) : vertId(vert), fragId(frag), m_valid(valid) {}
-	ShaderPair(ShaderId vert, ShaderId frag, bool valid = 1) : vertId(vert.id), fragId(frag.id), m_valid(valid) {}
-
-	bool valid() const { return m_valid; }
+	ShaderPair(u32 vert, u32 frag) : vertId(vert), fragId(frag) {}
+	ShaderPair(ShaderId vert, ShaderId frag) : vertId(vert.id), fragId(frag.id) {}
 };
 using ProgramId = ShaderPair;
 using PipelineId = ShaderPair;
@@ -56,42 +52,22 @@ public:
 	ShaderManager(ShaderManager&& other) noexcept = default;
 	ShaderManager& operator=(ShaderManager&& other) noexcept = default;
 
-	template <class Logger, class... Args>
-	std::enable_if_t<Log::first_is_log<Logger, Args...>::value, ShaderId>
-	addVertexShader(Logger&& logger, Args&&... args) {
+	template <class... Args>
+	ShaderId addVertexShader(Args&&... args) {
 		vertexShaders.emplace_back(std::forward<Args>(args)...);
 		updateGSVert();
-		ShaderId sid{ ShaderType::Vertex, static_cast<u32>(vertexShaders.size() - 1) };
-		bool success = compileSucceed(sid);
-		logger(success, getCompileLog(sid));
-		return success ? sid : ShaderId{ ShaderType::Invalid, 0 };
-	}
-	template <class... Args>
-	std::enable_if_t<!Log::first_is_log<Args...>::value, ShaderId>
-	addVertexShader(Args&&... args) {
-		return addVertexShader(Log::Compilation{}, std::forward<Args>(args)...);
+		return ShaderId{ ShaderType::Vertex, static_cast<u32>(vertexShaders.size() - 1) };
 	}
 
-	template <class Logger, class... Args>
-	std::enable_if_t<Log::first_is_log<Logger, Args...>::value, ShaderId>
-	addFragmentShader(Logger&& logger, Args&&... args) {
+	template <class... Args>
+	ShaderId addFragmentShader(Args&&... args) {
 		fragmentShaders.emplace_back(std::forward<Args>(args)...);
 		updateGSFrag();
-		ShaderId sid{ ShaderType::Fragment, static_cast<u32>(fragmentShaders.size() - 1) };
-		bool success = compileSucceed(sid);
-		logger(success, getCompileLog(sid));
-		return success ? sid : ShaderId{ ShaderType::Invalid, 0 };
-	}
-	template <class... Args>
-	std::enable_if_t<!Log::first_is_log<Args...>::value, ShaderId>
-	addFragmentShader(Args&&... args) {
-		return addFragmentShader(Log::Compilation{}, std::forward<Args>(args)...);
+		return ShaderId{ ShaderType::Fragment, static_cast<u32>(fragmentShaders.size() - 1) };
 	}
 
-	template <class Logger = Log::Linking>
-	ProgramId linkShaders(ShaderId vertId, ShaderId fragId, Logger logger = Log::Linking{}) {
+	ProgramId linkShaders(ShaderId vertId, ShaderId fragId) {
 		linkProgram_impl(vertId.id, fragId.id);
-		logger(linkSucceed(ProgramId{ vertId, fragId }), getLinkLog(ProgramId{ vertId, fragId }));
 		return ProgramId{ vertId, fragId };
 	}
 
@@ -99,7 +75,6 @@ public:
 		ShaderProgram& program = programTable[pid.vertId][pid.fragId];
 		if (!program.id()) {
 			linkProgram_impl(pid.vertId, pid.fragId); // lazy linking
-			Log::Linking()(linkSucceed(pid), getLinkLog(pid));
 		}
 		return program;
 	}
@@ -505,42 +480,22 @@ public:
 	ShaderManager(ShaderManager&& other) noexcept = default;
 	ShaderManager& operator=(ShaderManager&& other) noexcept = default;
 
-	template <class Logger, class... Args>
-	std::enable_if_t<Log::first_is_log<Logger, Args...>::value, ShaderId>
-	addVertexShader(Logger&& logger, Args&&... args) {
+	template <class... Args>
+	ShaderId addVertexShader(Args&&... args) {
 		vertexComponents.emplace_back(VertexShader{ std::forward<Args>(args)... });
 		updateGSVert();
-		ShaderId sid = { ShaderType::Vertex, static_cast<u32>(vertexComponents.size() - 1) };
-		bool success = compileSucceed(sid);
-		logger(success, getCompileLog(sid));
-		return success ? sid : ShaderId{ ShaderType::Invalid, 0 };
-	}
-	template <class... Args>
-	std::enable_if_t<!Log::first_is_log<Args...>::value, ShaderId>
-	addVertexShader(Args&&... args) {
-		return addVertexShader(Log::Compilation{}, std::forward<Args>(args)...);
+		return ShaderId{ ShaderType::Vertex, static_cast<u32>(vertexComponents.size() - 1) };
 	}
 
-	template <class Logger, class... Args>
-	std::enable_if_t<Log::first_is_log<Logger, Args...>::value, ShaderId>
-	addFragmentShader(Logger&& logger, Args&&... args) {
+	template <class... Args>
+	ShaderId addFragmentShader(Args&&... args) {
 		fragmentComponents.emplace_back(FragmentShader{ std::forward<Args>(args)... });
 		updateGSFrag();
-		ShaderId sid = { ShaderType::Fragment, static_cast<u32>(fragmentComponents.size() - 1) };
-		bool success = compileSucceed(sid);
-		logger(success, getCompileLog(sid));
-		return success ? sid : ShaderId{ ShaderType::Invalid, 0 };
-	}
-	template <class... Args>
-	std::enable_if_t<!Log::first_is_log<Args...>::value, ShaderId>
-	addFragmentShader(Args&&... args) {
-		return addFragmentShader(Log::Compilation{}, std::forward<Args>(args)...);
+		return ShaderId{ ShaderType::Fragment, static_cast<u32>(fragmentComponents.size() - 1) };
 	}
 
-	template <class Logger = Log::Linking>
-	PipelineId linkShaders(ShaderId vertId, ShaderId fragId, Logger logger = Log::Linking{}) {
+	PipelineId linkShaders(ShaderId vertId, ShaderId fragId) {
 		linkPipeline_impl(vertId.id, fragId.id);
-		logger(linkSucceed(PipelineId{ vertId, fragId }), getLinkLog(PipelineId{ vertId, fragId }));
 		return PipelineId{ vertId, fragId };
 	}
 
@@ -548,7 +503,6 @@ public:
 		ShaderPipeline& pipeline = pipelineTable[pid.vertId][pid.fragId];
 		if (!pipeline.id()) {
 			linkPipeline_impl(pid.vertId, pid.fragId); // lazy linking
-			Log::Linking()(linkSucceed(pid), getLinkLog(pid));
 		}
 		return pipeline;
 	}

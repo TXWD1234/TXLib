@@ -22,17 +22,25 @@ namespace RenderEngine {
 
 const std::fs::path shaderPath = tx::getExeDir() / "assets/shaders";
 
-template <SMStyle style>
-bool addShaderPair(const std::string& vertName, const std::string& fragName, ShaderManager<style>& sm, ProgramId output) {
-	tx::RE::ShaderId vertId = sm.addVertexShader(tx::readWholeFileText(shaderPath / "vertex.vert"));
-	if (!vertId.valid()) return 0;
+bool addShaderPair(const std::string& vertName, const std::string& fragName, ShaderManager<SMStyle::Pipeline>& sm, ProgramId& output) {
+	tx::RE::ShaderId vertId = sm.addVertexShader(tx::readWholeFileText(shaderPath / (vertName + ".vert")));
+	std::cerr << "Compiling vertex shader...\n"
+	          << sm.getCompileLog(vertId) << "Done.\n"
+	          << "Linking vertex shader...\n"
+	          << sm.getComponentLinkLog(vertId) << "Done." << std::endl;
+	if (!sm.compileSucceed(vertId)) return 0;
 
-	tx::RE::ShaderId fragId = sm.addFragmentShader(tx::readWholeFileText(shaderPath / "fragment.frag"));
-	if (!fragId.valid()) return 0;
+	tx::RE::ShaderId fragId = sm.addFragmentShader(tx::readWholeFileText(shaderPath / (fragName + ".frag")));
+	std::cerr << "Compiling fragment shader...\n"
+	          << sm.getCompileLog(fragId) << "Done.\n"
+	          << "Linking fragment shader...\n"
+	          << sm.getComponentLinkLog(fragId) << "Done." << std::endl;
+	if (!sm.compileSucceed(fragId)) return 0;
 
 	output = sm.linkShaders(vertId, fragId);
-
-	if (!output.valid()) return 0;
+	std::cerr << "Linking shader pipeline...\n"
+	          << sm.getLinkLog(output) << "Done." << std::endl;
+	if (!sm.linkSucceed(output)) return 0;
 
 	return 1;
 }
