@@ -26,6 +26,7 @@ struct Compilation {
 		if (!success)
 			std::cerr << "Error compiling shader.\n";
 		std::cerr << log;
+		if (success) std::cerr << "Done.\n";
 	}
 };
 
@@ -35,6 +36,7 @@ struct Linking {
 		if (!success)
 			std::cerr << "Error linking shaders.\n";
 		std::cerr << log;
+		if (success) std::cerr << "Done.\n";
 	}
 };
 

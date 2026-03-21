@@ -63,7 +63,7 @@ private:
 		}
 	}
 
-	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Program;
+	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Pipeline;
 
 	re::DrawCallManager dcm;
 	re::ShaderManager<smtype> sm;
@@ -144,7 +144,7 @@ private:
 		}
 
 		dcm = tx::RE::DrawCallManager(vam);
-		dcm.setShaderProgram(sm.getShaderProgram(activeShaders));
+		dcm.setShaderPipeline(sm.getShaderPipeline(activeShaders));
 		dcm.setTexture(0, ta);
 
 		return 1;

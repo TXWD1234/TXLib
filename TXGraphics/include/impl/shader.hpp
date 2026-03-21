@@ -145,10 +145,10 @@ template <ShaderType ST>
 class ShaderProgramComponent {
 public:
 	ShaderProgramComponent() = default;
-	ShaderProgramComponent(const Shader<ST>& shader) {
+	ShaderProgramComponent(Shader<ST>&& shader) : m_shader(std::move(shader)) {
 		m_id = glCreateProgram();
 		glProgramParameteri(m_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
-		glAttachShader(m_id, shader.id());
+		glAttachShader(m_id, m_shader.id());
 		glLinkProgram(m_id);
 		// check valid
 		glGetProgramiv(m_id, GL_LINK_STATUS, &m_valid);
@@ -177,7 +177,13 @@ public:
 	gid id() const { return m_id; }
 	bool valid() const { return m_valid; }
 
-	std::string getLog() const {
+	bool linkSucceed() const {
+		return m_valid;
+	}
+	bool compileSucceed() const {
+		return m_shader.valid();
+	}
+	std::string getLinkLog() const {
 		int length = 0;
 		glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &length);
 		if (length <= 1) return "";
@@ -185,8 +191,12 @@ public:
 		glGetProgramInfoLog(m_id, length, nullptr, str.data());
 		return str;
 	}
+	std::string getCompileLog() const {
+		return m_shader.getLog();
+	}
 
 private:
+	Shader<ST> m_shader;
 	gid m_id = 0;
 	int m_valid = 0;
 };

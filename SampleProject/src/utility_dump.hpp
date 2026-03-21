@@ -31,6 +31,7 @@ bool addShaderPair(const std::string& vertName, const std::string& fragName, Sha
 	if (!fragId.valid()) return 0;
 
 	output = sm.linkShaders(vertId, fragId);
+
 	if (!output.valid()) return 0;
 
 	return 1;
