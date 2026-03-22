@@ -289,11 +289,8 @@ private:
 	bool m_allocated = false;
 };
 
-template <class... Ts>
-void finishRingBuffers(RingBufferObject<Ts>&... buffers) {
-	(buffers.finish(), ...);
-}
 
+// return UINT64_MAX if failed
 template <class First, class... Rest>
 u64 getRingBufferOffset(RingBufferObject<First>& first, RingBufferObject<Rest>&... rest) {
 	u64 expected = first.getNext();

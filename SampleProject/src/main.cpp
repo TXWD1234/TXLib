@@ -69,9 +69,10 @@ private:
 	re::DrawCallManager dcm;
 	re::ShaderManager<smtype> sm;
 	re::VertexAttributeManager vam;
-	vector<re::StaticBufferObject<tx::vec2>> staticBuffers;
-	re::RingBufferObject<tx::u32> animStateBuffer;
-	re::RingBufferObject<tx::vec2> UVBuffer;
+	re::BufferHandle<re::StaticBufferObject<tx::vec2>> squarePosBuffer;
+	re::BufferHandle<re::StaticBufferObject<tx::vec2>> instanceBuffer;
+	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
+	re::BufferHandle<re::RingBufferObject<tx::vec2>> UVBuffer;
 	re::TextureArray ta;
 
 
@@ -103,18 +104,23 @@ private:
 			{ -0.5, 0.5 }
 		};
 
-		staticBuffers.reserve(3);
-		tx::RE::StaticBufferObject<tx::vec2>& squarePosBuffer = staticBuffers.emplace_back(6, squarePos.data());
-		//tx::RE::StaticBufferObject<tx::vec2>& squareUVBuffer = staticBuffers.emplace_back(6, squareUV.data());
-		tx::RE::StaticBufferObject<tx::vec2>& instanceBuffer = staticBuffers.emplace_back(4, positions.data());
+		squarePosBuffer.bo.alloc(6, squarePos.data());
+		instanceBuffer.bo.alloc(4, positions.data());
 
-		animStateBuffer.alloc();
+		animStateBuffer.bo.alloc();
+		UVBuffer.bo.alloc();
 		vam = tx::RE::VertexAttributeManager([&](tx::RE::VAMIniter& initer) {
-			initer.addBuffer(squarePosBuffer);
-			UVBufferId = initer.addBuffer(UVBuffer);
-			animStateBufferId = initer.addInstanceBuffer(animStateBuffer);
-			initer.addInstanceBuffer(instanceBuffer);
+			squarePosBuffer.id = initer.addAttrib<tx::vec2>();
+			UVBuffer.id = initer.addAttrib<tx::vec2>();
+			animStateBuffer.id = initer.addAttribInstanced<tx::u32>();
+			instanceBuffer.id = initer.addAttribInstanced<tx::vec2>();
 		});
+
+		re::VAMBindBuffer(vam, squarePosBuffer);
+		re::VAMBindBuffer(vam, UVBuffer);
+		re::VAMBindBuffer(vam, animStateBuffer);
+		re::VAMBindBuffer(vam, instanceBuffer);
+
 
 		re::ProgramId activeShaders;
 		if (!re::addShaderPair("vertex", "fragment", sm, activeShaders)) {
@@ -149,14 +155,12 @@ private:
 
 		dcm = tx::RE::DrawCallManager();
 		dcm.setVAM(vam);
-		dcm.setShaderPipeline(sm.getShaderPipeline(activeShaders));
+		dcm.setShaders(sm.get(activeShaders));
 		dcm.setTexture(0, ta);
 
 		return 1;
 	}
 
-	tx::u32 animStateBufferId;
-	tx::u32 UVBufferId;
 	tx::u32 frameCounter = 0;
 	tx::u32 imageCount = 15;
 
@@ -173,11 +177,11 @@ private:
 	tx::u64 tickCounter = 0;
 	void update() {
 		if (!(tickCounter % 3)) {
-			re::writeRingBuffer(animStateBuffer, [&](std::vector<tx::u32>& input) {
+			re::writeRingBuffer(animStateBuffer.bo, [&](std::vector<tx::u32>& input) {
 				for (int i = 0; i < 4; i++)
 					input.push_back(frameCounter);
 			});
-			re::writeRingBuffer(UVBuffer, [&](std::vector<tx::vec2>& input) {
+			re::writeRingBuffer(UVBuffer.bo, [&](std::vector<tx::vec2>& input) {
 				for (int i = 0; i < 6; i++) {
 					input.push_back(squareUV[i] * imageCount);
 				}
@@ -199,8 +203,8 @@ private:
 	}
 	void render() {
 		//tx::Time::Timer timer;
-		vam.setBuffer(animStateBufferId, animStateBuffer, animStateBuffer.getNext());
-		vam.setBuffer(UVBufferId, UVBuffer, UVBuffer.getNext());
+		re::VAMBindBuffer(vam, animStateBuffer, animStateBuffer.bo.getNext());
+		re::VAMBindBuffer(vam, UVBuffer, UVBuffer.bo.getNext());
 		dcm.drawInstanced(0, 6, 4);
 		//cout << timer.duration() << "ms" << endl;
 	}

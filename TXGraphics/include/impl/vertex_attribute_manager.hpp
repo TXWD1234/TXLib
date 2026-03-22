@@ -80,27 +80,17 @@ public:
 
 		// One buffer per attribute
 		template <class T>
-		u32 addBuffer(const BufferObject<T>& bufferObject) {
-			setBuffer_impl(m_id, bufferObject, m_entryCount);
-			setBufferAttrib_impl(m_id, bufferObject, m_entryCount);
+		u32 addAttrib() {
+			setBufferAttrib_impl<T>(m_id, m_entryCount);
 			return m_entryCount++;
-		}
-		template <class T>
-		u32 addBuffer(const RingBufferObject<T>& bufferObject) {
-			return addBuffer(static_cast<const BufferObject<T>&>(bufferObject));
 		}
 		// buffer for instancing
 		template <class T>
-		u32 addInstanceBuffer(const BufferObject<T>& bufferObject) {
-			setBuffer_impl(m_id, bufferObject, m_entryCount);
-			setBufferAttrib_impl(m_id, bufferObject, m_entryCount);
-			glVertexArrayBindingDivisor(m_id, m_entryCount, 1);
+		u32 addAttribInstanced(u32 divisor = 1) {
+			setBufferAttrib_impl<T>(m_id, m_entryCount);
+			glVertexArrayBindingDivisor(m_id, m_entryCount, divisor);
 			m_useInstancing = 1;
 			return m_entryCount++;
-		}
-		template <class T>
-		u32 addInstanceBuffer(const RingBufferObject<T>& bufferObject) {
-			return addInstanceBuffer(static_cast<const BufferObject<T>&>(bufferObject));
 		}
 
 	private:
@@ -109,7 +99,7 @@ public:
 		bool m_useInstancing = 0;
 
 		template <class T>
-		static void setBufferAttrib_impl(u32 vamId, const BufferObject<T>& bo, u32 id) {
+		static void setBufferAttrib_impl(u32 vamId, u32 id) {
 			if constexpr (glAttributeParameter<T>::is_int) {
 				glVertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
 			} else {
@@ -153,7 +143,6 @@ private:
 	}
 };
 
-using VAO = VertexAttributeManager;
 using VAM = VertexAttributeManager;
 using VAMIniter = VertexAttributeManager::Initializer;
 } // namespace RenderEngine
