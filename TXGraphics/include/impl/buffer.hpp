@@ -7,6 +7,7 @@
 #include "impl/basic_gl_utils.hpp"
 #include "fence.hpp"
 #include <deque>
+#include <concepts>
 
 namespace tx::RenderEngine {
 // strict
@@ -157,6 +158,8 @@ using DBO = DynamicBufferObject<T>;
 template <class T>
 class RingBufferObject {
 public:
+	using value_type = T;
+
 	struct Region;
 	RingBufferObject() = default;
 
@@ -285,4 +288,30 @@ private:
 	std::vector<gid> deleteId;
 	bool m_allocated = false;
 };
+
+template <class... Ts>
+void finishRingBuffers(RingBufferObject<Ts>&... buffers) {
+	(buffers.finish(), ...);
+}
+
+template <class First, class... Rest>
+u64 getRingBufferOffset(RingBufferObject<First>& first, RingBufferObject<Rest>&... rest) {
+	u64 expected = first.getNext();
+	u64 result = expected;
+	if constexpr (sizeof...(Rest) > 0) {
+		((rest.getNext() != expected ? (result = UINT64_MAX) : 0), ...);
+	}
+	return result;
+}
+
+template <class T, std::invocable<std::vector<T>&> Func>
+void writeRingBuffer(RingBufferObject<T>& buffer, Func&& modifier) {
+	modifier(buffer.getStagingBuffer());
+	buffer.finish();
+}
+
+
+
+
+
 } // namespace tx::RenderEngine

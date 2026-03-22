@@ -1,5 +1,6 @@
 #include "Project.hpp"
 #include "stb_image.hpp"
+#include <concepts>
 
 class Application {
 private:
@@ -146,8 +147,8 @@ private:
 			if (data[i]) stbi_image_free(data[i]);
 		}
 
-		dcm = tx::RE::DrawCallManager(vam);
-		//dcm.setVAM(vam);
+		dcm = tx::RE::DrawCallManager();
+		dcm.setVAM(vam);
 		dcm.setShaderPipeline(sm.getShaderPipeline(activeShaders));
 		dcm.setTexture(0, ta);
 
@@ -172,16 +173,15 @@ private:
 	tx::u64 tickCounter = 0;
 	void update() {
 		if (!(tickCounter % 3)) {
-			std::vector<tx::u32>& animStateInput = animStateBuffer.getStagingBuffer();
-			for (int i = 0; i < 4; i++)
-				animStateInput.push_back(frameCounter);
-			animStateBuffer.finish();
-
-			std::vector<tx::vec2>& uvInput = UVBuffer.getStagingBuffer();
-			for (int i = 0; i < 6; i++) {
-				uvInput.push_back(squareUV[i] * imageCount);
-			}
-			UVBuffer.finish();
+			re::writeRingBuffer(animStateBuffer, [&](std::vector<tx::u32>& input) {
+				for (int i = 0; i < 4; i++)
+					input.push_back(frameCounter);
+			});
+			re::writeRingBuffer(UVBuffer, [&](std::vector<tx::vec2>& input) {
+				for (int i = 0; i < 6; i++) {
+					input.push_back(squareUV[i] * imageCount);
+				}
+			});
 
 			frameCounter++;
 			if (frameCounter >= 11) {
