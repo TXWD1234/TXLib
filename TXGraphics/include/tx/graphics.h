@@ -10,5 +10,6 @@
 
 namespace tx {
 namespace RE = RenderEngine;
+namespace re = RenderEngine;
 } // namespace tx
 namespace re = tx::RE;

@@ -28,13 +28,16 @@ add_library(TXGraphics STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader_manager.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/draw_call_manager.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/texture_manager.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/texture.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/fence.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/buffer.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/render_engine.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/log.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/rgb.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/render_engine.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/texture.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/shader.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/framework.cpp"
 )
 tx_add_release_ops(TXGraphics)
 target_link_libraries(TXGraphics PUBLIC 

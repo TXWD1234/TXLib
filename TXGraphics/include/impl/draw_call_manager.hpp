@@ -7,7 +7,7 @@
 #include "impl/basic_gl_utils.hpp"
 #include "impl/vertex_attribute_manager.hpp"
 #include "impl/shader_manager.hpp"
-#include "impl/texture_manager.hpp"
+#include "impl/texture.hpp"
 #include <vector>
 
 namespace tx {

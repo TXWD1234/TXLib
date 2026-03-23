@@ -1,4 +1,6 @@
 function(tx_add_release_ops in_target)
+	set_property(TARGET ${in_target} PROPERTY INTERPROCEDURAL_OPTIMIZATION $<CONFIG:Release>)
+
 	# MSVC
 	target_compile_options(${in_target} PRIVATE
 		$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:

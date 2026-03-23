@@ -8,5 +8,5 @@
 #include "impl/buffer_manager.hpp"
 #include "impl/vertex_attribute_manager.hpp"
 #include "impl/shader_manager.hpp"
-#include "draw_call_manager.hpp"
-#include "texture_manager.hpp"
+#include "impl/draw_call_manager.hpp"
+#include "impl/texture.hpp"

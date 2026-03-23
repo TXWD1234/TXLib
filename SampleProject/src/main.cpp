@@ -71,8 +71,9 @@ private:
 	re::VertexAttributeManager vam;
 	re::BufferHandle<re::StaticBufferObject<tx::vec2>> squarePosBuffer;
 	re::BufferHandle<re::StaticBufferObject<tx::vec2>> instanceBuffer;
+	re::BufferHandle<re::StaticBufferObject<tx::vec2>> UVBuffer;
 	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
-	re::BufferHandle<re::RingBufferObject<tx::vec2>> UVBuffer;
+	re::BufferHandle<re::RingBufferObject<float>> scaleBuffer;
 	re::TextureArray ta;
 
 
@@ -89,37 +90,39 @@ private:
 			{ 0.5, 0.5 },
 			{ -0.5, 0.5 }
 		};
-		// vector<tx::vec2> squareUV = {
-		// 	{ 3.0, 0.0 },
-		// 	{ 0.0, 0.0 },
-		// 	{ 3.0, 3.0 },
-		// 	{ 0.0, 0.0 },
-		// 	{ 3.0, 3.0 },
-		// 	{ 0.0, 3.0 }
+		// bottom left origin
+		// vector<tx::vec2> squarePos2 = {
+		// 	{ 1.0, 0.0 }, // Bottom-Right
+		// 	{ 0.0, 0.0 }, // Bottom-Left
+		// 	{ 1.0, 1.0 }, // Top-Right
+		// 	{ 0.0, 0.0 }, // Bottom-Left
+		// 	{ 1.0, 1.0 }, // Top-Right
+		// 	{ 0.0, 1.0 } // Top-Left
 		// };
+
 		vector<tx::vec2> positions = {
-			{ -0.5, -0.5 },
-			{ 0.5, 0.5 },
-			{ 0.5, -0.5 },
-			{ -0.5, 0.5 }
+			tx::Origin
 		};
 
 		squarePosBuffer.bo.alloc(6, squarePos.data());
-		instanceBuffer.bo.alloc(4, positions.data());
+		instanceBuffer.bo.alloc(1, positions.data());
+		UVBuffer.bo.alloc(6, squareUV.data());
 
 		animStateBuffer.bo.alloc();
-		UVBuffer.bo.alloc();
+		scaleBuffer.bo.alloc();
 		vam = tx::RE::VertexAttributeManager([&](tx::RE::VAMIniter& initer) {
 			squarePosBuffer.id = initer.addAttrib<tx::vec2>();
 			UVBuffer.id = initer.addAttrib<tx::vec2>();
 			animStateBuffer.id = initer.addAttribInstanced<tx::u32>();
 			instanceBuffer.id = initer.addAttribInstanced<tx::vec2>();
+			scaleBuffer.id = initer.addAttribInstanced<tx::vec2>();
 		});
 
 		re::VAMBindBuffer(vam, squarePosBuffer);
 		re::VAMBindBuffer(vam, UVBuffer);
 		re::VAMBindBuffer(vam, animStateBuffer);
 		re::VAMBindBuffer(vam, instanceBuffer);
+		re::VAMBindBuffer(vam, scaleBuffer);
 
 
 		re::ProgramId activeShaders;
@@ -173,6 +176,9 @@ private:
 		{ 0.0, 1.0 }
 	};
 
+	const float scaleIncreaseMult = 1.067f;
+	const float scaleDecreaseMult = 0.8f;
+	float scale = 0.1f, currentMult = scaleIncreaseMult;
 
 	tx::u64 tickCounter = 0;
 	void update() {
@@ -180,11 +186,6 @@ private:
 			re::writeRingBuffer(animStateBuffer.bo, [&](std::vector<tx::u32>& input) {
 				for (int i = 0; i < 4; i++)
 					input.push_back(frameCounter);
-			});
-			re::writeRingBuffer(UVBuffer.bo, [&](std::vector<tx::vec2>& input) {
-				for (int i = 0; i < 6; i++) {
-					input.push_back(squareUV[i] * imageCount);
-				}
 			});
 
 			frameCounter++;
@@ -199,13 +200,22 @@ private:
 			}
 			tickCounter = 0;
 		}
+		scale *= currentMult;
+		re::writeRingBuffer(scaleBuffer.bo, [&](std::vector<float>& input) {
+			input.push_back(scale);
+		});
+		if (scale >= 3.0f) {
+			currentMult = scaleDecreaseMult;
+		} else if (scale <= 0.5f) {
+			currentMult = scaleIncreaseMult;
+		}
 		tickCounter++;
 	}
 	void render() {
 		//tx::Time::Timer timer;
-		re::VAMBindBuffer(vam, animStateBuffer, animStateBuffer.bo.getNext());
-		re::VAMBindBuffer(vam, UVBuffer, UVBuffer.bo.getNext());
-		dcm.drawInstanced(0, 6, 4);
+		re::VAMUpdateRingBuffer(vam, animStateBuffer);
+		re::VAMUpdateRingBuffer(vam, scaleBuffer);
+		dcm.drawInstanced(0, 6, 1);
 		//cout << timer.duration() << "ms" << endl;
 	}
 };

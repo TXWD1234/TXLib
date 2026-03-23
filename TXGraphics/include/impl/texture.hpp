@@ -22,8 +22,7 @@ enum class TextureRule : u32 {
 	Clamp = GL_CLAMP_TO_EDGE
 };
 
-
-u32 glCreateTexture() {
+inline u32 glCreateTexture() {
 	u32 id;
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &id);
 	return id;
@@ -32,18 +31,7 @@ u32 glCreateTexture() {
 class TextureArray {
 public:
 	TextureArray() {}
-	TextureArray(TextureFormat format, Coord dimension, u32 layerCount, bool useMipmap, u8* data = nullptr)
-	    : m_format(format), m_dimension(dimension), m_layerCount(layerCount), m_useMipmap(useMipmap) {
-		glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &m_id);
-		init_impl();
-		if (data != nullptr) { // assign data
-			glTextureSubImage3D(
-			    m_id, 0,
-			    0, 0, 0,
-			    m_dimension.x(), m_dimension.y(), m_layerCount,
-			    getFormat_impl(m_format), GL_UNSIGNED_BYTE, data);
-		}
-	}
+	TextureArray(TextureFormat format, Coord dimension, u32 layerCount, bool useMipmap, u8* data = nullptr);
 
 	~TextureArray() {
 		if (m_id) glDeleteTextures(1, &m_id);
@@ -131,8 +119,6 @@ private:
 		    dimension.x(), dimension.y(), 1,
 		    getFormat_impl(m_format), GL_UNSIGNED_BYTE, data);
 	}
-
-
 	void init_impl() {
 		u32 mipmapLevel = m_useMipmap ? getMipmapLevel_impl(m_dimension) : 1;
 		alloc_impl(m_format, m_dimension, mipmapLevel, m_layerCount);
@@ -142,19 +128,13 @@ private:
 	}
 	u32 getFormat_impl(TextureFormat format) {
 		switch (format) {
-		case TextureFormat::Grey:
-			return GL_RED;
-		case TextureFormat::RGBA:
-			return GL_RGBA;
-		case TextureFormat::RGB:
-			return GL_RGB;
-		default:
-			return 0;
+		case TextureFormat::Grey: return GL_RED;
+		case TextureFormat::RGBA: return GL_RGBA;
+		case TextureFormat::RGB: return GL_RGB;
+		default: return 0;
 		}
 	}
-	u32 getFormatInternal_impl(TextureFormat format) {
-		return enumval(format);
-	}
+	u32 getFormatInternal_impl(TextureFormat format) { return enumval(format); }
 };
 
 

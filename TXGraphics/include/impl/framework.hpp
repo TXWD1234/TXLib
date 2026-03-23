@@ -35,43 +35,7 @@ public:
 	    FullscreenConfig fullscreenCfg = FullscreenConfig::None)
 	    : dimension(in_windowDimension), pos(in_windowPos), title(in_windowTitle), fullscreen(fullscreenCfg) {}
 
-	bool make(GLFWwindow*& window) {
-		glfwWindowHint(GLFW_SAMPLES, 4);
-		glfwWindowHintString(GLFW_WAYLAND_APP_ID, "TXStudio_Project"); // set window class for hyprland
-
-		// full screen
-		GLFWmonitor* monitor = NULL;
-		const GLFWvidmode* mode = NULL;
-		if (fullscreen != FullscreenConfig::None) {
-			monitor = glfwGetPrimaryMonitor();
-			mode = glfwGetVideoMode(monitor);
-			dimension.setX(mode->width);
-			dimension.setY(mode->height);
-		}
-		if (fullscreen == FullscreenConfig::Windowed) {
-			glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-		}
-
-		window = glfwCreateWindow(
-		    dimension.x(), dimension.y(), title.c_str(),
-		    fullscreen == FullscreenConfig::Exclusive ? monitor : NULL,
-		    NULL);
-
-		if (!window) {
-			//glfwTerminate();
-			return 0;
-		}
-
-		glfwMakeContextCurrent(window);
-
-		if (fullscreen == FullscreenConfig::Windowed) {
-			glfwSetWindowPos(window, 0, 0);
-		} else {
-			glfwSetWindowPos(window, pos.x(), pos.y());
-		}
-
-		return 1;
-	}
+	bool make(GLFWwindow*& window);
 	bool operator()(GLFWwindow*& window) {
 		return make(window);
 	}
