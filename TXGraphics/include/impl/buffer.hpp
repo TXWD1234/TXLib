@@ -8,6 +8,7 @@
 #include "fence.hpp"
 #include <deque>
 #include <concepts>
+#include <span>
 
 namespace tx::RenderEngine {
 // strict
@@ -154,7 +155,6 @@ private:
 template <class T>
 using DBO = DynamicBufferObject<T>;
 
-
 template <class T>
 class RingBufferObject {
 public:
@@ -174,7 +174,6 @@ public:
 		if (m_allocated)
 			throw std::runtime_error("tx::RenderEngine::RingBufferObject: alloc() called twice.");
 		buffer.alloc(bufferCount * bufferSize);
-		dataBuffer.reserve(bufferSize * 1.5);
 		current.offset = 0;
 		previous.offset = 0;
 		previous_previous.offset = 0;
@@ -189,11 +188,12 @@ public:
 
 	// buffer manipulation
 
-	std::vector<T>& getStagingBuffer() { return dataBuffer; }
-	const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
+	//std::vector<T>& getStagingBuffer() { return dataBuffer; }
+	//const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
 
 
-	void finish() {
+	void finish(std::span<T> dataBuffer) {
+
 		if (dataBuffer.empty()) {
 			return;
 		}
@@ -215,7 +215,7 @@ public:
 		}
 
 		std::copy(dataBuffer.begin(), dataBuffer.end(), buffer.data() + current.offset);
-		dataBuffer.clear();
+		//userdataBuffer.clear();
 
 		previous = current;
 		current.offset = current.end();
@@ -281,7 +281,7 @@ private:
 
 private:
 	DynamicBufferObject<T> buffer;
-	std::vector<T> dataBuffer;
+	//std::vector<T> dataBuffer;
 	Region previous_previous;
 	Region previous;
 	Region current;
@@ -303,8 +303,9 @@ u64 getRingBufferOffset(RingBufferObject<First>& first, RingBufferObject<Rest>&.
 
 template <class T, std::invocable<std::vector<T>&> Func>
 void writeRingBuffer(RingBufferObject<T>& buffer, Func&& modifier) {
-	modifier(buffer.getStagingBuffer());
-	buffer.finish();
+	std::vector<T> stagingBuffer;
+	modifier(stagingBuffer);
+	buffer.finish(std::span<T>(stagingBuffer));
 }
 
 
