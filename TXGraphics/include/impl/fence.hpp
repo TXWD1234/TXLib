@@ -9,9 +9,9 @@
 namespace tx::RenderEngine {
 class Fence {
 public:
-	Fence() : handle(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)) {}
+	Fence() : handle(gl::fenceSync(0x9117 /* GL_SYNC_GPU_COMMANDS_COMPLETE */, 0)) {}
 	~Fence() {
-		if (handle) glDeleteSync(handle);
+		if (handle) gl::deleteSync(handle);
 	}
 
 	// Disable Copy & Move Semantics
@@ -22,7 +22,7 @@ public:
 	}
 	Fence& operator=(Fence&& other) noexcept {
 		if (this != &other) {
-			if (handle) glDeleteSync(handle);
+			if (handle) gl::deleteSync(handle);
 			handle = other.handle;
 			other.handle = nullptr;
 		}
@@ -32,11 +32,11 @@ public:
 	// query if passed
 	bool isFinished() const {
 		if (!handle) return true;
-		u32 result = glClientWaitSync(handle, 0, 0);
-		return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
+		u32 result = gl::clientWaitSync(handle, 0, 0);
+		return result == 0x911A /* GL_ALREADY_SIGNALED */ || result == 0x911C /* GL_CONDITION_SATISFIED */;
 	}
 
 private:
-	GLsync handle = nullptr;
+	gl::sync_t handle = nullptr;
 };
 } // namespace tx::RenderEngine

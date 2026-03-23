@@ -25,7 +25,9 @@ endif()
 
 add_library(glad STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/glad/glad.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/upset.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/glad.c"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/upset.cpp"
 )
 
 target_include_directories(glad PUBLIC 

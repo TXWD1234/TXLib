@@ -127,10 +127,10 @@ public:
 
 private:
 	void drawArrays_impl(u32 begin, u32 count) const {
-		glDrawArrays(GL_TRIANGLES, begin, count);
+		gl::drawArrays(0x0004 /* GL_TRIANGLES */, begin, count);
 	}
 	void drawArraysInstanced_impl(u32 begin, u32 count, u32 instanceCount) const {
-		glDrawArraysInstanced(GL_TRIANGLES, begin, count, instanceCount);
+		gl::drawArraysInstanced(0x0004 /* GL_TRIANGLES */, begin, count, instanceCount);
 	}
 
 	// draw call variables
@@ -150,7 +150,7 @@ private:
 
 	void bindVAM_impl() {
 		if (m_vamId && currentBindingVAM != m_vamId) {
-			glBindVertexArray(m_vamId);
+			gl::bindVertexArray(m_vamId);
 			currentBindingVAM = m_vamId;
 		}
 	}
@@ -158,17 +158,17 @@ private:
 	void bindShaders_impl() {
 		if (m_usePipeline && m_pipelineId) {
 			if (currentBindingShaderProgram != 0) {
-				glUseProgram(0);
+				gl::useProgram(0);
 				currentBindingShaderProgram = 0;
 			}
 			if (m_pipelineId != currentBindingShaderPipeline) {
 				currentBindingShaderPipeline = m_pipelineId;
-				glBindProgramPipeline(m_pipelineId);
+				gl::bindProgramPipeline(m_pipelineId);
 			}
 		} else if (!m_usePipeline && m_programId) {
 			if (m_programId != currentBindingShaderProgram) {
 				currentBindingShaderProgram = m_programId;
-				glUseProgram(m_programId);
+				gl::useProgram(m_programId);
 			}
 		}
 	}
@@ -181,7 +181,7 @@ private:
 					currentBindingTextures.resize(i + 1, 0);
 				}
 				if (currentBindingTextures[i] != id) {
-					glBindTextureUnit(i, id);
+					gl::bindTextureUnit(i, id);
 					currentBindingTextures[i] = id;
 				}
 			}

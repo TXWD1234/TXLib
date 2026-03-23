@@ -10,21 +10,21 @@
 namespace tx::RenderEngine {
 
 enum class TextureFormat : u32 {
-	Grey = GL_R8,
-	RGBA = GL_RGBA8,
-	RGB = GL_RGB8
+	Grey = 0x8229, // GL_R8
+	RGBA = 0x8058, // GL_RGBA8
+	RGB = 0x8051 // GL_RGB8
 };
 
 enum class TextureRule : u32 {
-	Pixel = GL_NEAREST,
-	Linear = GL_LINEAR,
-	Repeat = GL_REPEAT,
-	Clamp = GL_CLAMP_TO_EDGE
+	Pixel = 0x2600, // GL_NEAREST
+	Linear = 0x2601, // GL_LINEAR
+	Repeat = 0x2901, // GL_REPEAT
+	Clamp = 0x812F // GL_CLAMP_TO_EDGE
 };
 
 inline u32 glCreateTexture() {
 	u32 id;
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &id);
+	gl::createTextures(0x8C1A /* GL_TEXTURE_2D_ARRAY */, 1, &id);
 	return id;
 }
 
@@ -34,7 +34,7 @@ public:
 	TextureArray(TextureFormat format, Coord dimension, u32 layerCount, bool useMipmap, u8* data = nullptr);
 
 	~TextureArray() {
-		if (m_id) glDeleteTextures(1, &m_id);
+		if (m_id) gl::deleteTextures(1, &m_id);
 	}
 
 	// Disable Copy
@@ -52,7 +52,7 @@ public:
 	}
 	TextureArray& operator=(TextureArray&& other) noexcept {
 		if (this != &other) {
-			if (m_id) glDeleteTextures(1, &m_id);
+			if (m_id) gl::deleteTextures(1, &m_id);
 			m_id = other.m_id;
 			m_format = other.m_format;
 			m_dimension = other.m_dimension;
@@ -72,24 +72,24 @@ public:
 
 	void setScaleRule(TextureRule rule) {
 		if (rule == TextureRule::Linear || rule == TextureRule::Pixel) {
-			glTextureParameteri(m_id, GL_TEXTURE_MAG_FILTER, enumval(rule));
-			glTextureParameteri(m_id, GL_TEXTURE_MIN_FILTER, enumval(rule));
+			gl::textureParameteri(m_id, 0x2800 /* GL_TEXTURE_MAG_FILTER */, enumval(rule));
+			gl::textureParameteri(m_id, 0x2801 /* GL_TEXTURE_MIN_FILTER */, enumval(rule));
 		}
 	}
 	void setXWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			glTextureParameteri(m_id, GL_TEXTURE_WRAP_S, enumval(rule));
+			gl::textureParameteri(m_id, 0x2802 /* GL_TEXTURE_WRAP_S */, enumval(rule));
 		}
 	}
 	void setYWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			glTextureParameteri(m_id, GL_TEXTURE_WRAP_T, enumval(rule));
+			gl::textureParameteri(m_id, 0x2803 /* GL_TEXTURE_WRAP_T */, enumval(rule));
 		}
 	}
 	void setWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			glTextureParameteri(m_id, GL_TEXTURE_WRAP_S, enumval(rule));
-			glTextureParameteri(m_id, GL_TEXTURE_WRAP_T, enumval(rule));
+			gl::textureParameteri(m_id, 0x2802 /* GL_TEXTURE_WRAP_S */, enumval(rule));
+			gl::textureParameteri(m_id, 0x2803 /* GL_TEXTURE_WRAP_T */, enumval(rule));
 		}
 	}
 	void setTextureRule(TextureRule scaleRule, TextureRule wrapRule) {
@@ -110,14 +110,14 @@ private:
 	bool m_useMipmap = false;
 
 	void alloc_impl(TextureFormat format, Coord dimension, u32 mipmapLevel, u32 layerCount) {
-		glTextureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);
+		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);
 	}
 	void setLayerRegion_impl(u32 layer, Coord offset, Coord dimension, u8* data) {
-		glTextureSubImage3D(
+		gl::textureSubImage3D(
 		    m_id, 0,
 		    offset.x(), offset.y(), layer,
 		    dimension.x(), dimension.y(), 1,
-		    getFormat_impl(m_format), GL_UNSIGNED_BYTE, data);
+		    getFormat_impl(m_format), 0x1401 /* GL_UNSIGNED_BYTE */, data);
 	}
 	void init_impl() {
 		u32 mipmapLevel = m_useMipmap ? getMipmapLevel_impl(m_dimension) : 1;
@@ -128,9 +128,9 @@ private:
 	}
 	u32 getFormat_impl(TextureFormat format) {
 		switch (format) {
-		case TextureFormat::Grey: return GL_RED;
-		case TextureFormat::RGBA: return GL_RGBA;
-		case TextureFormat::RGB: return GL_RGB;
+		case TextureFormat::Grey: return 0x1903 /* GL_RED */;
+		case TextureFormat::RGBA: return 0x1908 /* GL_RGBA */;
+		case TextureFormat::RGB: return 0x1907 /* GL_RGB */;
 		default: return 0;
 		}
 	}

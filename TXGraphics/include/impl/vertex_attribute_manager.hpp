@@ -28,7 +28,7 @@ public:
 	}
 
 	~VertexAttributeManager() {
-		if (m_id) glDeleteVertexArrays(1, &m_id);
+		if (m_id) gl::deleteVertexArrays(1, &m_id);
 	}
 	// Move-Only Semantics
 	VertexAttributeManager(const VertexAttributeManager&) = delete;
@@ -41,7 +41,7 @@ public:
 	}
 	VertexAttributeManager& operator=(VertexAttributeManager&& other) noexcept {
 		if (this != &other) {
-			if (m_id) glDeleteVertexArrays(1, &m_id);
+			if (m_id) gl::deleteVertexArrays(1, &m_id);
 			m_id = other.m_id;
 			m_entryCount = other.m_entryCount;
 			m_useInstancing = other.m_useInstancing;
@@ -56,9 +56,9 @@ public:
 		friend class VertexAttributeManager;
 
 	public:
-		Initializer() { glCreateVertexArrays(1, &m_id); }
+		Initializer() { gl::createVertexArrays(1, &m_id); }
 		~Initializer() {
-			if (m_id) glDeleteVertexArrays(1, &m_id);
+			if (m_id) gl::deleteVertexArrays(1, &m_id);
 		}
 
 		Initializer(const Initializer&) = delete;
@@ -69,7 +69,7 @@ public:
 		}
 		Initializer& operator=(Initializer&& other) noexcept {
 			if (this != &other) {
-				if (m_id) glDeleteVertexArrays(1, &m_id);
+				if (m_id) gl::deleteVertexArrays(1, &m_id);
 				m_id = other.m_id;
 				m_entryCount = other.m_entryCount;
 				m_useInstancing = other.m_useInstancing;
@@ -88,7 +88,7 @@ public:
 		template <class T>
 		u32 addAttribInstanced(u32 divisor = 1) {
 			setBufferAttrib_impl<T>(m_id, m_entryCount);
-			glVertexArrayBindingDivisor(m_id, m_entryCount, divisor);
+			gl::vertexArrayBindingDivisor(m_id, m_entryCount, divisor);
 			m_useInstancing = 1;
 			return m_entryCount++;
 		}
@@ -101,16 +101,16 @@ public:
 		template <class T>
 		static void setBufferAttrib_impl(u32 vamId, u32 id) {
 			if constexpr (glAttributeParameter<T>::is_int) {
-				glVertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
+				gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
 			} else {
-				glVertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, GL_FALSE, 0);
+				gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, 0 /* GL_FALSE */, 0);
 			}
-			glEnableVertexArrayAttrib(vamId, id);
-			glVertexArrayAttribBinding(vamId, id, id);
+			gl::enableVertexArrayAttrib(vamId, id);
+			gl::vertexArrayAttribBinding(vamId, id, id);
 		}
 		template <class T>
 		static void setBuffer_impl(u32 vamId, const BufferObject<T>& bo, u32 id, u32 offset = 0) {
-			glVertexArrayVertexBuffer(vamId, id, bo.id(), offset * sizeof(T), sizeof(T));
+			gl::vertexArrayVertexBuffer(vamId, id, bo.id(), offset * sizeof(T), sizeof(T));
 		}
 	};
 

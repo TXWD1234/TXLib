@@ -8,37 +8,37 @@
 namespace tx::RenderEngine {
 
 ShaderProgram::ShaderProgram(const VertexShader& vert, const FragmentShader& frag) {
-	m_id = glCreateProgram();
-	glAttachShader(m_id, vert.id());
-	glAttachShader(m_id, frag.id());
-	glLinkProgram(m_id);
-	glGetProgramiv(m_id, GL_LINK_STATUS, &m_valid);
+	m_id = gl::createProgram();
+	gl::attachShader(m_id, vert.id());
+	gl::attachShader(m_id, frag.id());
+	gl::linkProgram(m_id);
+	gl::getProgramiv(m_id, 0x8B82 /* GL_LINK_STATUS */, &m_valid);
 }
 
 std::string ShaderProgram::getLog() const {
 	int length = 0;
-	glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &length);
+	gl::getProgramiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
 	if (length <= 1) return "";
 	std::string str(length - 1, '\0');
-	glGetProgramInfoLog(m_id, length, nullptr, str.data());
+	gl::getProgramInfoLog(m_id, length, nullptr, str.data());
 	return str;
 }
 
 ShaderPipeline::ShaderPipeline(const ShaderProgramComponent<ShaderType::Vertex>& vert, const ShaderProgramComponent<ShaderType::Fragment>& frag) {
-	glCreateProgramPipelines(1, &m_id);
-	glUseProgramStages(m_id, GL_VERTEX_SHADER_BIT, vert.id());
-	glUseProgramStages(m_id, GL_FRAGMENT_SHADER_BIT, frag.id());
+	gl::createProgramPipelines(1, &m_id);
+	gl::useProgramStages(m_id, 0x00000001 /* GL_VERTEX_SHADER_BIT */, vert.id());
+	gl::useProgramStages(m_id, 0x00000002 /* GL_FRAGMENT_SHADER_BIT */, frag.id());
 	// check valid
-	glValidateProgramPipeline(m_id);
-	glGetProgramPipelineiv(m_id, GL_VALIDATE_STATUS, &m_valid);
+	gl::validateProgramPipeline(m_id);
+	gl::getProgramPipelineiv(m_id, 0x8B83 /* GL_VALIDATE_STATUS */, &m_valid);
 }
 
 std::string ShaderPipeline::getLog() const {
 	int length = 0;
-	glGetProgramPipelineiv(m_id, GL_INFO_LOG_LENGTH, &length);
+	gl::getProgramPipelineiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
 	if (length <= 1) return "";
 	std::string str(length - 1, '\0');
-	glGetProgramPipelineInfoLog(m_id, length, nullptr, str.data());
+	gl::getProgramPipelineInfoLog(m_id, length, nullptr, str.data());
 	return str;
 }
 

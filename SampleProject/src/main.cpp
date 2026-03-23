@@ -28,7 +28,7 @@ private:
 	}
 	bool initGLAD() {
 		std::cout << "Initializing GLAD...\n";
-		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		if (!gl::init((void*)glfwGetProcAddress)) {
 			std::cerr << "[FatalError]: Failed to init GLAD\n";
 			return false;
 		}

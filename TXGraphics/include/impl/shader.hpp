@@ -13,10 +13,10 @@ namespace tx {
 namespace RenderEngine {
 
 enum class ShaderType : u32 {
-	Vertex = GL_VERTEX_SHADER,
-	Fragment = GL_FRAGMENT_SHADER,
-	Geometry = GL_GEOMETRY_SHADER,
-	Compute = GL_COMPUTE_SHADER
+	Vertex = 0x8B31, // GL_VERTEX_SHADER
+	Fragment = 0x8B30, // GL_FRAGMENT_SHADER
+	Geometry = 0x8DD9, // GL_GEOMETRY_SHADER
+	Compute = 0x91B9 // GL_COMPUTE_SHADER
 };
 
 
@@ -40,7 +40,7 @@ public:
 	}
 
 	~Shader() {
-		if (m_id) glDeleteShader(m_id);
+		if (m_id) gl::deleteShader(m_id);
 	}
 
 	// Disable Copy
@@ -54,7 +54,7 @@ public:
 	}
 	Shader& operator=(Shader&& other) noexcept {
 		if (&other != this) {
-			if (m_id) glDeleteShader(m_id);
+			if (m_id) gl::deleteShader(m_id);
 			m_id = other.m_id;
 			m_valid = other.m_valid;
 			other.m_id = 0;
@@ -67,11 +67,11 @@ public:
 	bool valid() const { return m_valid; }
 	std::string getLog() const {
 		int length = 0;
-		glGetShaderiv(m_id, GL_INFO_LOG_LENGTH, &length);
+		gl::getShaderiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
 		if (length <= 1) return "";
 
 		std::string str(length - 1, '\0');
-		glGetShaderInfoLog(m_id, length, nullptr, str.data());
+		gl::getShaderInfoLog(m_id, length, nullptr, str.data());
 		return str;
 	}
 
@@ -80,11 +80,11 @@ private:
 	int m_valid = 0;
 
 	void init_impl(u32 sourceCount, const char* const source[]) {
-		m_id = glCreateShader(enumval(type));
-		glShaderSource(m_id, sourceCount, source, nullptr);
-		glCompileShader(m_id);
+		m_id = gl::createShader(enumval(type));
+		gl::shaderSource(m_id, sourceCount, source, nullptr);
+		gl::compileShader(m_id);
 		// check valid
-		glGetShaderiv(m_id, GL_COMPILE_STATUS, &m_valid);
+		gl::getShaderiv(m_id, 0x8B81 /* GL_COMPILE_STATUS */, &m_valid);
 	}
 };
 
@@ -98,7 +98,7 @@ public:
 	ShaderProgram() = default;
 	ShaderProgram(const VertexShader& vert, const FragmentShader& frag);
 	~ShaderProgram() {
-		if (m_id) glDeleteProgram(m_id);
+		if (m_id) gl::deleteProgram(m_id);
 	}
 
 	ShaderProgram(const ShaderProgram&) = delete;
@@ -109,7 +109,7 @@ public:
 	}
 	ShaderProgram& operator=(ShaderProgram&& other) noexcept {
 		if (this != &other) {
-			if (m_id) glDeleteProgram(m_id);
+			if (m_id) gl::deleteProgram(m_id);
 			m_id = other.m_id;
 			m_valid = other.m_valid;
 			other.m_id = 0;
@@ -132,15 +132,15 @@ class ShaderProgramComponent {
 public:
 	ShaderProgramComponent() = default;
 	ShaderProgramComponent(Shader<ST>&& shader) : m_shader(std::move(shader)) {
-		m_id = glCreateProgram();
-		glProgramParameteri(m_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
-		glAttachShader(m_id, m_shader.id());
-		glLinkProgram(m_id);
+		m_id = gl::createProgram();
+		gl::programParameteri(m_id, 0x8258 /* GL_PROGRAM_SEPARABLE */, 1 /* GL_TRUE */);
+		gl::attachShader(m_id, m_shader.id());
+		gl::linkProgram(m_id);
 		// check valid
-		glGetProgramiv(m_id, GL_LINK_STATUS, &m_valid);
+		gl::getProgramiv(m_id, 0x8B82 /* GL_LINK_STATUS */, &m_valid);
 	}
 	~ShaderProgramComponent() {
-		if (m_id) glDeleteProgram(m_id);
+		if (m_id) gl::deleteProgram(m_id);
 	}
 
 	ShaderProgramComponent(const ShaderProgramComponent&) = delete;
@@ -151,7 +151,7 @@ public:
 	}
 	ShaderProgramComponent& operator=(ShaderProgramComponent&& other) noexcept {
 		if (this != &other) {
-			if (m_id) glDeleteProgram(m_id);
+			if (m_id) gl::deleteProgram(m_id);
 			m_id = other.m_id;
 			m_valid = other.m_valid;
 			other.m_id = 0;
@@ -171,10 +171,10 @@ public:
 	}
 	std::string getLinkLog() const {
 		int length = 0;
-		glGetProgramiv(m_id, GL_INFO_LOG_LENGTH, &length);
+		gl::getProgramiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
 		if (length <= 1) return "";
 		std::string str(length - 1, '\0');
-		glGetProgramInfoLog(m_id, length, nullptr, str.data());
+		gl::getProgramInfoLog(m_id, length, nullptr, str.data());
 		return str;
 	}
 	std::string getCompileLog() const {
@@ -192,7 +192,7 @@ public:
 	ShaderPipeline() = default;
 	ShaderPipeline(const ShaderProgramComponent<ShaderType::Vertex>& vert, const ShaderProgramComponent<ShaderType::Fragment>& frag);
 	~ShaderPipeline() {
-		if (m_id) glDeleteProgramPipelines(1, &m_id);
+		if (m_id) gl::deleteProgramPipelines(1, &m_id);
 	}
 
 	ShaderPipeline(const ShaderPipeline&) = delete;
@@ -203,7 +203,7 @@ public:
 	}
 	ShaderPipeline& operator=(ShaderPipeline&& other) noexcept {
 		if (this != &other) {
-			if (m_id) glDeleteProgramPipelines(1, &m_id);
+			if (m_id) gl::deleteProgramPipelines(1, &m_id);
 			m_id = other.m_id;
 			m_valid = other.m_valid;
 			other.m_id = 0;

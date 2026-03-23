@@ -5,6 +5,7 @@
 
 #pragma once
 #include "tx/math.h"
+#include "impl/basic_gl_utils.hpp"
 #include <GLFW/glfw3.h>
 #include <chrono>
 #include <string>
@@ -137,7 +138,7 @@ public:
 			}
 
 			//glClearColor(0.0f, 0.9f, 1.0f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT);
+			gl::clear(0x00004000 /* GL_COLOR_BUFFER_BIT */);
 
 			this->renderCb();
 

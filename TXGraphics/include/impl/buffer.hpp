@@ -13,7 +13,7 @@ namespace tx::RenderEngine {
 // strict
 enum class BufferType : u32 {
 	Static = 0,
-	Dynamic = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+	Dynamic = 0x0002 | 0x0040 | 0x0080 // GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
 };
 using ioMode = BufferType;
 using iom = BufferType;
@@ -34,7 +34,7 @@ public:
 	}
 	BufferObject& operator=(BufferObject&& other) {
 		if (this != &other) {
-			if (m_id) glDeleteBuffers(1, &m_id);
+			if (m_id) gl::deleteBuffers(1, &m_id);
 			m_id = other.m_id;
 			other.m_id = 0;
 		}
@@ -45,7 +45,7 @@ protected:
 	BufferObject() = default;
 	virtual ~BufferObject() {
 		if (m_id) {
-			glDeleteBuffers(1, &m_id);
+			gl::deleteBuffers(1, &m_id);
 		}
 	}
 
@@ -53,7 +53,7 @@ protected:
 	gid reinit() {
 		gid oldId = m_id;
 		m_id = 0;
-		glCreateBuffers(1, &m_id);
+		gl::createBuffers(1, &m_id);
 		return oldId;
 	}
 
@@ -72,8 +72,8 @@ public:
 	void alloc(u64 count, const T* ptr = nullptr) {
 		if (m_allocated)
 			throw std::runtime_error("tx::RenderEngine::BufferObject: alloc() called twice.");
-		if (!this->m_id) glCreateBuffers(1, &this->m_id);
-		glNamedBufferStorage(this->m_id, count * sizeof(T), (void*)ptr, enumval(ioMode::Static));
+		if (!this->m_id) gl::createBuffers(1, &this->m_id);
+		gl::namedBufferStorage(this->m_id, count * sizeof(T), (void*)ptr, enumval(ioMode::Static));
 		m_allocated = 1;
 	}
 
@@ -92,7 +92,7 @@ public:
 	DynamicBufferObject(u64 count, const T* ptr = nullptr)
 	    : BufferObject<T>() { alloc(count, ptr); }
 	~DynamicBufferObject() override {
-		if (m_data) glUnmapNamedBuffer(this->m_id);
+		if (m_data) gl::unmapNamedBuffer(this->m_id);
 	}
 
 	DynamicBufferObject(DynamicBufferObject&& other) noexcept
@@ -106,7 +106,7 @@ public:
 	}
 	DynamicBufferObject& operator=(DynamicBufferObject&& other) noexcept {
 		if (this != &other) {
-			if (m_data) glUnmapNamedBuffer(this->m_id);
+			if (m_data) gl::unmapNamedBuffer(this->m_id);
 			BufferObject<T>::operator=(std::move(other));
 			m_data = other.m_data;
 			m_size = other.m_size;
@@ -121,16 +121,16 @@ public:
 	void alloc(u64 count, const T* ptr = nullptr) {
 		if (m_allocated)
 			throw std::runtime_error("tx::RenderEngine::BufferObject: alloc() called twice.");
-		if (!this->m_id) glCreateBuffers(1, &this->m_id);
-		glNamedBufferStorage(this->m_id, count * sizeof(T), (void*)ptr, enumval(ioMode::Dynamic));
-		m_data = reinterpret_cast<T*>(glMapNamedBufferRange(this->m_id, 0, count * sizeof(T), enumval(ioMode::Dynamic)));
+		if (!this->m_id) gl::createBuffers(1, &this->m_id);
+		gl::namedBufferStorage(this->m_id, count * sizeof(T), (void*)ptr, enumval(ioMode::Dynamic));
+		m_data = reinterpret_cast<T*>(gl::mapNamedBufferRange(this->m_id, 0, count * sizeof(T), enumval(ioMode::Dynamic)));
 		m_size = count;
 		m_allocated = 1;
 	}
 	// after resize, the caller will take the ownership of the old buffer
 	gid resize(u64 count, const T* ptr = nullptr) {
 		gid oldId = this->reinit();
-		if (m_data) glUnmapNamedBuffer(oldId);
+		if (m_data) gl::unmapNamedBuffer(oldId);
 		m_allocated = false;
 
 		alloc(count, ptr);
@@ -265,7 +265,7 @@ private:
 		while (!fences.empty() && fences.front().fence.isFinished()) {
 			FenceEntry_impl& entry = fences.front();
 			for (gid i : entry.deleteIds) {
-				glDeleteBuffers(1, &i);
+				gl::deleteBuffers(1, &i);
 			}
 			fences.pop_front();
 		}
