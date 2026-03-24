@@ -12,12 +12,12 @@ ShaderProgram::ShaderProgram(const VertexShader& vert, const FragmentShader& fra
 	gl::attachShader(m_id, vert.id());
 	gl::attachShader(m_id, frag.id());
 	gl::linkProgram(m_id);
-	gl::getProgramiv(m_id, 0x8B82 /* GL_LINK_STATUS */, &m_valid);
+	gl::getProgramiv(m_id, gl::LINK_STATUS, &m_valid);
 }
 
 std::string ShaderProgram::getLog() const {
 	int length = 0;
-	gl::getProgramiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
+	gl::getProgramiv(m_id, gl::INFO_LOG_LENGTH, &length);
 	if (length <= 1) return "";
 	std::string str(length - 1, '\0');
 	gl::getProgramInfoLog(m_id, length, nullptr, str.data());
@@ -26,16 +26,16 @@ std::string ShaderProgram::getLog() const {
 
 ShaderPipeline::ShaderPipeline(const ShaderProgramComponent<ShaderType::Vertex>& vert, const ShaderProgramComponent<ShaderType::Fragment>& frag) {
 	gl::createProgramPipelines(1, &m_id);
-	gl::useProgramStages(m_id, 0x00000001 /* GL_VERTEX_SHADER_BIT */, vert.id());
-	gl::useProgramStages(m_id, 0x00000002 /* GL_FRAGMENT_SHADER_BIT */, frag.id());
+	gl::useProgramStages(m_id, gl::VERTEX_SHADER_BIT, vert.id());
+	gl::useProgramStages(m_id, gl::FRAGMENT_SHADER_BIT, frag.id());
 	// check valid
 	gl::validateProgramPipeline(m_id);
-	gl::getProgramPipelineiv(m_id, 0x8B83 /* GL_VALIDATE_STATUS */, &m_valid);
+	gl::getProgramPipelineiv(m_id, gl::VALIDATE_STATUS, &m_valid);
 }
 
 std::string ShaderPipeline::getLog() const {
 	int length = 0;
-	gl::getProgramPipelineiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
+	gl::getProgramPipelineiv(m_id, gl::INFO_LOG_LENGTH, &length);
 	if (length <= 1) return "";
 	std::string str(length - 1, '\0');
 	gl::getProgramPipelineInfoLog(m_id, length, nullptr, str.data());

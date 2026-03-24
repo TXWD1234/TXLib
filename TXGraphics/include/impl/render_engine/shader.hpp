@@ -13,10 +13,10 @@ namespace tx {
 namespace RenderEngine {
 
 enum class ShaderType : u32 {
-	Vertex = 0x8B31, // GL_VERTEX_SHADER
-	Fragment = 0x8B30, // GL_FRAGMENT_SHADER
-	Geometry = 0x8DD9, // GL_GEOMETRY_SHADER
-	Compute = 0x91B9 // GL_COMPUTE_SHADER
+	Vertex = gl::VERTEX_SHADER,
+	Fragment = gl::FRAGMENT_SHADER,
+	Geometry = gl::GEOMETRY_SHADER,
+	Compute = gl::COMPUTE_SHADER
 };
 
 
@@ -67,7 +67,7 @@ public:
 	bool valid() const { return m_valid; }
 	std::string getLog() const {
 		int length = 0;
-		gl::getShaderiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
+		gl::getShaderiv(m_id, gl::INFO_LOG_LENGTH, &length);
 		if (length <= 1) return "";
 
 		std::string str(length - 1, '\0');
@@ -84,7 +84,7 @@ private:
 		gl::shaderSource(m_id, sourceCount, source, nullptr);
 		gl::compileShader(m_id);
 		// check valid
-		gl::getShaderiv(m_id, 0x8B81 /* GL_COMPILE_STATUS */, &m_valid);
+		gl::getShaderiv(m_id, gl::COMPILE_STATUS, &m_valid);
 	}
 };
 
@@ -133,11 +133,11 @@ public:
 	ShaderProgramComponent() = default;
 	ShaderProgramComponent(Shader<ST>&& shader) : m_shader(std::move(shader)) {
 		m_id = gl::createProgram();
-		gl::programParameteri(m_id, 0x8258 /* GL_PROGRAM_SEPARABLE */, 1 /* GL_TRUE */);
+		gl::programParameteri(m_id, gl::PROGRAM_SEPARABLE, gl::TRUE);
 		gl::attachShader(m_id, m_shader.id());
 		gl::linkProgram(m_id);
 		// check valid
-		gl::getProgramiv(m_id, 0x8B82 /* GL_LINK_STATUS */, &m_valid);
+		gl::getProgramiv(m_id, gl::LINK_STATUS, &m_valid);
 	}
 	~ShaderProgramComponent() {
 		if (m_id) gl::deleteProgram(m_id);
@@ -171,7 +171,7 @@ public:
 	}
 	std::string getLinkLog() const {
 		int length = 0;
-		gl::getProgramiv(m_id, 0x8B84 /* GL_INFO_LOG_LENGTH */, &length);
+		gl::getProgramiv(m_id, gl::INFO_LOG_LENGTH, &length);
 		if (length <= 1) return "";
 		std::string str(length - 1, '\0');
 		gl::getProgramInfoLog(m_id, length, nullptr, str.data());

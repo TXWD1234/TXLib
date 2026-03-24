@@ -14,7 +14,7 @@ namespace tx::RenderEngine {
 // strict
 enum class BufferType : u32 {
 	Static = 0,
-	Dynamic = 0x0002 | 0x0040 | 0x0080 // GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+	Dynamic = gl::MAP_WRITE_BIT | gl::MAP_PERSISTENT_BIT | gl::MAP_COHERENT_BIT
 };
 using ioMode = BufferType;
 using iom = BufferType;

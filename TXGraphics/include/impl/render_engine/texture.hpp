@@ -10,21 +10,21 @@
 namespace tx::RenderEngine {
 
 enum class TextureFormat : u32 {
-	Grey = 0x8229, // GL_R8
-	RGBA = 0x8058, // GL_RGBA8
-	RGB = 0x8051 // GL_RGB8
+	Grey = gl::R8,
+	RGBA = gl::RGBA8,
+	RGB = gl::RGB8
 };
 
 enum class TextureRule : u32 {
-	Pixel = 0x2600, // GL_NEAREST
-	Linear = 0x2601, // GL_LINEAR
-	Repeat = 0x2901, // GL_REPEAT
-	Clamp = 0x812F // GL_CLAMP_TO_EDGE
+	Pixel = gl::NEAREST,
+	Linear = gl::LINEAR,
+	Repeat = gl::REPEAT,
+	Clamp = gl::CLAMP_TO_EDGE
 };
 
 inline u32 glCreateTexture() {
 	u32 id;
-	gl::createTextures(0x8C1A /* GL_TEXTURE_2D_ARRAY */, 1, &id);
+	gl::createTextures(gl::TEXTURE_2D_ARRAY, 1, &id);
 	return id;
 }
 
@@ -72,24 +72,24 @@ public:
 
 	void setScaleRule(TextureRule rule) {
 		if (rule == TextureRule::Linear || rule == TextureRule::Pixel) {
-			gl::textureParameteri(m_id, 0x2800 /* GL_TEXTURE_MAG_FILTER */, enumval(rule));
-			gl::textureParameteri(m_id, 0x2801 /* GL_TEXTURE_MIN_FILTER */, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_MAG_FILTER, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_MIN_FILTER, enumval(rule));
 		}
 	}
 	void setXWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, 0x2802 /* GL_TEXTURE_WRAP_S */, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_S, enumval(rule));
 		}
 	}
 	void setYWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, 0x2803 /* GL_TEXTURE_WRAP_T */, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_T, enumval(rule));
 		}
 	}
 	void setWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, 0x2802 /* GL_TEXTURE_WRAP_S */, enumval(rule));
-			gl::textureParameteri(m_id, 0x2803 /* GL_TEXTURE_WRAP_T */, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_S, enumval(rule));
+			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_T, enumval(rule));
 		}
 	}
 	void setTextureRule(TextureRule scaleRule, TextureRule wrapRule) {
@@ -118,7 +118,7 @@ private:
 		    m_id, 0,
 		    offset.x(), offset.y(), layer,
 		    dimension.x(), dimension.y(), 1,
-		    getFormat_impl(m_format), 0x1401 /* GL_UNSIGNED_BYTE */, data);
+		    getFormat_impl(m_format), gl::UNSIGNED_BYTE, data);
 	}
 	void init_impl() {
 		u32 mipmapLevel = m_useMipmap ? getMipmapLevel_impl(m_dimension) : 1;
@@ -129,9 +129,9 @@ private:
 	}
 	u32 getFormat_impl(TextureFormat format) {
 		switch (format) {
-		case TextureFormat::Grey: return 0x1903 /* GL_RED */;
-		case TextureFormat::RGBA: return 0x1908 /* GL_RGBA */;
-		case TextureFormat::RGB: return 0x1907 /* GL_RGB */;
+		case TextureFormat::Grey: return gl::RED;
+		case TextureFormat::RGBA: return gl::RGBA;
+		case TextureFormat::RGB: return gl::RGB;
 		default: return 0;
 		}
 	}

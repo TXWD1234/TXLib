@@ -103,7 +103,7 @@ public:
 			if constexpr (glAttributeParameter<T>::is_int) {
 				gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
 			} else {
-				gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, 0 /* GL_FALSE */, 0);
+				gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, gl::FALSE, 0);
 			}
 			gl::enableVertexArrayAttrib(vamId, id);
 			gl::vertexArrayAttribBinding(vamId, id, id);

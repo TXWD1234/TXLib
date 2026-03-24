@@ -21,37 +21,37 @@ struct glAttributeParameter {
 
 template <>
 struct glAttributeParameter<float> {
-	static constexpr u32 type = 0x1406; // GL_FLOAT
+	static constexpr u32 type = gl::FLOAT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = false;
 };
 template <>
 struct glAttributeParameter<int> {
-	static constexpr u32 type = 0x1404; // GL_INT
+	static constexpr u32 type = gl::INT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<u8> {
-	static constexpr u32 type = 0x1401; // GL_UNSIGNED_BYTE
+	static constexpr u32 type = gl::UNSIGNED_BYTE;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<u32> {
-	static constexpr u32 type = 0x1405; // GL_UNSIGNED_INT
+	static constexpr u32 type = gl::UNSIGNED_INT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<tx::vec2> {
-	static constexpr u32 type = 0x1406; // GL_FLOAT
+	static constexpr u32 type = gl::FLOAT;
 	static constexpr u32 count = 2; // count of component / count of element
 	static constexpr bool is_int = false;
 };
 template <>
 struct glAttributeParameter<tx::Coord> {
-	static constexpr u32 type = 0x1404; // GL_INT
+	static constexpr u32 type = gl::INT;
 	static constexpr u32 count = 2; // count of component / count of element
 	static constexpr bool is_int = true;
 };
