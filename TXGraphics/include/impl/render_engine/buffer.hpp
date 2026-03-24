@@ -191,14 +191,12 @@ public:
 	//std::vector<T>& getStagingBuffer() { return dataBuffer; }
 	//const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
 
+	template <class Func>
+	    requires std::invocable<Func, std::span<T>>
+	void finish(u32 size, Func&& f) {
+		if (!size) return;
 
-	void finish(std::span<T> dataBuffer) {
-
-		if (dataBuffer.empty()) {
-			return;
-		}
-
-		current.count = dataBuffer.size();
+		current.count = size;
 
 		if (current.end() > buffer.size()) current.offset = 0;
 
@@ -214,12 +212,16 @@ public:
 			collision = false;
 		}
 
-		std::copy(dataBuffer.begin(), dataBuffer.end(), buffer.data() + current.offset);
-		//userdataBuffer.clear();
+		f(std::span<T>(buffer.data() + current.offset, size));
 
 		previous = current;
 		current.offset = current.end();
 		current.count = 0;
+	}
+	void finish(std::span<T> dataBuffer) {
+		this->finish(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) {
+			std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
+		});
 	}
 
 	// draw call associated
