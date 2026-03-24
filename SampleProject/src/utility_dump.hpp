@@ -1,3 +1,4 @@
+#pragma once
 #include "tx/math.h"
 #include "tx/grid.h"
 #include "tx/graphics.h"
@@ -42,22 +43,6 @@ bool addShaderPair(const std::string& vertName, const std::string& fragName, Sha
 	return 1;
 }
 
-// vam related
-
-template <class BufferT>
-struct BufferHandle {
-	u32 id; // id in vam
-	BufferT bo; // Buffer Obejct
-};
-
-template <class BufferT>
-inline void VAMBindBuffer(VAM& vam, const BufferHandle<BufferT>& handle, u32 offset = 0) {
-	vam.setBuffer(handle.id, handle.bo, offset);
-}
-template <class T>
-inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& handle) {
-	vam.setBuffer(handle.id, handle.bo, handle.bo.getNext());
-}
 
 
 

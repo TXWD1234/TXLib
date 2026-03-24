@@ -10,6 +10,7 @@
 #include "impl/render_engine/shader_manager.hpp"
 #include "impl/render_engine/draw_call_manager.hpp"
 #include "impl/render_engine/texture.hpp"
+#include "impl/render_engine/utility.hpp"
 #include "impl/parted_arr.hpp"
 #include <unordered_map>
 
