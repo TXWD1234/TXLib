@@ -4,9 +4,9 @@
 // File: buffer_manager.hpp
 
 #pragma once
-#include "impl/basic_gl_utils.hpp"
-#include "buffer.hpp"
-#include "fence.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/render_engine/buffer.hpp"
+#include "impl/render_engine/fence.hpp"
 #include <tuple>
 
 namespace tx {

@@ -3,7 +3,7 @@
 // Module: TXGraphics
 // File: shader.cpp
 
-#include "impl/shader.hpp"
+#include "impl/render_engine/shader.hpp"
 
 namespace tx::RenderEngine {
 

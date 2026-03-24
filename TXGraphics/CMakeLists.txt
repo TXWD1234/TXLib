@@ -20,25 +20,12 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependency/glad")
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 
-add_library(TXGraphics STATIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/graphics.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/basic_gl_utils.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/buffer_manager.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/vertex_attribute_manager.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/shader_manager.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/draw_call_manager.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/texture.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/fence.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/buffer.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/render_engine.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/log.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/rgb.hpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/render_engine.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/texture.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/shader.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/src/framework.cpp"
-)
+# Automatically collect all nested headers and source files
+file(GLOB_RECURSE TX_GRAPHICS_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
+file(GLOB_RECURSE TX_GRAPHICS_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+
+add_library(TXGraphics STATIC ${TX_GRAPHICS_HEADERS} ${TX_GRAPHICS_SOURCES})
+
 tx_add_release_ops(TXGraphics)
 target_link_libraries(TXGraphics PUBLIC 
 	glfw

@@ -3,7 +3,7 @@
 // Module: TXGraphics
 // File: texture.cpp
 
-#include "impl/texture.hpp"
+#include "impl/render_engine/texture.hpp"
 
 namespace tx::RenderEngine {
 

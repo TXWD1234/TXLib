@@ -4,10 +4,10 @@
 // File: draw_call_manager.hpp
 
 #pragma once
-#include "impl/basic_gl_utils.hpp"
-#include "impl/vertex_attribute_manager.hpp"
-#include "impl/shader_manager.hpp"
-#include "impl/texture.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/render_engine/vertex_attribute_manager.hpp"
+#include "impl/render_engine/shader_manager.hpp"
+#include "impl/render_engine/texture.hpp"
 #include <vector>
 
 namespace tx {

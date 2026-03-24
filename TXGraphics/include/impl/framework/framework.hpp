@@ -5,7 +5,7 @@
 
 #pragma once
 #include "tx/math.h"
-#include "impl/basic_gl_utils.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
 #include <GLFW/glfw3.h>
 #include <chrono>
 #include <string>

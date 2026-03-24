@@ -4,7 +4,7 @@
 // File: texture_manager.hpp
 
 #pragma once
-#include "impl/basic_gl_utils.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
 #include <span>
 
 namespace tx::RenderEngine {

@@ -4,8 +4,8 @@
 // File: shader_program.hpp
 
 #pragma once
-#include "impl/basic_gl_utils.hpp"
-#include "impl/log.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/render_engine/log.hpp"
 #include <string>
 #include <vector>
 

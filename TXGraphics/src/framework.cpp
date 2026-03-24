@@ -3,7 +3,7 @@
 // Module: TXGraphics
 // File: framework.cpp
 
-#include "impl/framework.hpp"
+#include "impl/framework/framework.hpp"
 
 namespace tx::RenderEngine {
 

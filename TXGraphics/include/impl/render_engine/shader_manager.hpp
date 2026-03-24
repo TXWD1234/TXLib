@@ -4,9 +4,9 @@
 // File: shader_manager.hpp
 
 #pragma once
-#include "impl/basic_gl_utils.hpp"
-#include "impl/shader.hpp"
-#include "impl/log.hpp"
+#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/render_engine/shader.hpp"
+#include "impl/render_engine/log.hpp"
 
 namespace tx {
 namespace RenderEngine {
