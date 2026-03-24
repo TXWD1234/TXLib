@@ -96,6 +96,7 @@ public:
 		setScaleRule(scaleRule);
 		setWrapRule(wrapRule);
 	}
+	void setRule(TextureRule scaleRule, TextureRule wrapRule) { setTextureRule(scaleRule, wrapRule); }
 
 	gid id() const { return m_id; }
 	u32 size() const { return m_layerCount; }

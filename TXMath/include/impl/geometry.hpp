@@ -102,7 +102,7 @@ public:
 	}
 	/*explicit Coord(const vec2& in_pos) :
 			m_x(std::floor(in_pos.x())), m_y(std::floor(in_pos.y())) {
-		}*/
+				}*/
 	constexpr Coord() : m_x(0), m_y(0) {}
 	constexpr inline void set(int in_x, int in_y) {
 		this->m_x = in_x;
@@ -138,13 +138,13 @@ public:
 	constexpr inline bool operator<(const Coord& other) const { return this->m_x * this->m_x + this->m_y * this->m_y < other.m_x * other.m_x + other.m_y * other.m_y; }
 	constexpr inline bool operator>(const Coord& other) const { return this->m_x * this->m_x + this->m_y * this->m_y > other.m_x * other.m_x + other.m_y * other.m_y; }
 
-	constexpr inline vec2 operator*(float in) const { return vec2{m_x * in, m_y * in}; }
+	constexpr inline vec2 operator*(float in) const { return vec2{ m_x * in, m_y * in }; }
 
 	constexpr inline bool valid(int edge) {
 		return m_x >= 0 && m_y >= 0 && m_x < edge && m_y < edge;
 	}
 
-	constexpr inline Coord offset(int in_x, int in_y) const { return Coord{this->m_x + in_x, this->m_y + in_y}; }
+	constexpr inline Coord offset(int in_x, int in_y) const { return Coord{ this->m_x + in_x, this->m_y + in_y }; }
 	constexpr inline Coord offsetX(int in) const { return Coord(this->m_x + in, this->m_y); }
 	constexpr inline Coord offsetY(int in) const { return Coord(this->m_x, this->m_y + in); }
 	constexpr inline void move(int in_x, int in_y) {
@@ -158,8 +158,8 @@ private:
 	int m_x, m_y;
 };
 
-inline Coord toCoord(const vec2& in) { return Coord{static_cast<int>(std::floor(in.x())), static_cast<int>(std::floor(in.y()))}; }
-inline vec2 toVec2(const Coord& in) { return vec2{static_cast<float>(in.x()), static_cast<float>(in.y())}; }
+inline Coord toCoord(const vec2& in) { return Coord{ static_cast<int>(std::floor(in.x())), static_cast<int>(std::floor(in.y())) }; }
+inline vec2 toVec2(const Coord& in) { return vec2{ static_cast<float>(in.x()), static_cast<float>(in.y()) }; }
 
 inline std::ostream& operator<<(std::ostream& in_cout, const vec2& in_vec2) {
 	in_cout << "( " << in_vec2.x() << ", " << in_vec2.y() << " )";
@@ -177,31 +177,34 @@ constexpr const vec2 JHat(0.0f, 1.0f);
 constexpr const vec2 Origin(0.0f, 0.0f);
 constexpr const vec2 InvalidVec(NAN, NAN);
 
-constexpr vec2 TopRight = {1.0, 1.0};
-constexpr vec2 TopLeft = {-1.0, 1.0};
-constexpr vec2 BottomLeft = {-1.0, -1.0};
-constexpr vec2 BottomRight = {1.0, -1.0};
+constexpr vec2 TopRight = { 1.0, 1.0 };
+constexpr vec2 TopLeft = { -1.0, 1.0 };
+constexpr vec2 BottomLeft = { -1.0, -1.0 };
+constexpr vec2 BottomRight = { 1.0, -1.0 };
 
 constexpr float PI = 3.1415926f;
 constexpr float ONE_DEGREE = 0.017453292f;
 
 constexpr Coord _8wayIncrement[] = {
-    {1, 0},
-    {-1, 0},
-    {0, 1},
-    {0, -1},
-    {1, 1},
-    {-1, 1},
-    {-1, -1},
-    {1, -1}};
+	{ 1, 0 },
+	{ -1, 0 },
+	{ 0, 1 },
+	{ 0, -1 },
+	{ 1, 1 },
+	{ -1, 1 },
+	{ -1, -1 },
+	{ 1, -1 }
+};
 constexpr Coord _4wayIncrement[] = {
-    {1, 0},
-    {-1, 0},
-    {0, 1},
-    {0, -1}};
+	{ 1, 0 },
+	{ -1, 0 },
+	{ 0, 1 },
+	{ 0, -1 }
+};
 constexpr int _2wayIncrement[] = {
-    1, -1};
-constexpr Coord CoordOrigin{0, 0};
+	1, -1
+};
+constexpr Coord CoordOrigin{ 0, 0 };
 
 
 
@@ -217,3 +220,17 @@ constexpr Coord CoordOrigin{0, 0};
 
 
 } // namespace tx
+
+#include <functional>
+// std::hash specialization so tx::Coord can be used in std::unordered_map
+namespace std {
+template <>
+struct hash<tx::Coord> {
+	size_t operator()(const tx::Coord& c) const noexcept {
+		size_t h1 = std::hash<int>{}(c.x());
+		size_t h2 = std::hash<int>{}(c.y());
+		// Standard hash combining algorithm (from Boost)
+		return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+	}
+};
+} // namespace std

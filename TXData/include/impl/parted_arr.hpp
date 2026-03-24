@@ -83,6 +83,11 @@ public:
 	void refresh(Partition_impl& in) const { in.attrib = partAttribs[in.partIndex]; }
 	void refresh(ConstPartition_impl& in) const { in.attrib = partAttribs[in.partIndex]; }
 
+	void addPartition() {
+		partAttribs.push_back(PartAttrib_impl{ data.size(), 0, 1 });
+		pushPart_impl(1);
+	}
+
 
 	It_t begin() { return data.begin(); }
 	It_t end() { return data.end(); }

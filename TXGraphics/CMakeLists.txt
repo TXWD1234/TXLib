@@ -33,6 +33,7 @@ target_link_libraries(TXGraphics PUBLIC
 	OpenGL::GL
 	TXMath
 	TXUtility
+	TXData
 )
 
 target_compile_features(TXGraphics PUBLIC cxx_std_20)
