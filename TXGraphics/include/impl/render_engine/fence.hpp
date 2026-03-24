@@ -9,7 +9,7 @@
 namespace tx::RenderEngine {
 class Fence {
 public:
-	Fence() : handle(gl::fenceSync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0)) {}
+	Fence() : handle(gl::fenceSync(gl::enums::SYNC_GPU_COMMANDS_COMPLETE, 0)) {}
 	~Fence() {
 		if (handle) gl::deleteSync(handle);
 	}
@@ -33,7 +33,7 @@ public:
 	bool isFinished() const {
 		if (!handle) return true;
 		u32 result = gl::clientWaitSync(handle, 0, 0);
-		return result == gl::ALREADY_SIGNALED || result == gl::CONDITION_SATISFIED;
+		return result == gl::enums::ALREADY_SIGNALED || result == gl::enums::CONDITION_SATISFIED;
 	}
 
 private:

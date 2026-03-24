@@ -39,6 +39,7 @@ void deleteTextures(sizei_t n, const uint_t* textures) { glDeleteTextures(n, tex
 void textureStorage3D(uint_t texture, sizei_t levels, enum_t internalformat, sizei_t width, sizei_t height, sizei_t depth) { glTextureStorage3D(texture, levels, internalformat, width, height, depth); }
 void textureSubImage3D(uint_t texture, int_t level, int_t xoffset, int_t yoffset, int_t zoffset, sizei_t width, sizei_t height, sizei_t depth, enum_t format, enum_t type, const void* pixels) { glTextureSubImage3D(texture, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels); }
 void textureParameteri(uint_t texture, enum_t pname, int_t param) { glTextureParameteri(texture, pname, param); }
+void copyImageSubData(uint_t srcName, enum_t srcTarget, int_t srcLevel, int_t srcX, int_t srcY, int_t srcZ, uint_t dstName, enum_t dstTarget, int_t dstLevel, int_t dstX, int_t dstY, int_t dstZ, sizei_t srcWidth, sizei_t srcHeight, sizei_t srcDepth) { glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, srcWidth, srcHeight, srcDepth); }
 
 // --- Shaders & Programs ---
 uint_t createShader(enum_t type) { return glCreateShader(type); }

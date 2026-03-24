@@ -67,13 +67,10 @@ private:
 			Coord dimension() const { return ta.dimension(); }
 			u32 size() const { return m_size; }
 			u32 capacity() const { return ta.size(); }
-			void expand() {
-				ta = TextureArray{ TextureFormat::RGBA, ta.dimension(), ta.size() * 2, 0 };
-			}
 
 			u32 push_back(std::span<u8> data) {
 				if (m_size == capacity()) {
-					this->expand();
+					ta.resize(ta.size() * 2);
 				}
 				ta.setLayer(m_size, data);
 				return m_size++;

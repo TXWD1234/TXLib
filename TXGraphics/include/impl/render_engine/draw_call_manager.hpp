@@ -127,10 +127,10 @@ public:
 
 private:
 	void drawArrays_impl(u32 begin, u32 count) const {
-		gl::drawArrays(gl::TRIANGLES, begin, count);
+		gl::drawArrays(gl::enums::TRIANGLES, begin, count);
 	}
 	void drawArraysInstanced_impl(u32 begin, u32 count, u32 instanceCount) const {
-		gl::drawArraysInstanced(gl::TRIANGLES, begin, count, instanceCount);
+		gl::drawArraysInstanced(gl::enums::TRIANGLES, begin, count, instanceCount);
 	}
 
 	// draw call variables

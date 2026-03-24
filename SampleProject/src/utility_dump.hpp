@@ -72,11 +72,11 @@ void glfwSetKeyCallback(GLFWwindow* window, T* _this) {
 	    });
 }
 inline void glEnableTransparent() {
-	gl::enable(GL_BLEND);
-	gl::blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	gl::enable(gl::enums::BLEND);
+	gl::blendFunc(gl::enums::SRC_ALPHA, gl::enums::ONE_MINUS_SRC_ALPHA);
 }
 inline void glDisableDepthTest() {
-	gl::disable(GL_DEPTH_TEST);
+	gl::disable(gl::enums::DEPTH_TEST);
 }
 inline void glBasicSettings() {
 	glEnableTransparent();

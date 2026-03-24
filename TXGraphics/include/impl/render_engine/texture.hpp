@@ -10,21 +10,21 @@
 namespace tx::RenderEngine {
 
 enum class TextureFormat : u32 {
-	Grey = gl::R8,
-	RGBA = gl::RGBA8,
-	RGB = gl::RGB8
+	Grey = gl::enums::R8,
+	RGBA = gl::enums::RGBA8,
+	RGB = gl::enums::RGB8
 };
 
 enum class TextureRule : u32 {
-	Pixel = gl::NEAREST,
-	Linear = gl::LINEAR,
-	Repeat = gl::REPEAT,
-	Clamp = gl::CLAMP_TO_EDGE
+	Pixel = gl::enums::NEAREST,
+	Linear = gl::enums::LINEAR,
+	Repeat = gl::enums::REPEAT,
+	Clamp = gl::enums::CLAMP_TO_EDGE
 };
 
 inline u32 glCreateTexture() {
 	u32 id;
-	gl::createTextures(gl::TEXTURE_2D_ARRAY, 1, &id);
+	gl::createTextures(gl::enums::TEXTURE_2D_ARRAY, 1, &id);
 	return id;
 }
 
@@ -70,26 +70,28 @@ public:
 		setLayerRegion_impl(layer, offset, dimension, data.data());
 	}
 
+	void resize(u32 newLayerCount);
+
 	void setScaleRule(TextureRule rule) {
 		if (rule == TextureRule::Linear || rule == TextureRule::Pixel) {
-			gl::textureParameteri(m_id, gl::TEXTURE_MAG_FILTER, enumval(rule));
-			gl::textureParameteri(m_id, gl::TEXTURE_MIN_FILTER, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_MAG_FILTER, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_MIN_FILTER, enumval(rule));
 		}
 	}
 	void setXWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_S, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_WRAP_S, enumval(rule));
 		}
 	}
 	void setYWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_T, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_WRAP_T, enumval(rule));
 		}
 	}
 	void setWrapRule(TextureRule rule) {
 		if (rule == TextureRule::Clamp || rule == TextureRule::Repeat) {
-			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_S, enumval(rule));
-			gl::textureParameteri(m_id, gl::TEXTURE_WRAP_T, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_WRAP_S, enumval(rule));
+			gl::textureParameteri(m_id, gl::enums::TEXTURE_WRAP_T, enumval(rule));
 		}
 	}
 	void setTextureRule(TextureRule scaleRule, TextureRule wrapRule) {
@@ -118,7 +120,7 @@ private:
 		    m_id, 0,
 		    offset.x(), offset.y(), layer,
 		    dimension.x(), dimension.y(), 1,
-		    getFormat_impl(m_format), gl::UNSIGNED_BYTE, data);
+		    getFormat_impl(m_format), gl::enums::UNSIGNED_BYTE, data);
 	}
 	void init_impl() {
 		u32 mipmapLevel = m_useMipmap ? getMipmapLevel_impl(m_dimension) : 1;
@@ -129,9 +131,9 @@ private:
 	}
 	u32 getFormat_impl(TextureFormat format) {
 		switch (format) {
-		case TextureFormat::Grey: return gl::RED;
-		case TextureFormat::RGBA: return gl::RGBA;
-		case TextureFormat::RGB: return gl::RGB;
+		case TextureFormat::Grey: return gl::enums::RED;
+		case TextureFormat::RGBA: return gl::enums::RGBA;
+		case TextureFormat::RGB: return gl::enums::RGB;
 		default: return 0;
 		}
 	}
