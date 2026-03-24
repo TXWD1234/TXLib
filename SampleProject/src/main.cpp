@@ -80,7 +80,7 @@ private:
 private:
 	bool init() {
 		tx::glfwSetKeyCallback<Application, &Application::onKeyEvent>(framework.getWindow(), this);
-		tx::glEnableTransparent();
+		tx::glBasicSettings();
 
 		vector<tx::vec2> squarePos = {
 			{ 0.5, -0.5 },
@@ -224,7 +224,66 @@ private:
 // 1. reconstruction of all "baked" class -> can "interit" the data from previous instance
 // 2. DrawCallMan: error if not all dynamic buffer have same range
 
+#include <iostream>
+// Include your TXData headers here...
+#include "tx/data.h"
+
+void testPartedArr() {
+	std::cout << "--- Testing PartedArr Gap Reuse & Expansion ---\n";
+
+	// Create 3 partitions with an initial capacity of 2 each.
+	tx::PartedArr<int> arr(3, 2);
+
+	// Fill partitions exactly to their initial capacities
+	arr[0].push_back(10);
+	arr[0].push_back(11);
+	arr[1].push_back(20);
+	arr[1].push_back(21);
+	arr[2].push_back(30);
+	arr[2].push_back(31);
+
+	std::cout << "[Before Overflow]\n";
+	for (int i = 0; i < 3; ++i) {
+		std::cout << "Partition " << i << ": ";
+		for (int val : arr[i]) std::cout << val << " ";
+		std::cout << "\n";
+	}
+
+	// Overflow Partition 0.
+	// Since Partition 1 is physically in the way, it should be moved to the back of the vector.
+	std::cout << "\nPushing '12' to Partition 0 (Triggering P1 move)...\n";
+	arr[0].push_back(12);
+
+	// Overflow Partition 0 AGAIN.
+	// Since we now have a gap (size 4), and P0 currently takes 3, it shouldn't move P2!
+	std::cout << "Pushing '13' to Partition 0 (Should fit in gap)...\n";
+	arr[0].push_back(13);
+
+	std::cout << "\n[After Overflows]\n";
+	for (int i = 0; i < 3; ++i) {
+		std::cout << "Partition " << i << ": ";
+		// Re-fetching arr[i] guarantees we have the updated offsets
+		for (int val : arr[i]) std::cout << val << " ";
+		std::cout << "\n";
+	}
+
+	// Check sizes
+	std::cout << "\nSizes -> P0: " << arr[0].size()
+	          << ", P1: " << arr[1].size()
+	          << ", P2: " << arr[2].size() << "\n";
+}
+
+// Just call testPartedArr(); inside your main()
+
+
 int main() {
+
+	testPartedArr();
+
+
+
+
+	return 0;
 	std::cout << "Initializing Application...\n";
 	Application app;
 	if (!app.valid()) {

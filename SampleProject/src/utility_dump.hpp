@@ -87,8 +87,15 @@ void glfwSetKeyCallback(GLFWwindow* window, T* _this) {
 	    });
 }
 inline void glEnableTransparent() {
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	gl::enable(GL_BLEND);
+	gl::blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+}
+inline void glDisableDepthTest() {
+	gl::disable(GL_DEPTH_TEST);
+}
+inline void glBasicSettings() {
+	glEnableTransparent();
+	glDisableDepthTest();
 }
 
 

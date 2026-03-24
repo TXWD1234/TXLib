@@ -5,3 +5,4 @@
 
 #pragma once
 #include "impl/parted_arr.hpp"
+#include "impl/circular_arr.hpp"

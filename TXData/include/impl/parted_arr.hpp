@@ -5,60 +5,27 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include <cstring>
+#include <algorithm>
 
 namespace tx {
 
-// partitioned array, an alternative for std::vector<std::vector<T>> that's more cache friendly
+// partitioned array, an alternative for std::vector<std::vector<T>> that's more cache friendly and faster
+// note: slightly memory wasting comparing to CircularArr but faster
 // order is not garenteed. any pointer is not garenteed to be valid after push_back
 template <class T>
 class PartedArr {
 	// terminology:
 	// part = partition
 public:
-	class iterator {
-	public:
-		// Required traits for STL compatibility
-		using iterator_category = std::random_access_iterator_tag;
-		using value_type = T;
-		using difference_type = std::ptrdiff_t;
-		using pointer = T*;
-		using reference = T&;
-
-		iterator(T* base, u32 capacity, u32 virtualIndex)
-		    : m_base(base), m_capacity(capacity), m_vIndex(virtualIndex) {}
-
-		reference operator*() const {
-			return m_base[m_vIndex % m_capacity];
-		}
-
-		iterator& operator++() {
-			++m_vIndex;
-			return *this;
-		}
-		iterator operator+(u32 n) const { return { m_base, m_capacity, m_vIndex + n }; }
-
-		// Logic: Equality is based on the "virtual" position
-		bool operator==(const iterator& other) const { return m_vIndex == other.m_vIndex; }
-		bool operator!=(const iterator& other) const { return !(*this == other); }
-
-		// Distance (needed for std::distance and some loops)
-		difference_type operator-(const iterator& other) const {
-			return (difference_type)m_vIndex - (difference_type)other.m_vIndex;
-		}
-
-	private:
-		T* m_base; // Pointer to the start of data()
-		u32 m_capacity; // Total size of data()
-		u32 m_vIndex; // The "absolute" position (can be > capacity)
-	};
-
 	using It_t = typename std::vector<T>::iterator;
 	using ConstIt_t = typename std::vector<T>::const_iterator;
 
 public:
+	PartedArr(u32 partLen = 64) : PartLen(partLen) {}
 	PartedArr(u32 partCount, u32 partLen)
 	    : data(std::vector<T>(partCount * partLen)),
-	      partAttribs(std::vector<u32>(partCount)),
+	      partAttribs(std::vector<PartAttrib_impl>(partCount)),
 	      PartLen(partLen) {
 		for (int i = 0; i < partCount; ++i) {
 			partAttribs[i].offset = i * partLen;
@@ -71,13 +38,14 @@ public:
 	public:
 		u32 offset;
 		u32 len;
+		u32 partCount = 1;
 	};
 	class Partition_impl {
 	public:
 		Partition_impl(PartedArr* in_parent, u32 in_index)
 		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]), partIndex(in_index) {}
 
-		T& operator[](u32 index) { return parent->data[parent->clampIndex(attrib.offset + index)]; }
+		T& operator[](u32 index) { return parent->data[attrib.offset + index]; }
 
 		u32 size() const { return attrib.len; }
 
@@ -98,7 +66,7 @@ public:
 		ConstPartition_impl(const PartedArr* in_parent, u32 in_index)
 		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]) {}
 
-		const T& operator[](u32 index) const { return parent->data[parent->clampIndex(attrib.offset + index)]; }
+		const T& operator[](u32 index) const { return parent->data[attrib.offset + index]; }
 
 		u32 size() const { return attrib.len; }
 		ConstIt_t begin() const { return parent->begin() + attrib.offset; }
@@ -126,28 +94,45 @@ private:
 	std::vector<PartAttrib_impl> partAttribs;
 	const u32 PartLen;
 
-	u32 nextPart(u32 index) {
-		return index >= partAttribs.size() - 1 ? 0 : index + 1;
+	void pushPart_impl(u32 n = 1) { // add n empty partition at the end
+		data.resize(data.size() + PartLen * n);
 	}
-	u32 checkIndexBound(u32 index) {
-		return index >= data.size() ? 0 : index;
+	void moveData_impl(u32 dest, u32 src, u32 len) {
+		if (len == 0) return;
+
+		T* pSrc = data.data() + src;
+		T* pDst = data.data() + dest;
+
+		if constexpr (std::is_trivially_copyable_v<T>) {
+			std::memcpy(pDst, pSrc, len * sizeof(T));
+		} else {
+			for (u32 i = 0; i < len; ++i) {
+				pDst[i] = std::move(pSrc[i]);
+			}
+		}
 	}
-	u32 clampIndex(u32 index) const {
-		return index % data.size();
-	}
-	// circular shift
+
+	// linear reallocate
 	void push_back_impl(u32 partIndex, const T& val) {
 		PartAttrib_impl& attrib = partAttribs[partIndex];
-		if (partAttribs[partIndex].len >= PartLen) {
-			u32 next = nextPart(partIndex);
-			if (partAttribs[next].len) {
-				push_back_impl(next, std::move(data[partAttribs[next].offset++]));
-				partAttribs[next].offset = checkIndexBound(partAttribs[next].offset);
-			} else
-				++partAttribs[next].offset;
-			--partAttribs[next].len;
+		if (attrib.len >= attrib.partCount * PartLen) { // if exceeded -> resize
+			u32 targetOffset = attrib.offset + attrib.partCount * PartLen;
+
+			auto it = std::find_if(partAttribs.begin(), partAttribs.end(),
+			                       [targetOffset](const PartAttrib_impl& p) { return p.offset == targetOffset; });
+
+			if (it != partAttribs.end()) { // if another partition is in the way -> move it to the back
+				u32 nextOffset = data.size();
+				pushPart_impl(it->partCount);
+				moveData_impl(nextOffset, it->offset, it->len);
+				it->offset = nextOffset;
+			} else if (targetOffset == data.size()) { // if at the end of the data vector -> push new empty space
+				pushPart_impl(1);
+			}
+			attrib.partCount++;
+			// from now, the current partition should have a empty partition after it
 		}
-		data[checkIndexBound(attrib.offset + attrib.len++)] = val;
+		data[attrib.offset + attrib.len++] = val;
 	}
 };
 

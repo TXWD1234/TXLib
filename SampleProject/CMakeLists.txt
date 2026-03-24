@@ -42,6 +42,7 @@ target_link_libraries(TXProject PRIVATE
 	TXGrid
 	TXResource
 	TXGraphics
+	TXData
 	stb_image
 )
 
