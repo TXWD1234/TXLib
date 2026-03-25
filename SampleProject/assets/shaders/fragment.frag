@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : require
-#extension GL_ARB_bindless_texture : enable
+#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) out vec4 FragColor;
 
