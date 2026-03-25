@@ -193,7 +193,7 @@ public:
 
 	template <class Func>
 	    requires std::invocable<Func, std::span<T>>
-	void finish(u32 size, Func&& f) {
+	void push(u32 size, Func&& f) {
 		if (!size) return;
 
 		current.count = size;
@@ -218,8 +218,8 @@ public:
 		current.offset = current.end();
 		current.count = 0;
 	}
-	void finish(std::span<T> dataBuffer) {
-		this->finish(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) {
+	void push(std::span<T> dataBuffer) {
+		this->push(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) {
 			std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
 		});
 	}
@@ -307,7 +307,7 @@ template <class T, std::invocable<std::vector<T>&> Func>
 void writeRingBuffer(RingBufferObject<T>& buffer, Func&& modifier) {
 	std::vector<T> stagingBuffer;
 	modifier(stagingBuffer);
-	buffer.finish(std::span<T>(stagingBuffer));
+	buffer.push(std::span<T>(stagingBuffer));
 }
 
 

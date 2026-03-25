@@ -21,36 +21,49 @@ struct glAttributeParameter {
 
 template <>
 struct glAttributeParameter<float> {
+	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = false;
 };
 template <>
 struct glAttributeParameter<int> {
+	using underlying = int;
 	static constexpr u32 type = gl::enums::INT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<u8> {
+	using underlying = u8;
 	static constexpr u32 type = gl::enums::UNSIGNED_BYTE;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<u32> {
+	using underlying = u32;
 	static constexpr u32 type = gl::enums::UNSIGNED_INT;
 	static constexpr u32 count = 1; // count of component / count of element
 	static constexpr bool is_int = true;
 };
 template <>
+struct glAttributeParameter<u64> {
+	using underlying = u64;
+	static constexpr u32 type = gl::enums::UNSIGNED_INT64_ARB;
+	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr bool is_int = true;
+};
+template <>
 struct glAttributeParameter<tx::vec2> {
+	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
 	static constexpr u32 count = 2; // count of component / count of element
 	static constexpr bool is_int = false;
 };
 template <>
 struct glAttributeParameter<tx::Coord> {
+	using underlying = int;
 	static constexpr u32 type = gl::enums::INT;
 	static constexpr u32 count = 2; // count of component / count of element
 	static constexpr bool is_int = true;

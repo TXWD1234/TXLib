@@ -11,6 +11,8 @@ namespace gl {
 using enum_t = unsigned int; // GLenum
 using uint_t = unsigned int; // GLuint
 using int_t = int; // GLint
+using uint64_t = unsigned long long; // GLuint64
+using int64_t = long long; // GLint64
 using sizei_t = int; // GLsizei
 using boolean_t = unsigned char; // GLboolean
 using bitfield_t = unsigned int; // GLbitfield
@@ -41,6 +43,7 @@ void createVertexArrays(sizei_t n, uint_t* arrays);
 void deleteVertexArrays(sizei_t n, const uint_t* arrays);
 void vertexArrayAttribFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, boolean_t normalized, uint_t relativeoffset);
 void vertexArrayAttribIFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, uint_t relativeoffset);
+void vertexArrayAttribLFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, uint_t relativeoffset);
 void enableVertexArrayAttrib(uint_t vaobj, uint_t index);
 void vertexArrayAttribBinding(uint_t vaobj, uint_t attribindex, uint_t bindingindex);
 void vertexArrayVertexBuffer(uint_t vaobj, uint_t bindingindex, uint_t buffer, intptr_t offset, sizei_t stride);
@@ -53,6 +56,11 @@ void textureStorage3D(uint_t texture, sizei_t levels, enum_t internalformat, siz
 void textureSubImage3D(uint_t texture, int_t level, int_t xoffset, int_t yoffset, int_t zoffset, sizei_t width, sizei_t height, sizei_t depth, enum_t format, enum_t type, const void* pixels);
 void textureParameteri(uint_t texture, enum_t pname, int_t param);
 void copyImageSubData(uint_t srcName, enum_t srcTarget, int_t srcLevel, int_t srcX, int_t srcY, int_t srcZ, uint_t dstName, enum_t dstTarget, int_t dstLevel, int_t dstX, int_t dstY, int_t dstZ, sizei_t srcWidth, sizei_t srcHeight, sizei_t srcDepth);
+// Bindless Textures
+uint64_t getTextureHandleARB(uint_t texture);
+void makeTextureHandleResidentARB(uint64_t handle);
+void makeTextureHandleNonResidentARB(uint64_t handle);
+
 
 // --- Shaders & Programs ---
 uint_t createShader(enum_t type);
@@ -1470,6 +1478,8 @@ inline constexpr enum_t TEXTURE_MAX_ANISOTROPY = 0x84FE;
 inline constexpr enum_t MAX_TEXTURE_MAX_ANISOTROPY = 0x84FF;
 inline constexpr enum_t TRANSFORM_FEEDBACK_OVERFLOW = 0x82EC;
 inline constexpr enum_t TRANSFORM_FEEDBACK_STREAM_OVERFLOW = 0x82ED;
+// bindless textures
+inline constexpr enum_t UNSIGNED_INT64_ARB = 0x140F;
 } // namespace enums
 } // namespace gl
 namespace glenums = gl::enums;

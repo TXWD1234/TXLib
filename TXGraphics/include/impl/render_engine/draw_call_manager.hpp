@@ -112,7 +112,7 @@ public:
 		setShaderPipeline(pipeline);
 	}
 
-	void setTexture(u32 port, const TextureArray& tex) {
+	void setTexture(u32 port, const TextureArray_legacy& tex) {
 		if (port >= m_textures.size()) m_textures.resize(port + 1, 0);
 		m_textures[port] = tex.id();
 	}

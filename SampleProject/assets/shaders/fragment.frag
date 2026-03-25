@@ -1,16 +1,22 @@
 #version 460 core
+#extension GL_ARB_gpu_shader_int64 : require
+#extension GL_ARB_bindless_texture : enable
 
 layout(location = 0) out vec4 FragColor;
 
-layout(binding = 0) uniform sampler2DArray u_tex;
-
 in vec2 uv;
-flat in uint animState;
+in flat uint animState;
+in flat uint64_t v_textureHandle;
 
 void main() {
-    vec4 texColor = texture(u_tex, vec3(uv, animState));
-	//texColor.x *= 0.5;
-	//texColor.y *= 1.5;
-	//texColor.z *= 1.5;
-	FragColor = texColor;
+	#if defined(GL_ARB_bindless_texture)
+        if (v_textureHandle != 0ul) {
+            sampler2DArray s = sampler2DArray(v_textureHandle);
+            FragColor = texture(s, vec3(uv, animState));
+        } else {
+            FragColor = vec4(1.0, 0.0, 1.0, 1.0); // Magenta for null
+        }
+    #else
+        FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Yellow fallback for Intel
+    #endif
 }

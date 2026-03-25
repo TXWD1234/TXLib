@@ -3,11 +3,28 @@
 
 #include "glad/glad.h"
 #include "tx/upset.hpp"
+#include <iostream>
 
 namespace gl {
 
 // --- Initialization ---
-bool init(void* loadProc) { return gladLoadGLLoader((GLADloadproc)loadProc) != 0; }
+bool init(void* loadProc) {
+	bool success = gladLoadGLLoader((GLADloadproc)loadProc) != 0;
+	if (!success) return 0;
+	if (glGetTextureHandleARB == nullptr) {
+		std::cerr << "glGetTextureHandleARB is null\n";
+		success = 0;
+	}
+	if (glMakeTextureHandleNonResidentARB == nullptr) {
+		std::cerr << "glMakeTextureHandleNonResidentARB is null\n";
+		success = 0;
+	}
+	if (glDrawArraysInstanced == nullptr) {
+		std::cerr << "glDrawArraysInstanced is null\n";
+		success = 0;
+	}
+	return success;
+}
 
 // --- General State ---
 void clear(bitfield_t mask) { glClear(mask); }
@@ -28,6 +45,7 @@ void createVertexArrays(sizei_t n, uint_t* arrays) { glCreateVertexArrays(n, arr
 void deleteVertexArrays(sizei_t n, const uint_t* arrays) { glDeleteVertexArrays(n, arrays); }
 void vertexArrayAttribFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, boolean_t normalized, uint_t relativeoffset) { glVertexArrayAttribFormat(vaobj, attribindex, size, type, normalized, relativeoffset); }
 void vertexArrayAttribIFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, uint_t relativeoffset) { glVertexArrayAttribIFormat(vaobj, attribindex, size, type, relativeoffset); }
+void vertexArrayAttribLFormat(uint_t vaobj, uint_t attribindex, int_t size, enum_t type, uint_t relativeoffset) { glVertexArrayAttribLFormat(vaobj, attribindex, size, type, relativeoffset); }
 void enableVertexArrayAttrib(uint_t vaobj, uint_t index) { glEnableVertexArrayAttrib(vaobj, index); }
 void vertexArrayAttribBinding(uint_t vaobj, uint_t attribindex, uint_t bindingindex) { glVertexArrayAttribBinding(vaobj, attribindex, bindingindex); }
 void vertexArrayVertexBuffer(uint_t vaobj, uint_t bindingindex, uint_t buffer, intptr_t offset, sizei_t stride) { glVertexArrayVertexBuffer(vaobj, bindingindex, buffer, offset, stride); }
@@ -40,6 +58,10 @@ void textureStorage3D(uint_t texture, sizei_t levels, enum_t internalformat, siz
 void textureSubImage3D(uint_t texture, int_t level, int_t xoffset, int_t yoffset, int_t zoffset, sizei_t width, sizei_t height, sizei_t depth, enum_t format, enum_t type, const void* pixels) { glTextureSubImage3D(texture, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels); }
 void textureParameteri(uint_t texture, enum_t pname, int_t param) { glTextureParameteri(texture, pname, param); }
 void copyImageSubData(uint_t srcName, enum_t srcTarget, int_t srcLevel, int_t srcX, int_t srcY, int_t srcZ, uint_t dstName, enum_t dstTarget, int_t dstLevel, int_t dstX, int_t dstY, int_t dstZ, sizei_t srcWidth, sizei_t srcHeight, sizei_t srcDepth) { glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, srcWidth, srcHeight, srcDepth); }
+// Bindless Textures
+uint64_t getTextureHandleARB(uint_t texture) { return glGetTextureHandleARB(texture); }
+void makeTextureHandleResidentARB(uint64_t handle) { glMakeTextureHandleResidentARB(handle); }
+void makeTextureHandleNonResidentARB(uint64_t handle) { glMakeTextureHandleNonResidentARB(handle); }
 
 // --- Shaders & Programs ---
 uint_t createShader(enum_t type) { return glCreateShader(type); }

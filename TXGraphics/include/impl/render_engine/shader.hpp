@@ -145,13 +145,14 @@ public:
 
 	ShaderProgramComponent(const ShaderProgramComponent&) = delete;
 	ShaderProgramComponent& operator=(const ShaderProgramComponent&) = delete;
-	ShaderProgramComponent(ShaderProgramComponent&& other) noexcept : m_id(other.m_id), m_valid(other.m_valid) {
+	ShaderProgramComponent(ShaderProgramComponent&& other) noexcept : m_shader(std::move(other.m_shader)), m_id(other.m_id), m_valid(other.m_valid) {
 		other.m_id = 0;
 		other.m_valid = 0;
 	}
 	ShaderProgramComponent& operator=(ShaderProgramComponent&& other) noexcept {
 		if (this != &other) {
 			if (m_id) gl::deleteProgram(m_id);
+			m_shader = std::move(other.m_shader);
 			m_id = other.m_id;
 			m_valid = other.m_valid;
 			other.m_id = 0;

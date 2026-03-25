@@ -72,6 +72,7 @@ private:
 	re::BufferHandle<re::StaticBufferObject<tx::vec2>> squarePosBuffer;
 	re::BufferHandle<re::StaticBufferObject<tx::vec2>> instanceBuffer;
 	re::BufferHandle<re::StaticBufferObject<tx::vec2>> UVBuffer;
+	re::BufferHandle<re::StaticBufferObject<tx::u64>> textureSamplerBuffer;
 	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
 	re::BufferHandle<re::RingBufferObject<float>> scaleBuffer;
 	re::TextureArray ta;
@@ -115,7 +116,8 @@ private:
 			UVBuffer.id = initer.addAttrib<tx::vec2>();
 			animStateBuffer.id = initer.addAttribInstanced<tx::u32>();
 			instanceBuffer.id = initer.addAttribInstanced<tx::vec2>();
-			scaleBuffer.id = initer.addAttribInstanced<tx::vec2>();
+			scaleBuffer.id = initer.addAttribInstanced<float>();
+			textureSamplerBuffer.id = initer.addAttribInstanced<tx::u64>();
 		});
 
 		re::VAMBindBuffer(vam, squarePosBuffer);
@@ -150,7 +152,9 @@ private:
 		tx::u32 length = width * height * 4;
 
 		ta = re::TextureArray(re::TextureFormat::RGBA, { width, height }, data.size(), 0);
-		ta.setTextureRule(re::TextureRule::Linear, re::TextureRule::Repeat);
+		tx::u64 handle = ta.handle();
+		textureSamplerBuffer.bo.alloc(1, &handle);
+		re::VAMBindBuffer(vam, textureSamplerBuffer);
 		for (int i = 0; i < data.size(); i++) {
 			ta.setLayer(i, std::bitSpan(data[i], length));
 			if (data[i]) stbi_image_free(data[i]);
@@ -159,7 +163,6 @@ private:
 		dcm = tx::RE::DrawCallManager();
 		dcm.setVAM(vam);
 		dcm.setShaders(sm.get(activeShaders));
-		dcm.setTexture(0, ta);
 
 		return 1;
 	}

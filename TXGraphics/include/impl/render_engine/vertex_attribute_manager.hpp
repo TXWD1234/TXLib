@@ -100,10 +100,21 @@ public:
 
 		template <class T>
 		static void setBufferAttrib_impl(u32 vamId, u32 id) {
-			if constexpr (glAttributeParameter<T>::is_int) {
-				gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
+			using underlying = typename glAttributeParameter<T>::underlying;
+			if constexpr (sizeof(underlying) <= 4) {
+				if constexpr (glAttributeParameter<T>::is_int) {
+					gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
+				} else {
+					gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, gl::enums::FALSE, 0);
+				}
+			} else if constexpr (sizeof(underlying) == 8) {
+				if constexpr (glAttributeParameter<T>::is_int) {
+					gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T> * 2, gl::enums::UNSIGNED_INT, 0); // Safe bindless mapping
+				} else {
+					gl::vertexArrayAttribLFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
+				}
 			} else {
-				gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, gl::enums::FALSE, 0);
+				static_assert(false_v<T>, "tx::RenderEngine::VertexAttributeManager::Initializer::setBufferAttrib_impl: Unsupported underlying type length.");
 			}
 			gl::enableVertexArrayAttrib(vamId, id);
 			gl::vertexArrayAttribBinding(vamId, id, id);
