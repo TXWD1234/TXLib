@@ -4,14 +4,14 @@
 // File: render_engine.hpp
 
 #pragma once
-#include "impl/render_engine/basic_gl_utils.hpp"
-#include "impl/render_engine/buffer_manager.hpp"
-#include "impl/render_engine/vertex_attribute_manager.hpp"
-#include "impl/render_engine/shader_manager.hpp"
-#include "impl/render_engine/draw_call_manager.hpp"
-#include "impl/render_engine/texture.hpp"
-#include "impl/render_engine/fence_manager.hpp"
-#include "impl/render_engine/utility.hpp"
+#include "impl/gl_core/basic_gl_utils.hpp"
+#include "impl/gl_core/buffer.hpp"
+#include "impl/gl_core/vertex_attribute_manager.hpp"
+#include "impl/gl_core/shader_manager.hpp"
+#include "impl/gl_core/draw_call_manager.hpp"
+#include "impl/gl_core/texture.hpp"
+#include "impl/gl_core/fence_manager.hpp"
+#include "impl/gl_core/utility.hpp"
 #include "impl/parted_arr.hpp"
 #include <unordered_map>
 

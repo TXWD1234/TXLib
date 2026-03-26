@@ -4,8 +4,8 @@
 // File: fence_manager.hpp
 
 #pragma once
-#include "impl/render_engine/basic_gl_utils.hpp"
-#include "impl/render_engine/fence.hpp"
+#include "impl/gl_core/basic_gl_utils.hpp"
+#include "impl/gl_core/fence.hpp"
 #include <tuple>
 #include <deque>
 

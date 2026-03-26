@@ -4,7 +4,7 @@
 // File: fence.hpp
 
 #pragma once
-#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/gl_core/basic_gl_utils.hpp"
 
 namespace tx::RenderEngine {
 class Fence {

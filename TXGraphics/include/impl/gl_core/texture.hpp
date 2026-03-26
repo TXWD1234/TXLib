@@ -4,7 +4,7 @@
 // File: texture_manager.hpp
 
 #pragma once
-#include "impl/render_engine/basic_gl_utils.hpp"
+#include "impl/gl_core/basic_gl_utils.hpp"
 #include <concepts>
 #include <span>
 
