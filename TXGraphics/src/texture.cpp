@@ -32,9 +32,10 @@ TextureArray::TextureArray(
 	m_handle = gl::getTextureHandleARB(m_id);
 	gl::makeTextureHandleResidentARB(m_handle);
 }
-void TextureArray::resize(u32 newLayerCount) {
-	if (newLayerCount <= m_layerCount) return;
+
+TextureDeleter TextureArray::resize_impl(u32 newLayerCount) {
 	gid oldId = m_id;
+	u64 oldHandle = m_handle;
 	u32 oldLayerCount = m_layerCount;
 	m_layerCount = newLayerCount;
 	gl::createTextures(gl::enums::TEXTURE_2D_ARRAY, 1, &m_id);
@@ -45,11 +46,12 @@ void TextureArray::resize(u32 newLayerCount) {
 	    m_dimension.x(), m_dimension.y(), oldLayerCount);
 	setRules_impl(m_scaleRule, m_xWrapRule, m_yWrapRule);
 
-	if (m_handle) gl::makeTextureHandleNonResidentARB(m_handle);
-	gl::deleteTextures(1, &oldId);
 	m_handle = gl::getTextureHandleARB(m_id);
 	gl::makeTextureHandleResidentARB(m_handle);
+
+	return TextureDeleter{ oldId, oldHandle };
 }
+
 
 TextureArray_legacy::TextureArray_legacy(TextureFormat format, Coord dimension, u32 layerCount, bool useMipmap, u8* data)
     : m_format(format), m_dimension(dimension), m_layerCount(layerCount), m_useMipmap(useMipmap) {
@@ -63,8 +65,8 @@ TextureArray_legacy::TextureArray_legacy(TextureFormat format, Coord dimension, 
 		    getFormat_impl(m_format), gl::enums::UNSIGNED_BYTE, data);
 	}
 }
-void TextureArray_legacy::resize(u32 newLayerCount) {
-	if (newLayerCount <= m_layerCount) return;
+
+TextureDeleter TextureArray_legacy::resize_impl(u32 newLayerCount) {
 	gid oldId = m_id;
 	u32 oldLayerCount = m_layerCount;
 	m_layerCount = newLayerCount;
@@ -77,7 +79,8 @@ void TextureArray_legacy::resize(u32 newLayerCount) {
 	setScaleRule(m_scaleRule);
 	setXWrapRule(m_xWrapRule);
 	setYWrapRule(m_yWrapRule);
-	gl::deleteTextures(1, &oldId);
+
+	return TextureDeleter{ oldId };
 }
 
 } // namespace tx::RenderEngine

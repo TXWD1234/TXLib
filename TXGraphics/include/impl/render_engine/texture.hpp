@@ -5,6 +5,7 @@
 
 #pragma once
 #include "impl/render_engine/basic_gl_utils.hpp"
+#include <concepts>
 #include <span>
 
 namespace tx::RenderEngine {
@@ -27,6 +28,15 @@ inline u32 glCreateTexture() {
 	gl::createTextures(gl::enums::TEXTURE_2D_ARRAY, 1, &id);
 	return id;
 }
+
+struct TextureDeleter {
+	gid id = 0;
+	u64 handle = 0;
+	void operator()() const {
+		if (handle) gl::makeTextureHandleNonResidentARB(handle);
+		if (id) gl::deleteTextures(1, &id);
+	}
+};
 
 // using GL_ARB_bindless_texture
 class TextureArray {
@@ -90,7 +100,12 @@ public:
 		setLayerRegion_impl(layer, offset, dimension, data.data());
 	}
 
-	void resize(u32 newLayerCount);
+	template <class Func>
+	    requires std::invocable<Func, TextureDeleter&&>
+	void resize(u32 newLayerCount, Func&& submitDeleter) {
+		if (newLayerCount <= m_layerCount) return;
+		submitDeleter(resize_impl(newLayerCount));
+	}
 
 
 	gid id() const { return m_id; }
@@ -109,6 +124,8 @@ private:
 	Coord m_dimension = { 0, 0 };
 	u32 m_layerCount = 1;
 	bool m_useMipmap = false;
+
+	[[nodiscard]] TextureDeleter resize_impl(u32 newLayerCount);
 
 	void alloc_impl(TextureFormat format, Coord dimension, u32 mipmapLevel, u32 layerCount) {
 		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);
@@ -194,7 +211,12 @@ public:
 		setLayerRegion_impl(layer, offset, dimension, data.data());
 	}
 
-	void resize(u32 newLayerCount);
+	template <class Func>
+	    requires std::invocable<Func, TextureDeleter&&>
+	void resize(u32 newLayerCount, Func&& submitDeleter) {
+		if (newLayerCount <= m_layerCount) return;
+		submitDeleter(resize_impl(newLayerCount));
+	}
 
 	void setScaleRule(TextureRule rule) {
 		m_scaleRule = rule;
@@ -241,6 +263,8 @@ private:
 	Coord m_dimension = { 0, 0 };
 	u32 m_layerCount = 1;
 	bool m_useMipmap = false;
+
+	[[nodiscard]] TextureDeleter resize_impl(u32 newLayerCount);
 
 	void alloc_impl(TextureFormat format, Coord dimension, u32 mipmapLevel, u32 layerCount) {
 		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);

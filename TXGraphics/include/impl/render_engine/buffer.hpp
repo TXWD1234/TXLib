@@ -6,6 +6,7 @@
 #pragma once
 #include "impl/render_engine/basic_gl_utils.hpp"
 #include "impl/render_engine/fence.hpp"
+#include <memory>
 #include <deque>
 #include <concepts>
 #include <span>
@@ -18,6 +19,21 @@ enum class BufferType : u32 {
 };
 using ioMode = BufferType;
 using iom = BufferType;
+
+// fencing stuff
+struct RingBufferObjectDeleter {
+	gid id = 0;
+	void operator()() const {
+		if (id) gl::deleteBuffers(1, &id);
+	}
+};
+struct RingBufferObjectMarker {
+	u64 targetOffset = 0;
+	std::shared_ptr<u64> currentOffset;
+	void operator()() const {
+		if (currentOffset) (*currentOffset) = targetOffset;
+	}
+};
 
 // Can only be move or referenced. Copying is disabled.
 template <class T>
@@ -176,8 +192,8 @@ public:
 		buffer.alloc(bufferCount * bufferSize);
 		current.offset = 0;
 		previous.offset = 0;
-		previous_previous.offset = 0;
 		m_allocated = true;
+		GPUUsageBegin = std::make_shared<u64>(0);
 	}
 
 	// Disable Copy
@@ -191,24 +207,20 @@ public:
 	//std::vector<T>& getStagingBuffer() { return dataBuffer; }
 	//const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
 
-	template <class Func>
-	    requires std::invocable<Func, std::span<T>>
-	void push(u32 size, Func&& f) {
+	template <class Func, class SubmitDeleter>
+	    requires std::invocable<Func, std::span<T>> && std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
+	void push(u32 size, Func&& f, SubmitDeleter&& submitDeleter) {
 		if (!size) return;
 
 		current.count = size;
 
-		if (current.end() > buffer.size()) current.offset = 0;
+		bool wrapped = current.end() > buffer.size();
+		if (wrapped) current.offset = 0;
 
-		bool collision = false;
-		for (const auto& f : fences) {
-			if (f.range.count > 0 && current.offset < f.range.end() && current.end() > f.range.offset) {
-				collision = true;
-				break;
-			}
-		}
+		// Collision happens if we wrap and lap the GPU read head, or if we wrap into an unstarted GPU read head
+		bool collision = current.offset <= *GPUUsageBegin && current.end() >= *GPUUsageBegin;
 		while (collision || current.end() > buffer.size()) {
-			resize();
+			resize_impl(submitDeleter);
 			collision = false;
 		}
 
@@ -218,22 +230,19 @@ public:
 		current.offset = current.end();
 		current.count = 0;
 	}
-	void push(std::span<T> dataBuffer) {
-		this->push(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) {
-			std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
-		});
+	template <class SubmitDeleter>
+	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
+	void push(std::span<T> dataBuffer, SubmitDeleter&& submitDeleter) {
+		this->push(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) { std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin()); }, std::forward<SubmitDeleter>(submitDeleter));
 	}
 
 	// draw call associated
 
-	u64 getNext() {
+	template <class Func>
+	    requires std::invocable<Func, RingBufferObjectMarker&&>
+	u64 getNext(Func&& submitMarker) {
 		// new draw call
-		fences.push_back(FenceEntry_impl{ Fence{}, std::move(deleteId), previous_previous });
-		previous_previous = previous;
-		deleteId = std::vector<gid>();
-
-		resolveFences();
-
+		submitMarker(RingBufferObjectMarker{ previous.offset, GPUUsageBegin });
 		return previous.offset;
 	}
 	operator const BufferObject<T>&() const { return buffer; }
@@ -254,60 +263,42 @@ private:
 	constexpr inline static u32 InitialBufferCount = 4;
 	u32 bufferSize = InitialBufferSize, bufferCount = InitialBufferCount;
 
-	// fencing stuff
-	struct FenceEntry_impl {
-		Fence fence;
-		std::vector<gid> deleteIds;
-		Region range;
-	};
-
-	std::deque<FenceEntry_impl> fences;
-
-	void resolveFences() {
-		while (!fences.empty() && fences.front().fence.isFinished()) {
-			FenceEntry_impl& entry = fences.front();
-			for (gid i : entry.deleteIds) {
-				gl::deleteBuffers(1, &i);
-			}
-			fences.pop_front();
-		}
-	}
-
-	void resize() {
+	template <class Func>
+	    requires std::invocable<Func, RingBufferObjectDeleter&&>
+	void resize_impl(Func&& submitDeleter) {
 		bufferSize *= 2;
-		deleteId.push_back(buffer.resize(bufferSize * bufferCount));
+		submitDeleter(RingBufferObjectDeleter{ buffer.resize(bufferSize * bufferCount) });
 		current.offset = 0;
-		for (auto& f : fences) f.range.count = 0; // Clear collisions for the NEW blank buffer!
-		previous_previous.count = 0;
+		GPUUsageBegin = std::make_shared<u64>(0);
 	}
 
 private:
 	DynamicBufferObject<T> buffer;
-	//std::vector<T> dataBuffer;
-	Region previous_previous;
 	Region previous;
 	Region current;
-	std::vector<gid> deleteId;
+	std::shared_ptr<u64> GPUUsageBegin;
 	bool m_allocated = false;
 };
 
 
 // return UINT64_MAX if failed
-template <class First, class... Rest>
-u64 getRingBufferOffset(RingBufferObject<First>& first, RingBufferObject<Rest>&... rest) {
-	u64 expected = first.getNext();
+template <class SubmitMarker, class First, class... Rest>
+    requires std::invocable<SubmitMarker, RingBufferObjectMarker&&>
+u64 getRingBufferOffset(SubmitMarker&& submitMarker, RingBufferObject<First>& first, RingBufferObject<Rest>&... rest) {
+	u64 expected = first.getNext(submitMarker);
 	u64 result = expected;
 	if constexpr (sizeof...(Rest) > 0) {
-		((rest.getNext() != expected ? (result = UINT64_MAX) : 0), ...);
+		((rest.getNext(submitMarker) != expected ? (result = UINT64_MAX) : 0), ...);
 	}
 	return result;
 }
 
-template <class T, std::invocable<std::vector<T>&> Func>
-void writeRingBuffer(RingBufferObject<T>& buffer, Func&& modifier) {
+template <class T, class SubmitDeleter, class Func>
+    requires std::invocable<Func, std::vector<T>&> && std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
+void writeRingBuffer(RingBufferObject<T>& buffer, SubmitDeleter&& submitDeleter, Func&& modifier) {
 	std::vector<T> stagingBuffer;
 	modifier(stagingBuffer);
-	buffer.push(std::span<T>(stagingBuffer));
+	buffer.push(std::span<T>(stagingBuffer), std::forward<SubmitDeleter>(submitDeleter));
 }
 
 

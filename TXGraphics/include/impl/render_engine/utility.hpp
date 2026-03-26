@@ -9,9 +9,11 @@
 #include "impl/render_engine/shader_manager.hpp"
 #include "impl/render_engine/buffer.hpp"
 #include "impl/render_engine/vertex_attribute_manager.hpp"
+#include "impl/render_engine/fence_manager.hpp"
+#include "impl/render_engine/texture.hpp"
 
-#include <filesystem>
 #include <iostream>
+#include <utility>
 
 
 namespace tx::RenderEngine {
@@ -28,11 +30,27 @@ template <class BufferT>
 inline void VAMBindBuffer(VAM& vam, const BufferHandle<BufferT>& handle, u32 offset = 0) {
 	vam.setBuffer(handle.id, handle.bo, offset);
 }
-template <class T>
-inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& handle) {
-	vam.setBuffer(handle.id, handle.bo, handle.bo.getNext());
+template <class T, class SubmitMarker>
+    requires std::invocable<SubmitMarker, RingBufferObjectMarker&&>
+inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& handle, SubmitMarker&& submitMarker) {
+	vam.setBuffer(handle.id, handle.bo, handle.bo.getNext(std::forward<SubmitMarker>(submitMarker)));
 }
 
+// fence
+
+
+using FenceManager_t = FenceManager<
+    RingBufferObjectDeleter,
+    RingBufferObjectMarker,
+    TextureDeleter>;
+
+struct FMAddOperation {
+	FenceManager_t& fm;
+	template <class T>
+	void operator()(T&& operation) const {
+		fm.addOperation(std::forward<T>(operation));
+	}
+};
 
 
 } // namespace tx::RenderEngine

@@ -76,6 +76,7 @@ private:
 	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
 	re::BufferHandle<re::RingBufferObject<float>> scaleBuffer;
 	re::TextureArray ta;
+	re::FenceManager_t fm;
 
 
 private:
@@ -186,7 +187,7 @@ private:
 	tx::u64 tickCounter = 0;
 	void update() {
 		if (!(tickCounter % 3)) {
-			re::writeRingBuffer(animStateBuffer.bo, [&](std::vector<tx::u32>& input) {
+			re::writeRingBuffer(animStateBuffer.bo, re::FMAddOperation{ fm }, [&](std::vector<tx::u32>& input) {
 				for (int i = 0; i < 4; i++)
 					input.push_back(frameCounter);
 			});
@@ -204,7 +205,7 @@ private:
 			tickCounter = 0;
 		}
 		scale *= currentMult;
-		re::writeRingBuffer(scaleBuffer.bo, [&](std::vector<float>& input) {
+		re::writeRingBuffer(scaleBuffer.bo, re::FMAddOperation{ fm }, [&](std::vector<float>& input) {
 			input.push_back(scale);
 		});
 		if (scale >= 3.0f) {
@@ -216,8 +217,9 @@ private:
 	}
 	void render() {
 		//tx::Time::Timer timer;
-		re::VAMUpdateRingBuffer(vam, animStateBuffer);
-		re::VAMUpdateRingBuffer(vam, scaleBuffer);
+		re::VAMUpdateRingBuffer(vam, animStateBuffer, re::FMAddOperation{ fm });
+		re::VAMUpdateRingBuffer(vam, scaleBuffer, re::FMAddOperation{ fm });
+		fm.update();
 		dcm.drawInstanced(0, 6, 1);
 		//cout << timer.duration() << "ms" << endl;
 	}
