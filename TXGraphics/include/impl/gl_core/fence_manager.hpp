@@ -4,6 +4,7 @@
 // File: fence_manager.hpp
 
 #pragma once
+#include "tx/type_traits.hpp"
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "impl/gl_core/fence.hpp"
 #include <tuple>
@@ -14,6 +15,16 @@ namespace tx::RenderEngine {
 template <class... FuncTypes>
 class FenceManager {
 public:
+	// Context pointer for easy global access within the current thread/context
+	inline static thread_local FenceManager* current = nullptr;
+
+	// Helper RAII struct to bind this manager
+	struct ScopeBind {
+		FenceManager* previous;
+		ScopeBind(FenceManager* fm) : previous(FenceManager::current) { FenceManager::current = fm; }
+		~ScopeBind() { FenceManager::current = previous; }
+	};
+
 	FenceManager() {
 		operationQueue.emplace_back();
 	}
@@ -64,5 +75,21 @@ private:
 		    operationBuffer);
 	}
 };
+
+/// @brief A helper callable that forwards a deleter operation to a FenceManager.
+/// Used to pass a fence manager to functions that expect a deleter-submitting functor.
+template <InstantiationOf<FenceManager> FMT>
+struct FMAddOperation {
+	FMAddOperation(FMT& in_fm) : fm(in_fm) {}
+	FMT& fm;
+
+	template <class Func>
+	void operator()(Func&& operation) const {
+		fm.addOperation(std::forward<Func>(operation));
+	}
+};
+
+template <typename FMT>
+FMAddOperation(FMT&) -> FMAddOperation<FMT>;
 
 } // namespace tx::RenderEngine

@@ -7,7 +7,7 @@
 
 #include "tx/upset.hpp"
 #include "tx/math.h"
-#include "impl/type_traits.hpp"
+#include "tx/type_traits.hpp"
 
 namespace tx {
 namespace RenderEngine {

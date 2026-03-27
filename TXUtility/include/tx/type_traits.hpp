@@ -24,6 +24,15 @@ inline constexpr u32 enumval(T in) noexcept {
 template <class>
 inline constexpr bool false_v = false;
 
+// is instantiatin of
+template <typename T, template <typename...> class Template>
+struct is_instantiation_of : std::false_type {};
+template <template <typename...> class Template, typename... Args>
+struct is_instantiation_of<Template<Args...>, Template> : std::true_type {};
+template <typename T, template <typename...> class Template>
+concept InstantiationOf = is_instantiation_of<T, Template>::value;
+
+
 enum class TypeEnum : u32 {
 	Float,
 	Int,

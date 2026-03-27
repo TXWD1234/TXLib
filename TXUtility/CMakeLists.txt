@@ -16,7 +16,7 @@ include("${CMakeUtils}/optimization.cmake")
 
 add_library(TXUtility INTERFACE
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/utility.h"
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/type_traits.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/type_traits.hpp"
 )
 tx_add_release_ops_interface(TXUtility)
 

@@ -2,6 +2,10 @@
 #include "stb_image.hpp"
 #include <concepts>
 
+template <class T = int>
+class aaa {
+};
+
 class Application {
 private:
 	struct UpdateFunc {
@@ -75,8 +79,8 @@ private:
 	re::BufferHandle<re::StaticBufferObject<tx::u64>> textureSamplerBuffer;
 	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
 	re::BufferHandle<re::RingBufferObject<float>> scaleBuffer;
-	re::TextureArray ta;
-	re::FenceManager_t fm;
+	re::TextureManager<> tm;
+	re::FenceManager_t fm; // Create the FenceManager instance
 
 
 private:
@@ -152,14 +156,14 @@ private:
 		}
 		tx::u32 length = width * height * 4;
 
-		ta = re::TextureArray(re::TextureFormat::RGBA, { width, height }, data.size(), 0);
-		tx::u64 handle = ta.handle();
-		textureSamplerBuffer.bo.alloc(1, &handle);
-		re::VAMBindBuffer(vam, textureSamplerBuffer);
+		tm.setFenceManager(fm);
 		for (int i = 0; i < data.size(); i++) {
-			ta.setLayer(i, std::bitSpan(data[i], length));
+			tm.addTexture({ width, height }, std::bitSpan(data[i], length));
 			if (data[i]) stbi_image_free(data[i]);
 		}
+		tx::u64 handle = tm.getTexture(re::TextureId{ 0, 0 }).handle();
+		textureSamplerBuffer.bo.alloc(1, &handle);
+		re::VAMBindBuffer(vam, textureSamplerBuffer);
 
 		dcm = tx::RE::DrawCallManager();
 		dcm.setVAM(vam);
@@ -238,7 +242,6 @@ int main() {
 		std::cerr << "[FatalError]: Failed to init Application\n";
 		return 1;
 	}
-
 	std::cout << "[Status]: Main Loop Starts\n";
 	app.run();
 

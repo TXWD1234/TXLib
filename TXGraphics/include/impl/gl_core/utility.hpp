@@ -39,18 +39,10 @@ inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& han
 // fence
 
 
-using FenceManager_t = FenceManager<
-    RingBufferObjectDeleter,
-    RingBufferObjectMarker,
-    TextureDeleter>;
-
-struct FMAddOperation {
-	FenceManager_t& fm;
-	template <class T>
-	void operator()(T&& operation) const {
-		fm.addOperation(std::forward<T>(operation));
-	}
-};
+// using FenceManager_t = FenceManager<
+//     RingBufferObjectDeleter,
+//     RingBufferObjectMarker,
+//     TextureDeleter>;
 
 
 } // namespace tx::RenderEngine
