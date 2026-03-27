@@ -27,7 +27,7 @@ struct BufferHandle {
 };
 
 template <class BufferT>
-inline void VAMBindBuffer(VAM& vam, const BufferHandle<BufferT>& handle, u32 offset = 0) {
+inline void VAMSetBuffer(VAM& vam, const BufferHandle<BufferT>& handle, u32 offset = 0) {
 	vam.setBuffer(handle.id, handle.bo, offset);
 }
 template <class T, class SubmitMarker>
@@ -39,10 +39,10 @@ inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& han
 // fence
 
 
-// using FenceManager_t = FenceManager<
-//     RingBufferObjectDeleter,
-//     RingBufferObjectMarker,
-//     TextureDeleter>;
+using FenceManager_t = FenceManager<
+    RingBufferObjectDeleter,
+    RingBufferObjectMarker,
+    TextureDeleter>;
 
 
 } // namespace tx::RenderEngine

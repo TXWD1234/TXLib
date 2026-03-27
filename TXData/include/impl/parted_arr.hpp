@@ -53,6 +53,10 @@ public:
 			parent->push_back_impl(partIndex, val);
 		}
 
+		void clear() {
+			parent->partAttribs[partIndex].len = 0;
+		}
+
 		It_t begin() { return parent->begin() + attrib.offset; }
 		It_t end() { return parent->begin() + attrib.offset + attrib.len; }
 
@@ -84,8 +88,24 @@ public:
 	void refresh(ConstPartition_impl& in) const { in.attrib = partAttribs[in.partIndex]; }
 
 	void addPartition() {
-		partAttribs.push_back(PartAttrib_impl{ data.size(), 0, 1 });
+		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(data.size()), 0, 1 });
 		pushPart_impl(1);
+	}
+
+	void clear() {
+		data.clear();
+		partAttribs.clear();
+	}
+	// keep partitions
+	void clearData() {
+		for (PartAttrib_impl& i : partAttribs) {
+			if constexpr (!std::is_trivially_destructible_v<T>) {
+				for (u32 j = 0; j < i.len; ++j) {
+					data[i.offset + j] = T{};
+				}
+			}
+			i.len = 0;
+		}
 	}
 
 
@@ -141,4 +161,8 @@ private:
 	}
 };
 
+template <class T>
+using PartedArr_Partition = typename PartedArr<T>::Partition_impl;
+template <class T>
+using PartedArr_ConstPartition = typename PartedArr<T>::ConstPartition_impl;
 } // namespace tx

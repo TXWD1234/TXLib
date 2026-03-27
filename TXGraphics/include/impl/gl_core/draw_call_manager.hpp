@@ -87,17 +87,15 @@ public:
 	void setCount(u32 count) { m_count = count; }
 	void setInstanceCount(u32 instanceCount) { m_instanceCount = instanceCount; }
 
-	void setDrawCallParameters(u32 begin, u32 count, u32 instanceCount) {
+	void setParameters(u32 begin, u32 count, u32 instanceCount) {
 		m_begin = begin;
 		m_count = count;
 		m_instanceCount = instanceCount;
 	}
-	void setDrawCallParameters(u32 begin, u32 count) {
+	void setParameters(u32 begin, u32 count) {
 		m_begin = begin;
 		m_count = count;
 	}
-	void setParameters(u32 begin, u32 count, u32 instanceCount) { setDrawCallParameters(begin, count, instanceCount); }
-	void setParameters(u32 begin, u32 count) { setDrawCallParameters(begin, count); }
 
 	void setShaderProgram(const ShaderProgram& program) {
 		m_programId = program.id();
@@ -114,6 +112,7 @@ public:
 		setShaderPipeline(pipeline);
 	}
 
+	// legacy
 	void setTexture(u32 port, const TextureArray_legacy& tex) {
 		if (port >= m_textures.size()) m_textures.resize(port + 1, 0);
 		m_textures[port] = tex.id();

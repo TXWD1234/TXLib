@@ -6,6 +6,7 @@
 #pragma once
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "buffer.hpp"
+#include <concepts>
 
 namespace tx {
 namespace RenderEngine {
@@ -17,8 +18,8 @@ public:
 
 	VertexAttributeManager() {}
 	template <class InitFunc>
+	    requires std::invocable<InitFunc, Initializer&>
 	VertexAttributeManager(InitFunc f) {
-		static_assert(std::is_invocable_v<InitFunc, Initializer&>, "tx::RE::VertexAttributeManager: InitFunc must take Initializer&");
 		Initializer initer;
 		f(initer);
 		init_impl(std::move(initer));

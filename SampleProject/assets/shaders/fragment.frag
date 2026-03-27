@@ -5,14 +5,14 @@
 layout(location = 0) out vec4 FragColor;
 
 in vec2 uv;
-in flat uint animState;
-in flat uint64_t v_textureHandle;
+in flat uint64_t textureHandle;
+in flat float textureIndex;
 
 void main() {
 	#if defined(GL_ARB_bindless_texture)
-        if (v_textureHandle != 0ul) {
-            sampler2DArray s = sampler2DArray(v_textureHandle);
-            FragColor = texture(s, vec3(uv, animState));
+        if (textureHandle != 0ul) {
+            sampler2DArray s = sampler2DArray(textureHandle);
+            FragColor = texture(s, vec3(uv, textureIndex));
         } else {
             FragColor = vec4(1.0, 0.0, 1.0, 1.0); // Magenta for null
         }

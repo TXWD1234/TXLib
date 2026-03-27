@@ -9,6 +9,7 @@
 #include "impl/gl_core/buffer.hpp"
 #include "impl/gl_core/texture.hpp"
 #include "impl/gl_core/fence_manager.hpp"
+#include "impl/gl_core/utility.hpp"
 #include <unordered_map>
 #include <span>
 #include <stdexcept>
@@ -20,15 +21,8 @@ struct TextureId {
 	u32 index;
 };
 
-// Define FenceManager_t here to ensure it's visible for TextureManager's default template argument
-using FenceManager_t = FenceManager<
-    RingBufferObjectDeleter,
-    RingBufferObjectMarker,
-    TextureDeleter>;
-
-template <class fmT = tx::RenderEngine::FenceManager_t>
-//requires InstantiationOf<fmT, FenceManager>
-class TextureManager {
+template <InstantiationOf<FenceManager> fmT>
+class TextureManagerBase {
 public:
 	TextureId addTexture(Coord dimension, std::span<u8> data) {
 		u32 dimensionId;
@@ -45,6 +39,16 @@ public:
 			m_textures[dimensionId].push_back(data, fm)
 		};
 	}
+	TextureId addTexture(u32 dimensionId, std::span<u8> data) {
+		if (dimensionId >= m_textures.size())
+			throw std::runtime_error("tx::RE::TextureManager::addTexture: Invalid dimensionId.");
+
+		return TextureId{
+			dimensionId,
+			m_textures[dimensionId].push_back(data, fm)
+		};
+	}
+
 
 	TextureArray& getTexture(TextureId id) {
 		return m_textures[id.dimensionId].ta;
@@ -87,6 +91,9 @@ private:
 		m_textures.emplace_back(dimension, TextureArraySize, TextureRule::Linear, TextureRule::Clamp);
 	}
 };
+
+using TextureManager = TextureManagerBase<FenceManager_t>;
+
 
 
 } // namespace tx::RenderEngine

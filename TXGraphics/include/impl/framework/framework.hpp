@@ -30,7 +30,7 @@ public:
 
 public:
 	MakeWindow(
-	    const Coord& in_windowDimension = Coord{ 900, 900 },
+	    const Coord& in_windowDimension = Coord{ 949, 949 },
 	    const Coord& in_windowPos = Coord{ 5, 42 },
 	    const std::string& in_windowTitle = "TXStudio Project",
 	    FullscreenConfig fullscreenCfg = FullscreenConfig::None)

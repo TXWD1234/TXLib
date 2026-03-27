@@ -50,7 +50,11 @@ bool addShaderPair(const std::string& vertName, const std::string& fragName, Sha
 
 
 
-
+Coord getWindowSize(GLFWwindow* window) {
+	int x, y;
+	glfwGetWindowSize(window, &x, &y);
+	return Coord{ x, y };
+}
 
 
 

@@ -2,10 +2,6 @@
 #include "stb_image.hpp"
 #include <concepts>
 
-template <class T = int>
-class aaa {
-};
-
 class Application {
 private:
 	struct UpdateFunc {
@@ -70,18 +66,10 @@ private:
 
 	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Pipeline;
 
-	re::DrawCallManager dcm;
 	re::ShaderManager<smtype> sm;
-	re::VertexAttributeManager vam;
-	re::BufferHandle<re::StaticBufferObject<tx::vec2>> squarePosBuffer;
-	re::BufferHandle<re::StaticBufferObject<tx::vec2>> instanceBuffer;
-	re::BufferHandle<re::StaticBufferObject<tx::vec2>> UVBuffer;
-	re::BufferHandle<re::StaticBufferObject<tx::u64>> textureSamplerBuffer;
-	re::BufferHandle<re::RingBufferObject<tx::u32>> animStateBuffer;
-	re::BufferHandle<re::RingBufferObject<float>> scaleBuffer;
-	re::TextureManager<> tm;
-	re::FenceManager_t fm; // Create the FenceManager instance
-
+	re::TextureArray ta;
+	re::Renderer renderer;
+	tx::u32 rendererSectionId;
 
 private:
 	bool init() {
@@ -106,37 +94,14 @@ private:
 		// 	{ 0.0, 1.0 } // Top-Left
 		// };
 
-		vector<tx::vec2> positions = {
-			tx::Origin
-		};
-
-		squarePosBuffer.bo.alloc(6, squarePos.data());
-		instanceBuffer.bo.alloc(1, positions.data());
-		UVBuffer.bo.alloc(6, squareUV.data());
-
-		animStateBuffer.bo.alloc();
-		scaleBuffer.bo.alloc();
-		vam = tx::RE::VertexAttributeManager([&](tx::RE::VAMIniter& initer) {
-			squarePosBuffer.id = initer.addAttrib<tx::vec2>();
-			UVBuffer.id = initer.addAttrib<tx::vec2>();
-			animStateBuffer.id = initer.addAttribInstanced<tx::u32>();
-			instanceBuffer.id = initer.addAttribInstanced<tx::vec2>();
-			scaleBuffer.id = initer.addAttribInstanced<float>();
-			textureSamplerBuffer.id = initer.addAttribInstanced<tx::u64>();
-		});
-
-		re::VAMBindBuffer(vam, squarePosBuffer);
-		re::VAMBindBuffer(vam, UVBuffer);
-		re::VAMBindBuffer(vam, animStateBuffer);
-		re::VAMBindBuffer(vam, instanceBuffer);
-		re::VAMBindBuffer(vam, scaleBuffer);
-
+		renderer.init();
 
 		re::ProgramId activeShaders;
 		if (!re::addShaderPair("vertex", "fragment", sm, activeShaders)) {
 			std::cerr << "[Error]: failed to add shaders.\n";
 			return 0;
 		}
+		rendererSectionId = renderer.registerSection(sm.get(activeShaders));
 
 		stbi_set_flip_vertically_on_load(true);
 		int width, height, channels;
@@ -156,18 +121,13 @@ private:
 		}
 		tx::u32 length = width * height * 4;
 
-		tm.setFenceManager(fm);
+
+
+		ta = re::TextureArray(re::TextureFormat::RGBA, { width, height }, data.size(), 0);
 		for (int i = 0; i < data.size(); i++) {
-			tm.addTexture({ width, height }, std::bitSpan(data[i], length));
+			ta.setLayer(i, std::bitSpan(data[i], length));
 			if (data[i]) stbi_image_free(data[i]);
 		}
-		tx::u64 handle = tm.getTexture(re::TextureId{ 0, 0 }).handle();
-		textureSamplerBuffer.bo.alloc(1, &handle);
-		re::VAMBindBuffer(vam, textureSamplerBuffer);
-
-		dcm = tx::RE::DrawCallManager();
-		dcm.setVAM(vam);
-		dcm.setShaders(sm.get(activeShaders));
 
 		return 1;
 	}
@@ -175,14 +135,6 @@ private:
 	tx::u32 frameCounter = 0;
 	tx::u32 imageCount = 15;
 
-	vector<tx::vec2> squareUV = {
-		{ 1.0, 0.0 },
-		{ 0.0, 0.0 },
-		{ 1.0, 1.0 },
-		{ 0.0, 0.0 },
-		{ 1.0, 1.0 },
-		{ 0.0, 1.0 }
-	};
 
 	const float scaleIncreaseMult = 1.067f;
 	const float scaleDecreaseMult = 0.8f;
@@ -191,11 +143,6 @@ private:
 	tx::u64 tickCounter = 0;
 	void update() {
 		if (!(tickCounter % 3)) {
-			re::writeRingBuffer(animStateBuffer.bo, re::FMAddOperation{ fm }, [&](std::vector<tx::u32>& input) {
-				for (int i = 0; i < 4; i++)
-					input.push_back(frameCounter);
-			});
-
 			frameCounter++;
 			if (frameCounter >= 11) {
 				frameCounter = 0;
@@ -209,9 +156,6 @@ private:
 			tickCounter = 0;
 		}
 		scale *= currentMult;
-		re::writeRingBuffer(scaleBuffer.bo, re::FMAddOperation{ fm }, [&](std::vector<float>& input) {
-			input.push_back(scale);
-		});
 		if (scale >= 3.0f) {
 			currentMult = scaleDecreaseMult;
 		} else if (scale <= 0.5f) {
@@ -221,10 +165,8 @@ private:
 	}
 	void render() {
 		//tx::Time::Timer timer;
-		re::VAMUpdateRingBuffer(vam, animStateBuffer, re::FMAddOperation{ fm });
-		re::VAMUpdateRingBuffer(vam, scaleBuffer, re::FMAddOperation{ fm });
-		fm.update();
-		dcm.drawInstanced(0, 6, 1);
+		renderer.drawSprite(tx::Origin, ta, frameCounter, rendererSectionId);
+		renderer.draw();
 		//cout << timer.duration() << "ms" << endl;
 	}
 };
@@ -242,6 +184,7 @@ int main() {
 		std::cerr << "[FatalError]: Failed to init Application\n";
 		return 1;
 	}
+
 	std::cout << "[Status]: Main Loop Starts\n";
 	app.run();
 
