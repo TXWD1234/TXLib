@@ -38,57 +38,67 @@ public:
 	public:
 		u32 offset;
 		u32 len;
+		u32 memoryIndex;
 		u32 partCount = 1;
 	};
 	class Partition_impl {
 	public:
 		Partition_impl(PartedArr* in_parent, u32 in_index)
-		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]), partIndex(in_index) {}
+		    : parent(in_parent), partIndex(in_index) {}
 
-		T& operator[](u32 index) { return parent->data[attrib.offset + index]; }
+		T& operator[](u32 index) { return parent->data[attrib().offset + index]; }
 
-		u32 size() const { return attrib.len; }
+		u32 size() const { return attrib().len; }
 
 		void push_back(const T& val) {
 			parent->push_back_impl(partIndex, val);
 		}
 
 		void clear() {
-			parent->partAttribs[partIndex].len = 0;
+			attrib().len = 0;
 		}
 
-		It_t begin() { return parent->begin() + attrib.offset; }
-		It_t end() { return parent->begin() + attrib.offset + attrib.len; }
+		void resize(u32 newsize) {
+			parent->reservePart_impl(partIndex, newsize);
+			attrib().len = newsize;
+		}
+		void reserve(u32 newsize) {
+			parent->reservePart_impl(partIndex, newsize);
+		}
+
+		It_t begin() { return parent->begin() + attrib().offset; }
+		It_t end() { return parent->begin() + attrib().offset + attrib().len; }
 
 	private:
 		PartedArr<T>* parent;
-		PartAttrib_impl attrib;
 		u32 partIndex;
+
+		PartAttrib_impl& attrib() const { return parent->partAttribs[partIndex]; }
 	};
 	class ConstPartition_impl {
 	public:
 		ConstPartition_impl(const PartedArr* in_parent, u32 in_index)
-		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]) {}
+		    : parent(in_parent), partIndex(in_index) {}
 
-		const T& operator[](u32 index) const { return parent->data[attrib.offset + index]; }
+		const T& operator[](u32 index) const { return parent->data[attrib().offset + index]; }
 
-		u32 size() const { return attrib.len; }
-		ConstIt_t begin() const { return parent->begin() + attrib.offset; }
-		ConstIt_t end() const { return parent->begin() + attrib.offset + attrib.len; }
+		u32 size() const { return attrib().len; }
+		ConstIt_t begin() const { return parent->begin() + attrib().offset; }
+		ConstIt_t end() const { return parent->begin() + attrib().offset + attrib().len; }
 
 	private:
 		const PartedArr<T>* parent;
-		PartAttrib_impl attrib;
+		u32 partIndex;
+
+		const PartAttrib_impl& attrib() const { return parent->partAttribs[partIndex]; }
 	};
 
 	Partition_impl operator[](u32 index) { return Partition_impl{ this, index }; }
 	ConstPartition_impl operator[](u32 index) const { return ConstPartition_impl{ this, index }; }
 
-	void refresh(Partition_impl& in) const { in.attrib = partAttribs[in.partIndex]; }
-	void refresh(ConstPartition_impl& in) const { in.attrib = partAttribs[in.partIndex]; }
-
 	void addPartition() {
-		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(data.size()), 0, 1 });
+		partOrder.push_back(partAttribs.size());
+		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(data.size()), 0, static_cast<u32>(partAttribs.size()), 1 });
 		pushPart_impl(1);
 	}
 
@@ -117,7 +127,10 @@ public:
 private:
 	std::vector<T> data;
 	std::vector<PartAttrib_impl> partAttribs;
+	std::vector<u32> partOrder;
 	const u32 PartLen;
+
+	// memory operations
 
 	void pushPart_impl(u32 n = 1) { // add n empty partition at the end
 		data.resize(data.size() + PartLen * n);
@@ -137,25 +150,49 @@ private:
 		}
 	}
 
+	// arrangements
+
+	void movePartToEnd_impl(u32 partIndex) {
+		PartAttrib_impl& attrib = partAttribs[partIndex];
+		if (attrib.memoryIndex >= partOrder.size() - 1) return;
+		// meta
+		for (u32 i = attrib.memoryIndex + 1; i < partOrder.size(); i++) {
+			partAttribs[partOrder[i]].memoryIndex--;
+		}
+		std::rotate(partOrder.begin() + attrib.memoryIndex,
+		            partOrder.begin() + attrib.memoryIndex + 1,
+		            partOrder.end());
+		attrib.memoryIndex = partOrder.size() - 1;
+		// memory
+		u32 nextOffset = data.size();
+		pushPart_impl(attrib.partCount);
+		moveData_impl(nextOffset, attrib.offset, attrib.len);
+		attrib.offset = nextOffset;
+	}
+
+	void reservePart_impl(u32 partIndex, u32 newsize) {
+		PartAttrib_impl& attrib = partAttribs[partIndex];
+		int expandPartCount = max(static_cast<int>((newsize + PartLen - 1) / PartLen) - static_cast<int>(attrib.partCount), 0);
+		attrib.partCount += expandPartCount;
+		// memory
+		if (attrib.memoryIndex >= partOrder.size() - 1) { // at the end
+			pushPart_impl(expandPartCount);
+		} else {
+			while (expandPartCount > 0) {
+				u32 next = partOrder[attrib.memoryIndex + 1];
+				movePartToEnd_impl(next);
+				expandPartCount -= partAttribs[next].partCount;
+			}
+			attrib.partCount -= expandPartCount;
+		}
+	}
+
+
 	// linear reallocate
 	void push_back_impl(u32 partIndex, const T& val) {
 		PartAttrib_impl& attrib = partAttribs[partIndex];
 		if (attrib.len >= attrib.partCount * PartLen) { // if exceeded -> resize
-			u32 targetOffset = attrib.offset + attrib.partCount * PartLen;
-
-			auto it = std::find_if(partAttribs.begin(), partAttribs.end(),
-			                       [targetOffset](const PartAttrib_impl& p) { return p.offset == targetOffset; });
-
-			if (it != partAttribs.end()) { // if another partition is in the way -> move it to the back
-				u32 nextOffset = data.size();
-				pushPart_impl(it->partCount);
-				moveData_impl(nextOffset, it->offset, it->len);
-				it->offset = nextOffset;
-			} else if (targetOffset == data.size()) { // if at the end of the data vector -> push new empty space
-				pushPart_impl(1);
-			}
-			attrib.partCount++;
-			// from now, the current partition should have a empty partition after it
+			reservePart_impl(partIndex, attrib.len + 1);
 		}
 		data[attrib.offset + attrib.len++] = val;
 	}

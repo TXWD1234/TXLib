@@ -66,7 +66,28 @@ public:
 	// per frame draw operations
 
 	void drawSprite(vec2 position, const TextureArray& textureArr, u32 textureIndex, u32 sectionIndex) {
-		addInstance_impl(sectionIndex, position, textureArr.handle(), textureIndex);
+		addInstance_impl(sectionIndex, position, textureArr.handle(), static_cast<float>(textureIndex));
+	}
+
+	void drawSprites(std::span<const vec2> positions, const TextureArray& textureArr, u32 textureIndex, u32 sectionIndex) {
+		u64 textureHandle = textureArr.handle();
+		float textureIndexF = static_cast<float>(textureIndex);
+		u32 count = positions.size();
+
+		auto positionBuffer = instancePositionBuffer.stage[sectionIndex];
+		auto handleBuffer = instanceTextureHandleBuffer.stage[sectionIndex];
+		auto indexBuffer = instanceTextureIndexBuffer.stage[sectionIndex];
+
+		u32 oldSize = positionBuffer.size();
+		u32 newSize = oldSize + count;
+
+		positionBuffer.resize(newSize);
+		handleBuffer.resize(newSize);
+		indexBuffer.resize(newSize);
+
+		std::copy(positions.begin(), positions.end(), positionBuffer.begin() + oldSize);
+		std::fill(handleBuffer.begin() + oldSize, handleBuffer.end(), textureHandle);
+		std::fill(indexBuffer.begin() + oldSize, indexBuffer.end(), textureIndexF);
 	}
 
 	// draw call
@@ -141,10 +162,10 @@ private:
 
 	// OpenGL
 
-	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, u32 textureIndex) {
+	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex) {
 		instancePositionBuffer.stage[section].push_back(position);
 		instanceTextureHandleBuffer.stage[section].push_back(textureHandle);
-		instanceTextureIndexBuffer.stage[section].push_back(static_cast<float>(textureIndex));
+		instanceTextureIndexBuffer.stage[section].push_back(textureIndex);
 	}
 
 	// draw call

@@ -166,9 +166,19 @@ private:
 	void render() {
 		//tx::Time::Timer timer;
 		renderer.drawSprite(tx::Origin, ta, frameCounter, rendererSectionId);
+		renderer.drawSprites(
+		    whatever,
+		    ta, frameCounter, rendererSectionId);
 		renderer.draw();
 		//cout << timer.duration() << "ms" << endl;
 	}
+
+	std::vector<tx::vec2> whatever = {
+		{ 0.999, 0.999 },
+		{ -0.5, -0.5 },
+		{ 0.5, -0.5 },
+		{ -0.5, 0.5 }
+	};
 };
 
 // Things to add:
