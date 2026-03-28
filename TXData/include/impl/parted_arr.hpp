@@ -24,7 +24,7 @@ public:
 public:
 	PartedArr(u32 partLen = 64) : PartLen(partLen) {}
 	PartedArr(u32 partCount, u32 partLen)
-	    : data(std::vector<T>(partCount * partLen)),
+	    : m_data(std::vector<T>(partCount * partLen)),
 	      partAttribs(std::vector<PartAttrib_impl>(partCount)),
 	      PartLen(partLen) {
 		for (int i = 0; i < partCount; ++i) {
@@ -46,9 +46,10 @@ public:
 		Partition_impl(PartedArr* in_parent, u32 in_index)
 		    : parent(in_parent), partIndex(in_index) {}
 
-		T& operator[](u32 index) { return parent->data[attrib().offset + index]; }
+		T& operator[](u32 index) { return parent->m_data[attrib().offset + index]; }
 
 		u32 size() const { return attrib().len; }
+		u32 offset() const { return attrib().offset; }
 
 		void push_back(const T& val) {
 			parent->push_back_impl(partIndex, val);
@@ -80,9 +81,10 @@ public:
 		ConstPartition_impl(const PartedArr* in_parent, u32 in_index)
 		    : parent(in_parent), partIndex(in_index) {}
 
-		const T& operator[](u32 index) const { return parent->data[attrib().offset + index]; }
+		const T& operator[](u32 index) const { return parent->m_data[attrib().offset + index]; }
 
 		u32 size() const { return attrib().len; }
+		u32 offset() const { return attrib().offset; }
 		ConstIt_t begin() const { return parent->begin() + attrib().offset; }
 		ConstIt_t end() const { return parent->begin() + attrib().offset + attrib().len; }
 
@@ -98,12 +100,12 @@ public:
 
 	void addPartition() {
 		partOrder.push_back(partAttribs.size());
-		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(data.size()), 0, static_cast<u32>(partAttribs.size()), 1 });
+		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(m_data.size()), 0, static_cast<u32>(partAttribs.size()), 1 });
 		pushPart_impl(1);
 	}
 
 	void clear() {
-		data.clear();
+		m_data.clear();
 		partAttribs.clear();
 	}
 	// keep partitions
@@ -111,21 +113,24 @@ public:
 		for (PartAttrib_impl& i : partAttribs) {
 			if constexpr (!std::is_trivially_destructible_v<T>) {
 				for (u32 j = 0; j < i.len; ++j) {
-					data[i.offset + j] = T{};
+					m_data[i.offset + j] = T{};
 				}
 			}
 			i.len = 0;
 		}
 	}
 
+	T* data() { return m_data.data(); }
+	u32 size() { return partAttribs.size(); }
+	u32 dataSize() { return m_data.size(); }
 
-	It_t begin() { return data.begin(); }
-	It_t end() { return data.end(); }
-	ConstIt_t begin() const { return data.begin(); }
-	ConstIt_t end() const { return data.end(); }
+	It_t begin() { return m_data.begin(); }
+	It_t end() { return m_data.end(); }
+	ConstIt_t begin() const { return m_data.begin(); }
+	ConstIt_t end() const { return m_data.end(); }
 
 private:
-	std::vector<T> data;
+	std::vector<T> m_data;
 	std::vector<PartAttrib_impl> partAttribs;
 	std::vector<u32> partOrder;
 	const u32 PartLen;
@@ -133,13 +138,13 @@ private:
 	// memory operations
 
 	void pushPart_impl(u32 n = 1) { // add n empty partition at the end
-		data.resize(data.size() + PartLen * n);
+		m_data.resize(m_data.size() + PartLen * n);
 	}
 	void moveData_impl(u32 dest, u32 src, u32 len) {
 		if (len == 0) return;
 
-		T* pSrc = data.data() + src;
-		T* pDst = data.data() + dest;
+		T* pSrc = m_data.data() + src;
+		T* pDst = m_data.data() + dest;
 
 		if constexpr (std::is_trivially_copyable_v<T>) {
 			std::memcpy(pDst, pSrc, len * sizeof(T));
@@ -164,7 +169,7 @@ private:
 		            partOrder.end());
 		attrib.memoryIndex = partOrder.size() - 1;
 		// memory
-		u32 nextOffset = data.size();
+		u32 nextOffset = m_data.size();
 		pushPart_impl(attrib.partCount);
 		moveData_impl(nextOffset, attrib.offset, attrib.len);
 		attrib.offset = nextOffset;
@@ -194,7 +199,7 @@ private:
 		if (attrib.len >= attrib.partCount * PartLen) { // if exceeded -> resize
 			reservePart_impl(partIndex, attrib.len + 1);
 		}
-		data[attrib.offset + attrib.len++] = val;
+		m_data[attrib.offset + attrib.len++] = val;
 	}
 };
 

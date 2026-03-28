@@ -218,11 +218,12 @@ public:
 		if (wrapped) current.offset = 0;
 
 		// Collision happens if we wrap and lap the GPU read head, or if we wrap into an unstarted GPU read head
-		bool collision = current.offset <= *GPUUsageBegin && current.end() >= *GPUUsageBegin;
+		bool collision = current.offset <= *GPUUsageBegin && current.end() >= *GPUUsageBegin && !isFirstIteration;
 		while (collision || current.end() > buffer.size()) {
 			resize_impl(submitDeleter);
 			collision = false;
 		}
+		isFirstIteration = 0;
 
 		f(std::span<T>(buffer.data() + current.offset, size));
 
@@ -278,6 +279,7 @@ private:
 	Region current;
 	std::shared_ptr<u64> GPUUsageBegin;
 	bool m_allocated = false;
+	bool isFirstIteration = 1;
 };
 
 

@@ -23,6 +23,10 @@ bool init(void* loadProc) {
 		std::cerr << "glDrawArraysInstanced is null\n";
 		success = 0;
 	}
+	if (glDrawArraysInstancedBaseInstance == nullptr) {
+		std::cerr << "glDrawArraysInstancedBaseInstance is null\n";
+		success = 0;
+	}
 	return success;
 }
 

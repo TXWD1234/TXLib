@@ -92,16 +92,28 @@ public:
 
 	// draw call
 	void draw() {
-		// check alignment
+		// get metadata
 		for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
-			if (!checkStageBufferSizeIdentical_impl(i))
+			if (!getStageBufferSectionMetaData_impl(i))
 				throw std::runtime_error(std::string("tx::RE::Renderer: unidentical dynamic buffer section: " + std::to_string(i)));
 		}
+		// update buffers
+		updateDynamicBuffers_impl();
+		if (!updateRingBufferOffset())
+			throw std::runtime_error("tx::RE::Renderer: Mismatched ring buffer offsets between dynamic buffers.");
 
+		// The VBOs for the ring buffers might be re-allocated (and get a new ID) inside updateDynamicBuffers_impl.
+		// We must re-bind them to the VAO to ensure the VAO points to the correct, live buffer objects before drawing.
+		// VAMSetBuffer(vam, instancePositionBuffer.buffer);
+		// VAMSetBuffer(vam, instanceTextureHandleBuffer.buffer);
+		// VAMSetBuffer(vam, instanceTextureIndexBuffer.buffer);
 
+		// draw call
+		fm.update();
 		for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
 			draw_impl(i);
 		}
+		// clean up
 		clearStage_impl();
 	}
 
@@ -121,6 +133,7 @@ private:
 	// sections are separated by different shaders
 	struct SectionMeta {
 		ShaderProduct shader;
+		u32 offset, size;
 	};
 
 private:
@@ -135,6 +148,7 @@ private:
 	DBuffer_impl<float> instanceTextureIndexBuffer;
 
 	std::vector<SectionMeta> sectionMetaDatas;
+	u32 ringBufferOffset = 0;
 
 	void initBuffers_impl() {
 		vam = VertexAttributeManager([&](VAMIniter& initer) {
@@ -176,31 +190,27 @@ private:
 	}
 
 	// draw call
-	// note: all dynamic buffers should have the same length in the current stage
+	// note: all dynamic buffers should have the same length in the same section
 
 	template <class T>
-	void updateDynamicBuffer_impl(u32 sectionIndex, DBuffer_impl<T>& buffer) {
-		auto stageBuffer = buffer.stage[sectionIndex];
-		u32 stageSize = stageBuffer.size();
+	void updateDynamicBuffer_impl(DBuffer_impl<T>& buffer) {
+		u32 size = buffer.stage.dataSize();
 		buffer.buffer.bo.push(
-		    stageSize, [&](std::span<T> input) {
-			    std::copy(stageBuffer.begin(), stageBuffer.end(), input.begin());
+		    size, [&](std::span<T> input) {
+			    std::copy(buffer.stage.begin(), buffer.stage.end(), input.begin());
 		    },
 		    FMSubmiter{ fm });
-		VAMUpdateRingBuffer(vam, buffer.buffer, FMSubmiter{ fm });
 	}
-	u32 updateDynamicBuffers_impl(u32 sectionIndex) {
-
-		updateDynamicBuffer_impl(sectionIndex, instancePositionBuffer);
-		updateDynamicBuffer_impl(sectionIndex, instanceTextureHandleBuffer);
-		updateDynamicBuffer_impl(sectionIndex, instanceTextureIndexBuffer);
-		return instancePositionBuffer.stage[sectionIndex].size();
+	void updateDynamicBuffers_impl() {
+		updateDynamicBuffer_impl(instancePositionBuffer);
+		updateDynamicBuffer_impl(instanceTextureHandleBuffer);
+		updateDynamicBuffer_impl(instanceTextureIndexBuffer);
 	}
 
 	// the actual single draw call
 	void draw_impl(u32 sectionIndex) {
-		// update buffer
-		u32 count = updateDynamicBuffers_impl(sectionIndex);
+		SectionMeta& section = sectionMetaDatas[sectionIndex];
+		if (!section.size) return; // skip empty draw calls
 
 		// configure dcm
 		dcm.setVAM(vam);
@@ -208,19 +218,26 @@ private:
 		    [&](auto& sp) {
 			    dcm.setShaders(*sp);
 		    },
-		    sectionMetaDatas[sectionIndex].shader);
+		    section.shader);
 
 		// draw call
-		fm.update();
-		dcm.drawInstanced(0, 6, count);
+		dcm.drawInstancedOffset(0, 6, section.size, ringBufferOffset + section.offset);
 	}
 
 	// security & clean up
 
-	bool checkStageBufferSizeIdentical_impl(u32 sectionIndex) const {
-		const u32 expectedSize = instancePositionBuffer.stage[sectionIndex].size();
-		return expectedSize == instanceTextureHandleBuffer.stage[sectionIndex].size() &&
-		       expectedSize == instanceTextureIndexBuffer.stage[sectionIndex].size();
+	[[nodiscard]] bool getStageBufferSectionMetaData_impl(u32 sectionIndex) {
+		sectionMetaDatas[sectionIndex].offset = instancePositionBuffer.stage[sectionIndex].offset();
+		sectionMetaDatas[sectionIndex].size = instancePositionBuffer.stage[sectionIndex].size();
+		return sectionMetaDatas[sectionIndex].size == instanceTextureHandleBuffer.stage[sectionIndex].size() &&
+		       sectionMetaDatas[sectionIndex].size == instanceTextureIndexBuffer.stage[sectionIndex].size() &&
+		       sectionMetaDatas[sectionIndex].offset == instanceTextureHandleBuffer.stage[sectionIndex].offset() &&
+		       sectionMetaDatas[sectionIndex].offset == instanceTextureIndexBuffer.stage[sectionIndex].offset();
+	}
+	[[nodiscard]] bool updateRingBufferOffset() {
+		ringBufferOffset = instancePositionBuffer.buffer.bo.getNext(FMSubmiter{ fm });
+		return ringBufferOffset == instanceTextureHandleBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
+		       ringBufferOffset == instanceTextureIndexBuffer.buffer.bo.getNext(FMSubmiter{ fm });
 	}
 
 	void clearStage_impl() {
@@ -232,6 +249,6 @@ private:
 
 // things to add:
 // 1. sprite size
-// 2. resolve shader registery problem
+// 2. selectable component -> instancePositionBuffer as base attribute that always exist
 
 } // namespace tx::RenderEngine

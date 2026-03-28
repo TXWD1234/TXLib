@@ -165,6 +165,7 @@ private:
 	}
 	void render() {
 		//tx::Time::Timer timer;
+		//std::cout << "frame\n";
 		renderer.drawSprite(tx::Origin, ta, frameCounter, rendererSectionId);
 		renderer.drawSprites(
 		    whatever,
