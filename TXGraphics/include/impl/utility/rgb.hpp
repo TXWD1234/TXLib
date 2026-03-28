@@ -31,15 +31,15 @@ public:
 	inline bool operator!=(const tx::RGB& other) const { return !this->operator==(other); }
 
 	inline void normalize() {
-		m_r /= 255.0f;
-		m_g /= 255.0f;
-		m_b /= 255.0f;
+		m_r *= oneOf255;
+		m_g *= oneOf255;
+		m_b *= oneOf255;
 	}
 	inline RGB normalized() const {
 		return RGB{
-			m_r / 255.0f,
-			m_g / 255.0f,
-			m_b / 255.0f
+			m_r * oneOf255,
+			m_g * oneOf255,
+			m_b * oneOf255
 		};
 	}
 	inline bool isNormalized() const {
@@ -48,9 +48,69 @@ public:
 		       m_b <= 1.0f;
 	}
 
+	inline u32 compress() const {
+		u32 r8 = static_cast<u32>(m_r) & 0xFF;
+		u32 g8 = static_cast<u32>(m_g) & 0xFF;
+		u32 b8 = static_cast<u32>(m_b) & 0xFF;
+		u32 a8 = 0xFF;
+		return (a8 << 24) | (b8 << 16) | (g8 << 8) | r8;
+	}
+
 private:
 	float m_r, m_g, m_b;
 };
+
+class RGBA {
+public:
+	constexpr RGBA(float in_r, float in_g, float in_b, float in_a) : m_r(in_r), m_g(in_g), m_b(in_b), m_a(in_a) {}
+	constexpr RGBA(const RGB& in_rgb, float in_a) : m_r(in_rgb.r()), m_g(in_rgb.g()), m_b(in_rgb.b()), m_a(in_a) {}
+	constexpr RGBA() : m_r{}, m_g{}, m_b{}, m_a{} {}
+
+	constexpr inline float r() const { return m_r; }
+	constexpr inline float g() const { return m_g; }
+	constexpr inline float b() const { return m_b; }
+	constexpr inline float a() const { return m_a; }
+
+	inline void setR(float in_r) { m_r = in_r; }
+	inline void setG(float in_g) { m_g = in_g; }
+	inline void setB(float in_b) { m_b = in_b; }
+	inline void setA(float in_a) { m_a = in_a; }
+
+	inline bool operator==(const tx::RGBA& other) const {
+		return m_r == other.m_r && m_g == other.m_g && m_b == other.m_b && m_a == other.m_a;
+	}
+	inline bool operator!=(const tx::RGBA& other) const { return !this->operator==(other); }
+
+	inline void normalize() {
+		m_r *= oneOf255;
+		m_g *= oneOf255;
+		m_b *= oneOf255;
+		m_a *= oneOf255;
+	}
+	inline RGBA normalized() const {
+		return RGBA{
+			m_r * oneOf255,
+			m_g * oneOf255,
+			m_b * oneOf255,
+			m_a * oneOf255
+		};
+	}
+	inline bool isNormalized() const {
+		return m_r <= 1.0f && m_g <= 1.0f && m_b <= 1.0f && m_a <= 1.0f;
+	}
+
+	inline u32 compress() const {
+		u32 r8 = static_cast<u32>(m_r) & 0xFF;
+		u32 g8 = static_cast<u32>(m_g) & 0xFF;
+		u32 b8 = static_cast<u32>(m_b) & 0xFF;
+		u32 a8 = static_cast<u32>(m_a) & 0xFF;
+		return (a8 << 24) | (b8 << 16) | (g8 << 8) | r8;
+	}
+
+private:
+	float m_r, m_g, m_b, m_a;
+};
+
 RGB InvalidColor = RGB(-1, -1, -1);
 constexpr RGB Black = RGB{};
 constexpr RGB White = RGB(255, 255, 255);

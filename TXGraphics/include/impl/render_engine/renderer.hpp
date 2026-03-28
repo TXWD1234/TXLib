@@ -185,7 +185,7 @@ private:
 	DBuffer_impl<float> instanceTextureIndexBuffer;
 	DBuffer_impl<vec2> instanceScaleBuffer;
 	DBuffer_impl<float> instanceRotationBuffer;
-	DBuffer_impl<u64> instanceColorBuffer;
+	DBuffer_impl<u32> instanceColorBuffer;
 
 	std::vector<SectionMeta> sectionMetaDatas;
 	u32 ringBufferOffset = 0;
@@ -199,7 +199,7 @@ private:
 			instanceTextureIndexBuffer.buffer.id = initer.addAttribInstanced<float>();
 			instanceScaleBuffer.buffer.id = initer.addAttribInstanced<vec2>();
 			instanceRotationBuffer.buffer.id = initer.addAttribInstanced<float>();
-			instanceColorBuffer.buffer.id = initer.addAttribInstanced<u64>();
+			instanceColorBuffer.buffer.id = initer.addAttribInstanced<u32>();
 		});
 		meshPositionBuffer.bo.alloc(6, SquareVertexPositions_CenterOrigin);
 		meshUVBuffer.bo.alloc(6, SquareVertexUVs_CenterOrigin);
@@ -258,7 +258,7 @@ private:
 
 	// OpenGL
 
-	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u64 color) {
+	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u32 color) {
 		instancePositionBuffer.stage[section].push_back(position);
 		instanceTextureHandleBuffer.stage[section].push_back(textureHandle);
 		instanceTextureIndexBuffer.stage[section].push_back(textureIndex);

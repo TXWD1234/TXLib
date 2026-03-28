@@ -17,6 +17,8 @@ using u8 = uint8_t;
 using f32 = float;
 using f64 = double;
 
+constexpr const float oneOf255 = 1.0f / 255.0f;
+
 template <class T>
 constexpr inline T sign(T num) { return (num == 0 ? 1 : num / std::abs(num)); }
 constexpr inline float sq(float in) { return in * in; }
