@@ -7,6 +7,7 @@
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "buffer.hpp"
 #include <concepts>
+#include <vector>
 
 namespace tx {
 namespace RenderEngine {
@@ -14,6 +15,11 @@ namespace RenderEngine {
 // SoA Design - One buffer per attribute
 class VertexAttributeManager {
 public:
+	struct BindingState {
+		gid bufferId = 0;
+		u32 byteOffset = 0;
+	};
+
 	class Initializer;
 
 	VertexAttributeManager() {}
@@ -35,19 +41,17 @@ public:
 	VertexAttributeManager(const VertexAttributeManager&) = delete;
 	VertexAttributeManager& operator=(const VertexAttributeManager&) = delete;
 	VertexAttributeManager(VertexAttributeManager&& other) noexcept
-	    : m_id(other.m_id), m_entryCount(other.m_entryCount), m_useInstancing(other.m_useInstancing) {
+	    : m_id(other.m_id), m_bindings(std::move(other.m_bindings)), m_useInstancing(other.m_useInstancing) {
 		other.m_id = 0;
-		other.m_entryCount = 0;
 		other.m_useInstancing = 0;
 	}
 	VertexAttributeManager& operator=(VertexAttributeManager&& other) noexcept {
 		if (this != &other) {
 			if (m_id) gl::deleteVertexArrays(1, &m_id);
 			m_id = other.m_id;
-			m_entryCount = other.m_entryCount;
+			m_bindings = std::move(other.m_bindings);
 			m_useInstancing = other.m_useInstancing;
 			other.m_id = 0;
-			other.m_entryCount = 0;
 			other.m_useInstancing = 0;
 		}
 		return *this;
@@ -65,14 +69,14 @@ public:
 		Initializer(const Initializer&) = delete;
 		Initializer& operator=(const Initializer&) = delete;
 		Initializer(Initializer&& other) noexcept
-		    : m_id(other.m_id), m_entryCount(other.m_entryCount), m_useInstancing(other.m_useInstancing) {
+		    : m_id(other.m_id), m_bindings(std::move(other.m_bindings)), m_useInstancing(other.m_useInstancing) {
 			other.m_id = 0;
 		}
 		Initializer& operator=(Initializer&& other) noexcept {
 			if (this != &other) {
 				if (m_id) gl::deleteVertexArrays(1, &m_id);
 				m_id = other.m_id;
-				m_entryCount = other.m_entryCount;
+				m_bindings = std::move(other.m_bindings);
 				m_useInstancing = other.m_useInstancing;
 				other.m_id = 0;
 			}
@@ -82,21 +86,25 @@ public:
 		// One buffer per attribute
 		template <class T>
 		u32 addAttrib() {
-			setBufferAttrib_impl<T>(m_id, m_entryCount);
-			return m_entryCount++;
+			u32 id = m_bindings.size();
+			setBufferAttrib_impl<T>(m_id, id);
+			m_bindings.push_back({ 0, 0 });
+			return id;
 		}
 		// buffer for instancing
 		template <class T>
 		u32 addAttribInstanced(u32 divisor = 1) {
-			setBufferAttrib_impl<T>(m_id, m_entryCount);
-			gl::vertexArrayBindingDivisor(m_id, m_entryCount, divisor);
+			u32 id = m_bindings.size();
+			setBufferAttrib_impl<T>(m_id, id);
+			gl::vertexArrayBindingDivisor(m_id, id, divisor);
 			m_useInstancing = 1;
-			return m_entryCount++;
+			m_bindings.push_back({ 0, 0 });
+			return id;
 		}
 
 	private:
 		gid m_id = 0;
-		u32 m_entryCount = 0;
+		std::vector<BindingState> m_bindings;
 		bool m_useInstancing = 0;
 
 		template <class T>
@@ -120,36 +128,40 @@ public:
 			gl::enableVertexArrayAttrib(vamId, id);
 			gl::vertexArrayAttribBinding(vamId, id, id);
 		}
-		template <class T>
-		static void setBuffer_impl(u32 vamId, const BufferObject<T>& bo, u32 id, u32 offset = 0) {
-			gl::vertexArrayVertexBuffer(vamId, id, bo.id(), offset * sizeof(T), sizeof(T));
-		}
 	};
 
 
 	template <class T>
 	void setBuffer(u32 id, const BufferObject<T>& bufferObject, u32 offset = 0) {
-		Initializer::setBuffer_impl(m_id, bufferObject, id, offset);
+		if (id >= m_bindings.size()) return;
+		u32 byteOffset = offset * sizeof(T);
+		gid boId = bufferObject.id();
+
+		if (m_bindings[id].bufferId != boId || m_bindings[id].byteOffset != byteOffset) {
+			gl::vertexArrayVertexBuffer(m_id, id, boId, byteOffset, sizeof(T));
+			m_bindings[id].bufferId = boId;
+			m_bindings[id].byteOffset = byteOffset;
+		}
 	}
 	template <class T>
 	void setBuffer(u32 id, const RingBufferObject<T>& bufferObject, u32 offset = 0) {
-		Initializer::setBuffer_impl(m_id, static_cast<const BufferObject<T>&>(bufferObject), id, offset);
+		setBuffer(id, static_cast<const BufferObject<T>&>(bufferObject), offset);
 	}
 
 	gid id() const { return m_id; }
-	u32 size() const { return m_entryCount; }
+	u32 size() const { return m_bindings.size(); }
 
 	bool useInstancing() const { return m_useInstancing; }
 
 private:
 	gid m_id = 0;
-	u32 m_entryCount = 0;
+	std::vector<BindingState> m_bindings;
 	bool m_useInstancing = 0;
 
 
 	void init_impl(Initializer&& initer) {
 		m_id = initer.m_id;
-		m_entryCount = initer.m_entryCount;
+		m_bindings = std::move(initer.m_bindings);
 		m_useInstancing = initer.m_useInstancing;
 		initer.m_id = 0;
 	}

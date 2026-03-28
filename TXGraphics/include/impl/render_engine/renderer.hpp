@@ -104,9 +104,9 @@ public:
 
 		// The VBOs for the ring buffers might be re-allocated (and get a new ID) inside updateDynamicBuffers_impl.
 		// We must re-bind them to the VAO to ensure the VAO points to the correct, live buffer objects before drawing.
-		// VAMSetBuffer(vam, instancePositionBuffer.buffer);
-		// VAMSetBuffer(vam, instanceTextureHandleBuffer.buffer);
-		// VAMSetBuffer(vam, instanceTextureIndexBuffer.buffer);
+		VAMSetBuffer(vam, instancePositionBuffer.buffer);
+		VAMSetBuffer(vam, instanceTextureHandleBuffer.buffer);
+		VAMSetBuffer(vam, instanceTextureIndexBuffer.buffer);
 
 		// draw call
 		fm.update();
