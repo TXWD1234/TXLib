@@ -86,7 +86,7 @@ public:
 	                u32 textureIndex,
 	                vec2 scale = { 1.0f, 1.0f },
 	                float rotation = 0.0f,
-	                u64 color = UINT64_MAX) {
+	                u32 color = 0xFFFFFFFF) {
 		addInstance_impl(
 		    sectionIndex,
 		    position,
@@ -102,7 +102,7 @@ public:
 	                 u32 textureIndex,
 	                 vec2 scale = { 1.0f, 1.0f },
 	                 float rotation = 0.0f,
-	                 u64 color = UINT64_MAX) {
+	                 u32 color = 0xFFFFFFFF) {
 		u64 textureHandle = textureArr.handle();
 		float textureIndexF = static_cast<float>(textureIndex);
 		u32 count = positions.size();

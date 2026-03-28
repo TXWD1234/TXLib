@@ -47,11 +47,24 @@ public:
 		       m_g <= 1.0f &&
 		       m_b <= 1.0f;
 	}
+	inline void denormalize() {
+		m_r *= 255.0f;
+		m_g *= 255.0f;
+		m_b *= 255.0f;
+	}
+	inline RGB denormalized() const {
+		return RGB{
+			m_r * 255.0f,
+			m_g * 255.0f,
+			m_b * 255.0f
+		};
+	}
 
 	inline u32 compress() const {
-		u32 r8 = static_cast<u32>(m_r) & 0xFF;
-		u32 g8 = static_cast<u32>(m_g) & 0xFF;
-		u32 b8 = static_cast<u32>(m_b) & 0xFF;
+		RGB temp = isNormalized() ? denormalized() : *this;
+		u32 r8 = static_cast<u32>(temp.m_r) & 0xFF;
+		u32 g8 = static_cast<u32>(temp.m_g) & 0xFF;
+		u32 b8 = static_cast<u32>(temp.m_b) & 0xFF;
 		u32 a8 = 0xFF;
 		return (a8 << 24) | (b8 << 16) | (g8 << 8) | r8;
 	}
@@ -98,12 +111,27 @@ public:
 	inline bool isNormalized() const {
 		return m_r <= 1.0f && m_g <= 1.0f && m_b <= 1.0f && m_a <= 1.0f;
 	}
+	inline void denormalize() {
+		m_r *= 255.0f;
+		m_g *= 255.0f;
+		m_b *= 255.0f;
+		m_a *= 255.0f;
+	}
+	inline RGBA denormalized() const {
+		return RGBA{
+			m_r * 255.0f,
+			m_g * 255.0f,
+			m_b * 255.0f,
+			m_a * 255.0f
+		};
+	}
 
 	inline u32 compress() const {
-		u32 r8 = static_cast<u32>(m_r) & 0xFF;
-		u32 g8 = static_cast<u32>(m_g) & 0xFF;
-		u32 b8 = static_cast<u32>(m_b) & 0xFF;
-		u32 a8 = static_cast<u32>(m_a) & 0xFF;
+		RGBA temp = isNormalized() ? denormalized() : *this;
+		u32 r8 = static_cast<u32>(temp.m_r) & 0xFF;
+		u32 g8 = static_cast<u32>(temp.m_g) & 0xFF;
+		u32 b8 = static_cast<u32>(temp.m_b) & 0xFF;
+		u32 a8 = static_cast<u32>(temp.m_a) & 0xFF;
 		return (a8 << 24) | (b8 << 16) | (g8 << 8) | r8;
 	}
 

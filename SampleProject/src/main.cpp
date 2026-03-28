@@ -137,39 +137,41 @@ private:
 
 
 	const float scaleIncreaseMult = 1.067f;
-	const float scaleDecreaseMult = 0.8f;
+	const float scaleDecreaseMult = 0.9f;
 	float scale = 0.1f, currentMult = scaleIncreaseMult;
+	float degree = 0.0f, rotationSpeed = tx::ONE_DEGREE * -5.0f, degreeMax = 2 * tx::PI;
+	tx::Rainbow colorEngine = tx::Rainbow(36);
 
 	tx::u64 tickCounter = 0;
 	void update() {
+		// anim frame
 		if (!(tickCounter % 3)) {
 			frameCounter++;
 			if (frameCounter >= 11) {
 				frameCounter = 0;
 			}
 		}
-		if (tickCounter >= 10) {
-			imageCount--;
-			if (imageCount == 0) {
-				imageCount = 15;
-			}
-			tickCounter = 0;
-		}
+		// scale
 		scale *= currentMult;
-		if (scale >= 3.0f) {
+		if (scale >= 2.0f) {
 			currentMult = scaleDecreaseMult;
 		} else if (scale <= 0.5f) {
 			currentMult = scaleIncreaseMult;
 		}
+		// rotation
+		degree += rotationSpeed;
+		if (degree >= degreeMax) degree -= degreeMax;
+
 		tickCounter++;
 	}
 	void render() {
 		//tx::Time::Timer timer;
 		//std::cout << "frame\n";
-		renderer.drawSprite(tx::Origin, ta, frameCounter, rendererSectionId);
-		renderer.drawSprites(
-		    whatever,
-		    ta, frameCounter, rendererSectionId);
+		renderer.drawSprite(rendererSectionId, tx::Origin, ta, frameCounter, tx::vec2{ scale, scale }, degree, colorEngine.getNextColor().compress());
+		// renderer.drawSprites(
+		//     rendererSectionId,
+		//     whatever,
+		//     ta, frameCounter, tx::vec2{ 1.5f, 1.5f }, tx::PI, tx::MikuColor.compress());
 		renderer.draw();
 		//cout << timer.duration() << "ms" << endl;
 	}
