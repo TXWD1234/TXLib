@@ -54,31 +54,30 @@ public:
 	// draw call
 
 	void draw() {
-		bindVAM_impl();
-		bindShaders_impl();
-		bindTextures_impl();
+		preDrawOperations_impl();
 		drawArrays_impl(m_begin, m_count);
 	}
-
 	void draw(u32 begin, u32 count) {
-		bindVAM_impl();
-		bindShaders_impl();
-		bindTextures_impl();
+		preDrawOperations_impl();
 		drawArrays_impl(begin, count);
 	}
 
 	void drawInstanced() {
-		bindVAM_impl();
-		bindShaders_impl();
-		bindTextures_impl();
+		preDrawOperations_impl();
 		drawArraysInstanced_impl(m_begin, m_count, m_instanceCount);
 	}
-
 	void drawInstanced(u32 begin, u32 count, u32 instanceCount) {
-		bindVAM_impl();
-		bindShaders_impl();
-		bindTextures_impl();
+		preDrawOperations_impl();
 		drawArraysInstanced_impl(begin, count, instanceCount);
+	}
+
+	void drawInstancedOffset() {
+		preDrawOperations_impl();
+		drawArraysInstancedOffset_impl(m_begin, m_count, m_instanceCount, m_instanceOffset);
+	}
+	void drawInstancedOffset(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) {
+		preDrawOperations_impl();
+		drawArraysInstancedOffset_impl(begin, count, instanceCount, instanceOffset);
 	}
 
 	// configure
@@ -86,15 +85,20 @@ public:
 	void setBegin(u32 begin) { m_begin = begin; }
 	void setCount(u32 count) { m_count = count; }
 	void setInstanceCount(u32 instanceCount) { m_instanceCount = instanceCount; }
+	void setInstanceOffset(u32 instanceOffset) { m_instanceOffset = instanceOffset; }
 
-	void setParameters(u32 begin, u32 count, u32 instanceCount) {
-		m_begin = begin;
-		m_count = count;
-		m_instanceCount = instanceCount;
-	}
+
 	void setParameters(u32 begin, u32 count) {
 		m_begin = begin;
 		m_count = count;
+	}
+	void setParameters(u32 begin, u32 count, u32 instanceCount) {
+		setParameters(begin, count);
+		m_instanceCount = instanceCount;
+	}
+	void setParameters(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) {
+		setParameters(begin, count, instanceCount);
+		m_instanceOffset = instanceOffset;
 	}
 
 	void setShaderProgram(const ShaderProgram& program) {
@@ -133,10 +137,13 @@ private:
 	void drawArraysInstanced_impl(u32 begin, u32 count, u32 instanceCount) const {
 		gl::drawArraysInstanced(gl::enums::TRIANGLES, begin, count, instanceCount);
 	}
+	void drawArraysInstancedOffset_impl(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) const {
+		gl::drawArraysInstancedBaseInstance(gl::enums::TRIANGLES, begin, count, instanceCount, instanceOffset);
+	}
 
 	// draw call variables
 
-	u32 m_begin = 0, m_count = 0, m_instanceCount = 0;
+	u32 m_begin = 0, m_count = 0, m_instanceCount = 0, m_instanceOffset = 0;
 
 	gid m_vamId = 0;
 	gid m_programId = 0;
@@ -187,6 +194,12 @@ private:
 				}
 			}
 		}
+	}
+
+	void preDrawOperations_impl() {
+		bindVAM_impl();
+		bindShaders_impl();
+		bindTextures_impl();
 	}
 };
 using DCM = DrawCallManager;

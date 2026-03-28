@@ -92,6 +92,13 @@ public:
 
 	// draw call
 	void draw() {
+		// check alignment
+		for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
+			if (!checkStageBufferSizeIdentical_impl(i))
+				throw std::runtime_error(std::string("tx::RE::Renderer: unidentical dynamic buffer section: " + std::to_string(i)));
+		}
+
+
 		for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
 			draw_impl(i);
 		}
@@ -183,8 +190,7 @@ private:
 		VAMUpdateRingBuffer(vam, buffer.buffer, FMSubmiter{ fm });
 	}
 	u32 updateDynamicBuffers_impl(u32 sectionIndex) {
-		if (!checkStageBufferSizeIdentical_impl(sectionIndex))
-			throw std::runtime_error(std::string("tx::RE::Renderer: unidentical dynamic buffer section: " + std::to_string(sectionIndex)));
+
 		updateDynamicBuffer_impl(sectionIndex, instancePositionBuffer);
 		updateDynamicBuffer_impl(sectionIndex, instanceTextureHandleBuffer);
 		updateDynamicBuffer_impl(sectionIndex, instanceTextureIndexBuffer);

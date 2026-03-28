@@ -90,6 +90,7 @@ void getProgramPipelineInfoLog(uint_t pipeline, sizei_t bufSize, sizei_t* length
 // --- Draw & Bind ---
 void drawArrays(enum_t mode, int_t first, sizei_t count) { glDrawArrays(mode, first, count); }
 void drawArraysInstanced(enum_t mode, int_t first, sizei_t count, sizei_t instancecount) { glDrawArraysInstanced(mode, first, count, instancecount); }
+void drawArraysInstancedBaseInstance(enum_t mode, int_t first, sizei_t count, sizei_t instancecount, uint_t baseinstance) { glDrawArraysInstancedBaseInstance(mode, first, count, instancecount, baseinstance); }
 void bindVertexArray(uint_t array) { glBindVertexArray(array); }
 void useProgram(uint_t program) { glUseProgram(program); }
 void bindProgramPipeline(uint_t pipeline) { glBindProgramPipeline(pipeline); }
