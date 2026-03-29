@@ -169,6 +169,7 @@ private:
 	DBuffer_impl<vec2>  instanceScaleBuffer;
 	DBuffer_impl<float> instanceRotationBuffer;
 	DBuffer_impl<u32>   instanceColorBuffer;
+	// clang-format on
 
 	void initBuffers_impl();
 
@@ -183,7 +184,6 @@ private:
 	// OpenGL
 
 	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u32 color);
-	// clang-format on
 
 	// update for id changes
 	void updateVAM();

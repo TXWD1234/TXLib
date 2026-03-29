@@ -66,7 +66,7 @@ private:
 
 	re::RE re;
 	re::RSP rr;
-	tx::u64 textureHandle;
+	tx::Animation anim{ 3 };
 
 private:
 	bool init() {
@@ -96,10 +96,10 @@ private:
 		tx::u32 length = width * height * 4;
 
 		for (int i = 0; i < data.size(); i++) {
-			re.addTexture({ width, height }, std::bitSpan(data[i], length));
+			anim.addFrame(
+			    re.addTexture({ width, height }, std::bitSpan(data[i], length)));
 			if (data[i]) stbi_image_free(data[i]);
 		}
-		textureHandle = re.getTexture({ 0, 0 }).handle();
 
 		return 1;
 	}
@@ -139,7 +139,7 @@ private:
 	void render() {
 		//tx::Time::Timer timer;
 		//std::cout << "frame\n";
-		rr.drawSprite(tx::Origin, textureHandle, static_cast<float>(frameCounter), tx::vec2{ scale, scale }, degree, colorEngine.getNextColor().compress());
+		rr.drawSprite(tx::Origin, anim.next(), tx::vec2{ 1.0, 1.0 }, 0, colorEngine.getNextColor().compress());
 		// renderer.drawSprites(
 		//     rendererSectionId,
 		//     whatever,
