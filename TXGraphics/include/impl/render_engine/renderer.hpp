@@ -18,13 +18,16 @@
 namespace tx::RenderEngine {
 
 constexpr vec2 SquareVertexPositions_CenterOrigin[] = {
-	{ 0.5, -0.5 },
+	// clang-format off
+	{  0.5, -0.5 },
 	{ -0.5, -0.5 },
-	{ 0.5, 0.5 },
+	{  0.5,  0.5 },
 	{ -0.5, -0.5 },
-	{ 0.5, 0.5 },
-	{ -0.5, 0.5 }
+	{  0.5,  0.5 },
+	{ -0.5,  0.5 }
+	// clang-format on
 };
+
 constexpr vec2 SquareVertexUVs_CenterOrigin[] = {
 	{ 1.0, 0.0 },
 	{ 0.0, 0.0 },
@@ -64,73 +67,80 @@ public:
 
 	// per frame draw operations
 
-	void reserveSprites(u32 sectionIndex, u32 count) {
-		auto positionBuffer = instancePositionBuffer.stage[sectionIndex];
-		auto handleBuffer = instanceTextureHandleBuffer.stage[sectionIndex];
-		auto indexBuffer = instanceTextureIndexBuffer.stage[sectionIndex];
-		auto scaleBuffer = instanceScaleBuffer.stage[sectionIndex];
-		auto rotationBuffer = instanceRotationBuffer.stage[sectionIndex];
-		auto colorBuffer = instanceColorBuffer.stage[sectionIndex];
-		u32 targetSize = positionBuffer.size() + count;
-		positionBuffer.reserve(targetSize);
-		handleBuffer.reserve(targetSize);
-		indexBuffer.reserve(targetSize);
-		scaleBuffer.reserve(targetSize);
-		rotationBuffer.reserve(targetSize);
-		colorBuffer.reserve(targetSize);
-	}
-
 	void drawSprite(u32 sectionIndex,
 	                vec2 position,
-	                const TextureArray& textureArr,
-	                u32 textureIndex,
+	                u64 textureArrHandle,
+	                float textureIndex,
 	                vec2 scale = { 1.0f, 1.0f },
 	                float rotation = 0.0f,
 	                u32 color = 0xFFFFFFFF) {
 		addInstance_impl(
 		    sectionIndex,
 		    position,
-		    textureArr.handle(),
-		    static_cast<float>(textureIndex),
+		    textureArrHandle,
+		    textureIndex,
 		    scale,
 		    rotation,
 		    color);
 	}
-	void drawSprites(u32 sectionIndex,
-	                 std::span<const vec2> positions,
-	                 const TextureArray& textureArr,
-	                 u32 textureIndex,
-	                 vec2 scale = { 1.0f, 1.0f },
-	                 float rotation = 0.0f,
-	                 u32 color = 0xFFFFFFFF) {
-		u64 textureHandle = textureArr.handle();
-		float textureIndexF = static_cast<float>(textureIndex);
-		u32 count = positions.size();
+	// clang-format off
 
-		auto positionBuffer = instancePositionBuffer.stage[sectionIndex];
-		auto handleBuffer = instanceTextureHandleBuffer.stage[sectionIndex];
-		auto indexBuffer = instanceTextureIndexBuffer.stage[sectionIndex];
-		auto scaleBuffer = instanceScaleBuffer.stage[sectionIndex];
-		auto rotationBuffer = instanceRotationBuffer.stage[sectionIndex];
-		auto colorBuffer = instanceColorBuffer.stage[sectionIndex];
+	struct SpriteAtrribs {
+		std::span<vec2>  positionBuffer;
+		std::span<u64>   textureHandleBuffer;
+		std::span<float> textureIndexBuffer;
+		std::span<vec2>  scaleBuffer;
+		std::span<float> rotationBuffer;
+		std::span<u32>   colorBuffer;
+	};
+	template <std::invocable<SpriteAtrribs> Func>
+	void drawSprites(u32 sectionIndex, u32 count, Func&& editor) {
+		auto positionBuffer = instancePositionBuffer     .stage[sectionIndex];
+		auto handleBuffer   = instanceTextureHandleBuffer.stage[sectionIndex];
+		auto indexBuffer    = instanceTextureIndexBuffer .stage[sectionIndex];
+		auto scaleBuffer    = instanceScaleBuffer        .stage[sectionIndex];
+		auto rotationBuffer = instanceRotationBuffer     .stage[sectionIndex];
+		auto colorBuffer    = instanceColorBuffer        .stage[sectionIndex];
 
 		u32 oldSize = positionBuffer.size();
 		u32 newSize = oldSize + count;
 
-		positionBuffer.resize(newSize);
-		handleBuffer.resize(newSize);
-		indexBuffer.resize(newSize);
-		scaleBuffer.resize(newSize);
-		rotationBuffer.resize(newSize);
-		colorBuffer.resize(newSize);
+		positionBuffer .resize(newSize);
+		handleBuffer   .resize(newSize);
+		indexBuffer    .resize(newSize);
+		scaleBuffer    .resize(newSize);
+		rotationBuffer .resize(newSize);
+		colorBuffer    .resize(newSize);
 
-		std::copy(positions.begin(), positions.end(), positionBuffer.begin() + oldSize);
-		std::fill(handleBuffer.begin() + oldSize, handleBuffer.end(), textureHandle);
-		std::fill(indexBuffer.begin() + oldSize, indexBuffer.end(), textureIndexF);
-		std::fill(scaleBuffer.begin() + oldSize, scaleBuffer.end(), scale);
-		std::fill(rotationBuffer.begin() + oldSize, rotationBuffer.end(), rotation);
-		std::fill(colorBuffer.begin() + oldSize, colorBuffer.end(), color);
+		SpriteAtrribs attribs = {
+			std::span<vec2> { positionBuffer.begin() + oldSize, positionBuffer.end() },
+			std::span<u64>  { handleBuffer  .begin() + oldSize, handleBuffer  .end() },
+			std::span<float>{ indexBuffer   .begin() + oldSize, indexBuffer   .end() },
+			std::span<vec2> { scaleBuffer   .begin() + oldSize, scaleBuffer   .end() },
+			std::span<float>{ rotationBuffer.begin() + oldSize, rotationBuffer.end() },
+			std::span<u32>  { colorBuffer   .begin() + oldSize, colorBuffer   .end() }
+		};
+
+		editor(attribs);
 	}
+
+	void reserveSprites(u32 sectionIndex, u32 count) {
+		auto positionBuffer = instancePositionBuffer     .stage[sectionIndex];
+		auto handleBuffer   = instanceTextureHandleBuffer.stage[sectionIndex];
+		auto indexBuffer    = instanceTextureIndexBuffer .stage[sectionIndex];
+		auto scaleBuffer    = instanceScaleBuffer        .stage[sectionIndex];
+		auto rotationBuffer = instanceRotationBuffer     .stage[sectionIndex];
+		auto colorBuffer    = instanceColorBuffer        .stage[sectionIndex];
+		u32 targetSize = positionBuffer.size() + count;
+		positionBuffer.reserve(targetSize);
+		handleBuffer  .reserve(targetSize);
+		indexBuffer   .reserve(targetSize);
+		scaleBuffer   .reserve(targetSize);
+		rotationBuffer.reserve(targetSize);
+		colorBuffer   .reserve(targetSize);
+	}
+	// clang-format on
+
 
 	// draw call
 	void draw() {
@@ -178,57 +188,60 @@ private:
 	VertexAttributeManager vam;
 	FenceManager_t fm;
 
-	BufferHandle<StaticBufferObject<vec2>> meshPositionBuffer;
-	BufferHandle<StaticBufferObject<vec2>> meshUVBuffer;
-	DBuffer_impl<vec2> instancePositionBuffer;
-	DBuffer_impl<u64> instanceTextureHandleBuffer;
-	DBuffer_impl<float> instanceTextureIndexBuffer;
-	DBuffer_impl<vec2> instanceScaleBuffer;
-	DBuffer_impl<float> instanceRotationBuffer;
-	DBuffer_impl<u32> instanceColorBuffer;
-
 	std::vector<SectionMeta> sectionMetaDatas;
 	u32 ringBufferOffset = 0;
 
+	// clang-format off
+
+	BufferHandle<StaticBufferObject<vec2>> meshPositionBuffer;
+	BufferHandle<StaticBufferObject<vec2>> meshUVBuffer;
+	DBuffer_impl<vec2>  instancePositionBuffer;
+	DBuffer_impl<u64>   instanceTextureHandleBuffer;
+	DBuffer_impl<float> instanceTextureIndexBuffer;
+	DBuffer_impl<vec2>  instanceScaleBuffer;
+	DBuffer_impl<float> instanceRotationBuffer;
+	DBuffer_impl<u32>   instanceColorBuffer;
+
+
 	void initBuffers_impl() {
 		vam = VertexAttributeManager([&](VAMIniter& initer) {
-			meshPositionBuffer.id = initer.addAttrib<vec2>();
-			meshUVBuffer.id = initer.addAttrib<vec2>();
-			instancePositionBuffer.buffer.id = initer.addAttribInstanced<vec2>();
-			instanceTextureHandleBuffer.buffer.id = initer.addAttribInstanced<u64>();
-			instanceTextureIndexBuffer.buffer.id = initer.addAttribInstanced<float>();
-			instanceScaleBuffer.buffer.id = initer.addAttribInstanced<vec2>();
-			instanceRotationBuffer.buffer.id = initer.addAttribInstanced<float>();
-			instanceColorBuffer.buffer.id = initer.addAttribInstanced<u32>();
+			meshPositionBuffer.id                 = initer.addAttrib<vec2>();
+			meshUVBuffer.id                       = initer.addAttrib<vec2>();
+			instancePositionBuffer     .buffer.id = initer.addAttribInstanced<vec2> ();
+			instanceTextureHandleBuffer.buffer.id = initer.addAttribInstanced<u64>  ();
+			instanceTextureIndexBuffer .buffer.id = initer.addAttribInstanced<float>();
+			instanceScaleBuffer        .buffer.id = initer.addAttribInstanced<vec2> ();
+			instanceRotationBuffer     .buffer.id = initer.addAttribInstanced<float>();
+			instanceColorBuffer        .buffer.id = initer.addAttribInstanced<u32>  ();
 		});
 		meshPositionBuffer.bo.alloc(6, SquareVertexPositions_CenterOrigin);
-		meshUVBuffer.bo.alloc(6, SquareVertexUVs_CenterOrigin);
-		instancePositionBuffer.buffer.bo.alloc();
+		meshUVBuffer      .bo.alloc(6, SquareVertexUVs_CenterOrigin);
+		instancePositionBuffer     .buffer.bo.alloc();
 		instanceTextureHandleBuffer.buffer.bo.alloc();
-		instanceTextureIndexBuffer.buffer.bo.alloc();
-		instanceScaleBuffer.buffer.bo.alloc();
-		instanceRotationBuffer.buffer.bo.alloc();
-		instanceColorBuffer.buffer.bo.alloc();
+		instanceTextureIndexBuffer .buffer.bo.alloc();
+		instanceScaleBuffer        .buffer.bo.alloc();
+		instanceRotationBuffer     .buffer.bo.alloc();
+		instanceColorBuffer        .buffer.bo.alloc();
 		VAMSetBuffer(vam, meshPositionBuffer);
 		VAMSetBuffer(vam, meshUVBuffer);
-		VAMSetBuffer(vam, instancePositionBuffer.buffer);
+		VAMSetBuffer(vam, instancePositionBuffer     .buffer);
 		VAMSetBuffer(vam, instanceTextureHandleBuffer.buffer);
-		VAMSetBuffer(vam, instanceTextureIndexBuffer.buffer);
-		VAMSetBuffer(vam, instanceScaleBuffer.buffer);
-		VAMSetBuffer(vam, instanceRotationBuffer.buffer);
-		VAMSetBuffer(vam, instanceColorBuffer.buffer);
+		VAMSetBuffer(vam, instanceTextureIndexBuffer .buffer);
+		VAMSetBuffer(vam, instanceScaleBuffer        .buffer);
+		VAMSetBuffer(vam, instanceRotationBuffer     .buffer);
+		VAMSetBuffer(vam, instanceColorBuffer        .buffer);
 	}
 
 	// section & metadata
 	// mote: each section is a different shader, which means one draw call
 
 	u32 addSection_impl(const ShaderProduct& sp) {
-		instancePositionBuffer.stage.addPartition();
+		instancePositionBuffer     .stage.addPartition();
 		instanceTextureHandleBuffer.stage.addPartition();
-		instanceTextureIndexBuffer.stage.addPartition();
-		instanceScaleBuffer.stage.addPartition();
-		instanceRotationBuffer.stage.addPartition();
-		instanceColorBuffer.stage.addPartition();
+		instanceTextureIndexBuffer .stage.addPartition();
+		instanceScaleBuffer        .stage.addPartition();
+		instanceRotationBuffer     .stage.addPartition();
+		instanceColorBuffer        .stage.addPartition();
 		sectionMetaDatas.push_back({ sp });
 		return sectionMetaDatas.size() - 1;
 	}
@@ -236,36 +249,38 @@ private:
 	[[nodiscard]] bool getStageBufferSectionMetaData_impl(u32 sectionIndex) {
 		sectionMetaDatas[sectionIndex].offset = instancePositionBuffer.stage[sectionIndex].offset();
 		sectionMetaDatas[sectionIndex].size = instancePositionBuffer.stage[sectionIndex].size();
-		return sectionMetaDatas[sectionIndex].size == instanceTextureHandleBuffer.stage[sectionIndex].size() &&
-		       sectionMetaDatas[sectionIndex].size == instanceTextureIndexBuffer.stage[sectionIndex].size() &&
-		       sectionMetaDatas[sectionIndex].size == instanceScaleBuffer.stage[sectionIndex].size() &&
-		       sectionMetaDatas[sectionIndex].size == instanceRotationBuffer.stage[sectionIndex].size() &&
-		       sectionMetaDatas[sectionIndex].size == instanceColorBuffer.stage[sectionIndex].size() &&
+		return sectionMetaDatas[sectionIndex].size   == instanceTextureHandleBuffer.stage[sectionIndex].size()   &&
+		       sectionMetaDatas[sectionIndex].size   == instanceTextureIndexBuffer .stage[sectionIndex].size()   &&
+		       sectionMetaDatas[sectionIndex].size   == instanceScaleBuffer        .stage[sectionIndex].size()   &&
+		       sectionMetaDatas[sectionIndex].size   == instanceRotationBuffer     .stage[sectionIndex].size()   &&
+		       sectionMetaDatas[sectionIndex].size   == instanceColorBuffer        .stage[sectionIndex].size()   &&
 		       sectionMetaDatas[sectionIndex].offset == instanceTextureHandleBuffer.stage[sectionIndex].offset() &&
-		       sectionMetaDatas[sectionIndex].offset == instanceTextureIndexBuffer.stage[sectionIndex].offset() &&
-		       sectionMetaDatas[sectionIndex].offset == instanceScaleBuffer.stage[sectionIndex].offset() &&
-		       sectionMetaDatas[sectionIndex].offset == instanceRotationBuffer.stage[sectionIndex].offset() &&
-		       sectionMetaDatas[sectionIndex].offset == instanceColorBuffer.stage[sectionIndex].offset();
+		       sectionMetaDatas[sectionIndex].offset == instanceTextureIndexBuffer .stage[sectionIndex].offset() &&
+		       sectionMetaDatas[sectionIndex].offset == instanceScaleBuffer        .stage[sectionIndex].offset() &&
+		       sectionMetaDatas[sectionIndex].offset == instanceRotationBuffer     .stage[sectionIndex].offset() &&
+		       sectionMetaDatas[sectionIndex].offset == instanceColorBuffer        .stage[sectionIndex].offset();
 	}
 	[[nodiscard]] bool updateRingBufferOffset() {
 		ringBufferOffset = instancePositionBuffer.buffer.bo.getNext(FMSubmiter{ fm });
 		return ringBufferOffset == instanceTextureHandleBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
-		       ringBufferOffset == instanceTextureIndexBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
-		       ringBufferOffset == instanceScaleBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
-		       ringBufferOffset == instanceRotationBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
-		       ringBufferOffset == instanceColorBuffer.buffer.bo.getNext(FMSubmiter{ fm });
+		       ringBufferOffset == instanceTextureIndexBuffer .buffer.bo.getNext(FMSubmiter{ fm }) &&
+		       ringBufferOffset == instanceScaleBuffer        .buffer.bo.getNext(FMSubmiter{ fm }) &&
+		       ringBufferOffset == instanceRotationBuffer     .buffer.bo.getNext(FMSubmiter{ fm }) &&
+		       ringBufferOffset == instanceColorBuffer        .buffer.bo.getNext(FMSubmiter{ fm });
 	}
 
 	// OpenGL
 
 	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u32 color) {
-		instancePositionBuffer.stage[section].push_back(position);
+		instancePositionBuffer     .stage[section].push_back(position);
 		instanceTextureHandleBuffer.stage[section].push_back(textureHandle);
-		instanceTextureIndexBuffer.stage[section].push_back(textureIndex);
-		instanceScaleBuffer.stage[section].push_back(scale);
-		instanceRotationBuffer.stage[section].push_back(rotation);
-		instanceColorBuffer.stage[section].push_back(color);
+		instanceTextureIndexBuffer .stage[section].push_back(textureIndex);
+		instanceScaleBuffer        .stage[section].push_back(scale);
+		instanceRotationBuffer     .stage[section].push_back(rotation);
+		instanceColorBuffer        .stage[section].push_back(color);
 	}
+	// clang-format on
+
 	// update for id changes
 	void updateVAM() {
 		// The VBOs for the ring buffers might be re-allocated (and get a new ID) inside updateDynamicBuffers_impl.

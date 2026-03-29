@@ -5,12 +5,11 @@
 
 #pragma once
 #include "impl/gl_core/basic_gl_utils.hpp"
-#include "impl/gl_core/fence_manager.hpp"
+#include "impl/gl_core/shader_manager.hpp"
+#include "impl/render_engine/texture_manager.hpp"
 #include "impl/gl_core/utility.hpp"
 
 #include "impl/render_engine/renderer.hpp"
-
-#include "impl/gl_core/draw_call_manager.hpp"
 
 namespace tx::RenderEngine {
 
