@@ -16,7 +16,7 @@ private:
 			ptr->render();
 		}
 	};
-	tx::RE::Framework<tx::RE::Mode::Release, UpdateFunc, RenderFunc> framework;
+	tx::RE::Framework<re::Mode::FixTickRate | re::Mode::PrintFrameRate, UpdateFunc, RenderFunc> framework;
 
 	bool initGLFW() {
 		std::cout << "Initializing GLFW...\n";
@@ -73,6 +73,7 @@ private:
 		tx::glfwSetKeyCallback<Application, &Application::onKeyEvent>(framework.getWindow(), this);
 		tx::glBasicSettings();
 		stbi_set_flip_vertically_on_load(true);
+		glfwSwapInterval(0); // turn off vsync
 
 		re.init();
 		rr = re.createSectionProxy(re::readShaderSource("vertex.vert"), re::readShaderSource("fragment.frag"));
@@ -137,15 +138,8 @@ private:
 		tickCounter++;
 	}
 	void render() {
-		//tx::Time::Timer timer;
-		//std::cout << "frame\n";
-		rr.drawSprite(tx::Origin, anim.next(), tx::vec2{ 1.0, 1.0 }, 0, colorEngine.getNextColor().compress());
-		// renderer.drawSprites(
-		//     rendererSectionId,
-		//     whatever,
-		//     ta, frameCounter, tx::vec2{ 1.5f, 1.5f }, tx::PI, tx::MikuColor.compress());
+		rr.drawSprite(tx::Origin, anim.next(), tx::vec2{ 1.0f, 1.0f }, 0, colorEngine.getNextColor().compress());
 		re.draw();
-		//cout << timer.duration() << "ms" << endl;
 	}
 };
 

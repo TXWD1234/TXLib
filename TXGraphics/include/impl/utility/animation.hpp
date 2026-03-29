@@ -16,7 +16,7 @@ class Animation {
 public:
 	Animation(u32 frameRate = 1) : m_frameSubCounterMax(frameRate) {}
 	Animation(std::span<id> frames, u32 frameRate = 1)
-	    : m_frames(frames.begin(), frames.end()) {}
+	    : m_frames(frames.begin(), frames.end()), m_frameSubCounterMax(frameRate) {}
 
 	void addFrame(id id) { m_frames.push_back(id); }
 
@@ -33,14 +33,20 @@ public:
 	id& operator[](u32 index) { return m_frames[index]; }
 	const id& operator[](u32 index) const { return m_frames[index]; }
 
-	id next() {
+	const id& next() {
+		// Get the texture for the current frame BEFORE advancing the counters.
+		const id& current_id = m_frames[m_currentFrame];
+
+		// Now, advance the counters for the NEXT time next() is called.
 		m_frameSubCounter++;
 		if (m_frameSubCounter >= m_frameSubCounterMax) {
 			m_frameSubCounter = 0;
 			m_currentFrame++;
+			if (m_currentFrame >= m_frames.size()) {
+				m_currentFrame = 0;
+			}
 		}
-		if (m_currentFrame >= m_frames.size()) m_currentFrame = 0;
-		return m_frames[m_currentFrame];
+		return current_id;
 	}
 
 private:

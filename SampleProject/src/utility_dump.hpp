@@ -34,6 +34,29 @@ std::string readShaderSource(const std::string& filename) {
 
 } // namespace RenderEngine
 
+class Timer {
+public:
+	Timer() : start(std::chrono::steady_clock::now()) {}
+
+	template <InstantiationOf<std::chrono::duration> T = std::chrono::duration<double, std::milli>>
+	inline auto duration() {
+		auto end = std::chrono::steady_clock::now();
+		auto duration = std::chrono::duration_cast<T>(end - start);
+		return duration.count();
+	}
+	inline size_t durationL() {
+		auto end = std::chrono::steady_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+		return duration.count();
+	}
+	inline void reset() {
+		this->start = std::chrono::steady_clock::now();
+	}
+
+private:
+	std::chrono::steady_clock::time_point start;
+};
+
 
 
 Coord getWindowSize(GLFWwindow* window) {
