@@ -93,7 +93,7 @@ public:
 		std::span<float> rotationBuffer;
 		std::span<u32>   colorBuffer;
 	};
-	template <std::invocable<SpriteAtrribs> Func>
+	template <std::invocable<SpriteAtrribs&> Func>
 	void drawSprites(u32 sectionIndex, u32 count, Func&& editor) {
 		auto positionBuffer = instancePositionBuffer     .stage[sectionIndex];
 		auto handleBuffer   = instanceTextureHandleBuffer.stage[sectionIndex];
@@ -168,7 +168,7 @@ public:
 
 
 
-	FenceManager_t& getFM() { return fm; }
+	FenceManager& getFM() { return fm; }
 
 private:
 	template <class T>
@@ -186,7 +186,7 @@ private:
 private:
 	DrawCallManager dcm;
 	VertexAttributeManager vam;
-	FenceManager_t fm;
+	FenceManager fm;
 
 	std::vector<SectionMeta> sectionMetaDatas;
 	u32 ringBufferOffset = 0;

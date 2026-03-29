@@ -15,9 +15,9 @@ void main() {
             sampler2DArray s = sampler2DArray(textureHandle);
             FragColor = texture(s, vec3(uv, textureIndex)) * unpackUnorm4x8(colorTint);
         } else {
-            FragColor = vec4(1.0, 0.0, 1.0, 1.0); // Magenta for null
+            FragColor = unpackUnorm4x8(colorTint);
         }
     #else
-        FragColor = vec4(1.0, 1.0, 0.0, 1.0); // Yellow fallback for Intel
+        FragColor = unpackUnorm4x8(colorTint);
     #endif
 }

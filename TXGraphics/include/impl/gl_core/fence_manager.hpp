@@ -13,13 +13,13 @@
 namespace tx::RenderEngine {
 
 template <class... FuncTypes>
-class FenceManager {
+class FenceManagerBase {
 public:
-	FenceManager() {
+	FenceManagerBase() {
 		operationQueue.emplace_back();
 	}
 
-	~FenceManager() {
+	~FenceManagerBase() {
 		Fence stallFence;
 		while (!stallFence.isFinished()) {} // Block until GPU is completely idle
 		for (auto& operationBuffer : operationQueue) {
@@ -68,7 +68,7 @@ private:
 
 /// @brief A helper callable that forwards a deleter operation to a FenceManager.
 /// Used to pass a fence manager to functions that expect a deleter-submitting functor.
-template <InstantiationOf<FenceManager> FMT>
+template <InstantiationOf<FenceManagerBase> FMT>
 struct FMAddOperation {
 	FMAddOperation(FMT& in_fm) : fm(in_fm) {}
 	FMT& fm;
@@ -82,7 +82,12 @@ struct FMAddOperation {
 template <typename FMT>
 FMAddOperation(FMT&) -> FMAddOperation<FMT>;
 
-template <InstantiationOf<FenceManager> FMT>
+template <InstantiationOf<FenceManagerBase> FMT>
 using FMSubmiter = FMAddOperation<FMT>;
+
+using FenceManager = FenceManagerBase<
+    RingBufferObjectDeleter,
+    RingBufferObjectMarker,
+    TextureDeleter>;
 
 } // namespace tx::RenderEngine

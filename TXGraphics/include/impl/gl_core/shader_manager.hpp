@@ -340,7 +340,6 @@ public:
 		return get(ShaderPair{ vertId, fragId });
 	}
 
-	// Aliases strictly to prevent breaking previously written usage
 	Product& getShaderProgram(ShaderPair pid) { return get(pid); }
 	Product& getShaderProgram(ShaderId vertId, ShaderId fragId) { return get(vertId, fragId); }
 	Product& getShaderPipeline(ShaderPair pid) { return get(pid); }

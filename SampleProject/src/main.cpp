@@ -64,46 +64,20 @@ private:
 		}
 	}
 
-	constexpr inline static thread_local re::SMStyle smtype = re::SMStyle::Pipeline;
-
-	re::ShaderManager<smtype> sm;
-	re::TextureArray ta;
-	re::Renderer renderer;
-	tx::u32 rendererSectionId;
+	re::RE re;
+	re::RSP rr;
+	tx::u64 textureHandle;
 
 private:
 	bool init() {
 		tx::glfwSetKeyCallback<Application, &Application::onKeyEvent>(framework.getWindow(), this);
 		tx::glBasicSettings();
-
-		vector<tx::vec2> squarePos = {
-			{ 0.5, -0.5 },
-			{ -0.5, -0.5 },
-			{ 0.5, 0.5 },
-			{ -0.5, -0.5 },
-			{ 0.5, 0.5 },
-			{ -0.5, 0.5 }
-		};
-		// bottom left origin
-		// vector<tx::vec2> squarePos2 = {
-		// 	{ 1.0, 0.0 }, // Bottom-Right
-		// 	{ 0.0, 0.0 }, // Bottom-Left
-		// 	{ 1.0, 1.0 }, // Top-Right
-		// 	{ 0.0, 0.0 }, // Bottom-Left
-		// 	{ 1.0, 1.0 }, // Top-Right
-		// 	{ 0.0, 1.0 } // Top-Left
-		// };
-
-		renderer.init();
-
-		re::ProgramId activeShaders;
-		if (!re::addShaderPair("vertex", "fragment", sm, activeShaders)) {
-			std::cerr << "[Error]: failed to add shaders.\n";
-			return 0;
-		}
-		rendererSectionId = renderer.registerSection(sm.get(activeShaders));
-
 		stbi_set_flip_vertically_on_load(true);
+
+		re.init();
+		rr = re.createSectionProxy(re::readShaderSource("vertex.vert"), re::readShaderSource("fragment.frag"));
+
+
 		int width, height, channels;
 		std::vector<tx::u8*> data;
 		data.reserve(11);
@@ -121,13 +95,11 @@ private:
 		}
 		tx::u32 length = width * height * 4;
 
-
-
-		ta = re::TextureArray(re::TextureFormat::RGBA, { width, height }, data.size(), 0);
 		for (int i = 0; i < data.size(); i++) {
-			ta.setLayer(i, std::bitSpan(data[i], length));
+			re.addTexture({ width, height }, std::bitSpan(data[i], length));
 			if (data[i]) stbi_image_free(data[i]);
 		}
+		textureHandle = re.getTexture({ 0, 0 }).handle();
 
 		return 1;
 	}
@@ -167,12 +139,12 @@ private:
 	void render() {
 		//tx::Time::Timer timer;
 		//std::cout << "frame\n";
-		renderer.drawSprite(rendererSectionId, tx::Origin, ta, frameCounter, tx::vec2{ scale, scale }, degree, colorEngine.getNextColor().compress());
+		rr.drawSprite(tx::Origin, textureHandle, static_cast<float>(frameCounter), tx::vec2{ scale, scale }, degree, colorEngine.getNextColor().compress());
 		// renderer.drawSprites(
 		//     rendererSectionId,
 		//     whatever,
 		//     ta, frameCounter, tx::vec2{ 1.5f, 1.5f }, tx::PI, tx::MikuColor.compress());
-		renderer.draw();
+		re.draw();
 		//cout << timer.duration() << "ms" << endl;
 	}
 

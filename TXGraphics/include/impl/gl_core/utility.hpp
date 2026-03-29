@@ -36,13 +36,27 @@ inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& han
 	vam.setBuffer(handle.id, handle.bo, handle.bo.getNext(std::forward<SubmitMarker>(submitMarker)));
 }
 
-// fence
+// sm
 
+template <SMStyle style>
+bool addShaderPair(const std::string& vertSource, const std::string& fragSource, ShaderManager<style>& sm, ProgramId& output, const std::string& vertName = "", const std::string& fragName = "") {
+	ShaderId vertId = sm.addVertexShader(vertSource);
+	std::cerr << "Compiling & Linking vertex shader... " << vertName << '\n'
+	          << sm.getCompileLog(vertId) << "Done.\n";
+	if (!sm.compileSucceed(vertId)) return 0;
 
-using FenceManager_t = FenceManager<
-    RingBufferObjectDeleter,
-    RingBufferObjectMarker,
-    TextureDeleter>;
+	ShaderId fragId = sm.addFragmentShader(fragSource);
+	std::cerr << "Compiling & Linking fragment shader... " << fragName << '\n'
+	          << sm.getCompileLog(fragId) << "Done.\n";
+	if (!sm.compileSucceed(fragId)) return 0;
+
+	output = sm.linkShaders(vertId, fragId);
+	std::cerr << "Linking shaders... " << vertName << ' ' << fragName << '\n'
+	          << sm.getLinkLog(output) << "Done." << std::endl;
+	if (!sm.linkSucceed(output)) return 0;
+
+	return 1;
+}
 
 
 } // namespace tx::RenderEngine

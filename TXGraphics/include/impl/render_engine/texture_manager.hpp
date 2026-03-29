@@ -21,7 +21,7 @@ struct TextureId {
 	u32 index;
 };
 
-template <InstantiationOf<FenceManager> fmT>
+template <InstantiationOf<FenceManagerBase> fmT>
 class TextureManagerBase {
 public:
 	TextureId addTexture(Coord dimension, std::span<u8> data) {
@@ -92,7 +92,7 @@ private:
 	}
 };
 
-using TextureManager = TextureManagerBase<FenceManager_t>;
+using TextureManager = TextureManagerBase<FenceManager>;
 
 
 
