@@ -147,20 +147,7 @@ private:
 		re.draw();
 		//cout << timer.duration() << "ms" << endl;
 	}
-
-	std::vector<tx::vec2> whatever = {
-		{ 0.999, 0.999 },
-		{ -0.5, -0.5 },
-		{ 0.5, -0.5 },
-		{ -0.5, 0.5 }
-	};
 };
-
-// Things to add:
-// 1. reconstruction of all "baked" class -> can "interit" the data from previous instance
-// 2. DrawCallMan: error if not all dynamic buffer have same range
-
-
 
 int main() {
 	std::cout << "Initializing Application...\n";
