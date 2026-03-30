@@ -36,7 +36,7 @@ public:
 		void drawSprite(vec2 position, u64 textureArrHandle, float textureIndex, vec2 scale = { 1.0f, 1.0f }, float rotation = 0.0f, u32 color = 0xFFFFFFFF) {
 			engine->drawSprite(id, position, textureArrHandle, textureIndex, scale, rotation, color);
 		}
-		template <std::invocable<Renderer::SpriteAtrribs> Func>
+		template <std::invocable<Renderer::SpriteAtrribs&> Func>
 		void drawSprites(u32 count, Func&& editor) {
 			engine->drawSprites(id, count, std::forward<Func>(editor));
 		}
@@ -78,7 +78,7 @@ public:
 	void drawSprite(u32 sectionIndex, vec2 position, u64 textureArrHandle, float textureIndex, vec2 scale = { 1.0f, 1.0f }, float rotation = 0.0f, u32 color = 0xFFFFFFFF) {
 		rr.drawSprite(sectionIndex, position, textureArrHandle, textureIndex, scale, rotation, color);
 	}
-	template <std::invocable<Renderer::SpriteAtrribs> Func>
+	template <std::invocable<Renderer::SpriteAtrribs&> Func>
 	void drawSprites(u32 sectionIndex, u32 count, Func&& editor) {
 		rr.drawSprites(sectionIndex, count, std::forward<Func>(editor));
 	}

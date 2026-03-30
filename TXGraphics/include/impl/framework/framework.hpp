@@ -151,15 +151,14 @@ public:
 			glfwSwapBuffers(this->window);
 			glfwPollEvents();
 
-			if constexpr (mode & Mode::PrintFrameRate) {
-				std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
-				if (std::chrono::duration<double>(currentTime - lastStatTime).count() >= 1.0) {
+			std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
+			if (std::chrono::duration<double>(currentTime - lastStatTime).count() >= 1.0) {
+				if constexpr (mode & Mode::PrintFrameRate) {
 					std::cout << "FPS: " << fps << " | UPS: " << ups << std::endl;
-
-					fps = 0;
-					ups = 0;
-					lastStatTime = currentTime; // or lastStatTime += std::chrono::seconds(1);
 				}
+				fps = 0;
+				ups = 0;
+				lastStatTime = currentTime;
 			}
 		}
 	}
