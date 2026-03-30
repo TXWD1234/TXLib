@@ -171,6 +171,7 @@ inline std::ostream& operator<<(std::ostream& in_cout, const Coord& in_coord) {
 }
 
 // constants **************************************************************************************************************
+// clang-format off
 
 constexpr const vec2 IHat(1.0f, 0.0f);
 constexpr const vec2 JHat(0.0f, 1.0f);
@@ -182,30 +183,41 @@ constexpr vec2 TopLeft = { -1.0, 1.0 };
 constexpr vec2 BottomLeft = { -1.0, -1.0 };
 constexpr vec2 BottomRight = { 1.0, -1.0 };
 
+constexpr vec2 directionVec[] = {
+    {  1.0f,  0.0f },
+    {  1.0f,  1.0f },
+    {  0.0f,  1.0f },
+    { -1.0f,  1.0f },
+    { -1.0f,  0.0f },
+    { -1.0f, -1.0f },
+    {  0.0f, -1.0f },
+    {  1.0f, -1.0f }
+};
+
 constexpr float PI = 3.1415926f;
 constexpr float ONE_DEGREE = 0.017453292f;
 
 constexpr Coord _8wayIncrement[] = {
-	{ 1, 0 },
-	{ -1, 0 },
-	{ 0, 1 },
-	{ 0, -1 },
-	{ 1, 1 },
-	{ -1, 1 },
-	{ -1, -1 },
-	{ 1, -1 }
+    {  1,  0 },
+    {  1,  1 },
+    {  0,  1 },
+    { -1,  1 },
+    { -1,  0 },
+    { -1, -1 },
+    {  0, -1 },
+    {  1, -1 }
 };
 constexpr Coord _4wayIncrement[] = {
-	{ 1, 0 },
-	{ -1, 0 },
-	{ 0, 1 },
-	{ 0, -1 }
+	{  1,  0 },
+	{ -1,  0 },
+	{  0,  1 },
+	{  0, -1 }
 };
 constexpr int _2wayIncrement[] = {
 	1, -1
 };
 constexpr Coord CoordOrigin{ 0, 0 };
-
+// clang-format on
 
 
 
