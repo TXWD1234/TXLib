@@ -37,6 +37,7 @@ struct glAttributeParameter<float> {
 	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
 	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = false;
 };
 template <>
@@ -44,6 +45,7 @@ struct glAttributeParameter<int> {
 	using underlying = int;
 	static constexpr u32 type = gl::enums::INT;
 	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = true;
 };
 template <>
@@ -51,6 +53,7 @@ struct glAttributeParameter<u8> {
 	using underlying = u8;
 	static constexpr u32 type = gl::enums::UNSIGNED_BYTE;
 	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = true;
 };
 template <>
@@ -58,6 +61,7 @@ struct glAttributeParameter<u32> {
 	using underlying = u32;
 	static constexpr u32 type = gl::enums::UNSIGNED_INT;
 	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = true;
 };
 template <>
@@ -65,6 +69,7 @@ struct glAttributeParameter<u64> {
 	using underlying = u64;
 	static constexpr u32 type = gl::enums::UNSIGNED_INT64_ARB;
 	static constexpr u32 count = 1; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = true;
 };
 template <>
@@ -72,6 +77,7 @@ struct glAttributeParameter<tx::vec2> {
 	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
 	static constexpr u32 count = 2; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = false;
 };
 template <>
@@ -79,13 +85,15 @@ struct glAttributeParameter<tx::Coord> {
 	using underlying = int;
 	static constexpr u32 type = gl::enums::INT;
 	static constexpr u32 count = 2; // count of component / count of element
+	static constexpr u32 attributeCount = 1; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = true;
 };
 template <>
 struct glAttributeParameter<mat2> {
 	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
-	static constexpr u32 count = 4; // count of component / count of element
+	static constexpr u32 count = 2; // count of component / count of element
+	static constexpr u32 attributeCount = 2; // non matrix type is always 1, matrix type is the number of column
 	static constexpr bool is_int = false;
 };
 
@@ -97,9 +105,9 @@ inline constexpr u32 glType = glAttributeParameter<T>::type;
 template <class T>
 inline constexpr u32 glComponentCount = glAttributeParameter<T>::count;
 template <class T>
+inline constexpr u32 glAttribCount = glAttributeParameter<T>::attributeCount;
+template <class T>
 inline constexpr bool glTypeIsInt = glAttributeParameter<T>::is_int;
-
-
 
 
 

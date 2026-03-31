@@ -87,7 +87,7 @@ public:
 		template <class T>
 		u32 addAttrib() {
 			u32 id = m_bindings.size();
-			setBufferAttrib_impl<T>(m_id, id);
+			setBufferAttrib_impl<T>(m_id, id, m_attribCount);
 			m_bindings.push_back({ 0, 0 });
 			return id;
 		}
@@ -95,7 +95,7 @@ public:
 		template <class T>
 		u32 addAttribInstanced(u32 divisor = 1) {
 			u32 id = m_bindings.size();
-			setBufferAttrib_impl<T>(m_id, id);
+			setBufferAttrib_impl<T>(m_id, id, m_attribCount);
 			gl::vertexArrayBindingDivisor(m_id, id, divisor);
 			m_useInstancing = 1;
 			m_bindings.push_back({ 0, 0 });
@@ -106,27 +106,32 @@ public:
 		gid m_id = 0;
 		std::vector<BindingState> m_bindings;
 		bool m_useInstancing = 0;
+		u32 m_attribCount = 0;
 
 		template <class T>
-		static void setBufferAttrib_impl(u32 vamId, u32 id) {
+		static void setBufferAttrib_impl(u32 vamId, u32 id, u32& attribId) {
 			using underlying = typename glAttributeParameter<T>::underlying;
-			if constexpr (sizeof(underlying) <= 4) {
-				if constexpr (glAttributeParameter<T>::is_int) {
-					gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
+			u32 relativeOffset = 0;
+			for (u32 i = 0; i < glAttribCount<T>; i++) {
+				if constexpr (sizeof(underlying) <= 4) {
+					if constexpr (glAttributeParameter<T>::is_int) {
+						gl::vertexArrayAttribIFormat(vamId, attribId, glComponentCount<T>, glType<T>, relativeOffset);
+					} else {
+						gl::vertexArrayAttribFormat(vamId, attribId, glComponentCount<T>, glType<T>, gl::enums::FALSE, relativeOffset);
+					}
+				} else if constexpr (sizeof(underlying) == 8) {
+					if constexpr (glAttributeParameter<T>::is_int) {
+						gl::vertexArrayAttribIFormat(vamId, attribId, glComponentCount<T> * 2, gl::enums::UNSIGNED_INT, relativeOffset); // Safe bindless mapping
+					} else {
+						gl::vertexArrayAttribLFormat(vamId, attribId, glComponentCount<T>, glType<T>, relativeOffset);
+					}
 				} else {
-					gl::vertexArrayAttribFormat(vamId, id, glComponentCount<T>, glType<T>, gl::enums::FALSE, 0);
+					static_assert(false_v<T>, "tx::RenderEngine::VertexAttributeManager::Initializer::setBufferAttrib_impl: Unsupported underlying type length.");
 				}
-			} else if constexpr (sizeof(underlying) == 8) {
-				if constexpr (glAttributeParameter<T>::is_int) {
-					gl::vertexArrayAttribIFormat(vamId, id, glComponentCount<T> * 2, gl::enums::UNSIGNED_INT, 0); // Safe bindless mapping
-				} else {
-					gl::vertexArrayAttribLFormat(vamId, id, glComponentCount<T>, glType<T>, 0);
-				}
-			} else {
-				static_assert(false_v<T>, "tx::RenderEngine::VertexAttributeManager::Initializer::setBufferAttrib_impl: Unsupported underlying type length.");
+				gl::enableVertexArrayAttrib(vamId, attribId);
+				gl::vertexArrayAttribBinding(vamId, attribId++, id);
+				relativeOffset += glComponentCount<T> * sizeof(underlying);
 			}
-			gl::enableVertexArrayAttrib(vamId, id);
-			gl::vertexArrayAttribBinding(vamId, id, id);
 		}
 	};
 
