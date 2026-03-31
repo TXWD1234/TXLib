@@ -92,7 +92,7 @@ public:
 			std::fill(attribs.textureHandleBuffer.begin(), attribs.textureHandleBuffer.end(), handle);
 			std::fill(attribs.textureIndexBuffer.begin(), attribs.textureIndexBuffer.end(), index);
 			std::fill(attribs.scaleBuffer.begin(), attribs.scaleBuffer.end(), scale);
-			std::fill(attribs.rotationBuffer.begin(), attribs.rotationBuffer.end(), rotation);
+			std::fill(attribs.rotationBuffer.begin(), attribs.rotationBuffer.end(), findRotationMat(rotation));
 			std::fill(attribs.colorBuffer.begin(), attribs.colorBuffer.end(), color);
 		});
 	}

@@ -80,7 +80,7 @@ public:
 		    textureArrHandle,
 		    textureIndex,
 		    scale,
-		    rotation,
+		    findRotationMat(rotation),
 		    color);
 	}
 	// clang-format off
@@ -90,7 +90,7 @@ public:
 		std::span<u64>   textureHandleBuffer;
 		std::span<float> textureIndexBuffer;
 		std::span<vec2>  scaleBuffer;
-		std::span<float> rotationBuffer;
+		std::span<mat2>  rotationBuffer;
 		std::span<u32>   colorBuffer;
 	};
 	template <std::invocable<SpriteAtrribs&> Func>
@@ -117,7 +117,7 @@ public:
 			std::span<u64>  { handleBuffer  .begin() + oldSize, handleBuffer  .end() },
 			std::span<float>{ indexBuffer   .begin() + oldSize, indexBuffer   .end() },
 			std::span<vec2> { scaleBuffer   .begin() + oldSize, scaleBuffer   .end() },
-			std::span<float>{ rotationBuffer.begin() + oldSize, rotationBuffer.end() },
+			std::span<mat2> { rotationBuffer.begin() + oldSize, rotationBuffer.end() },
 			std::span<u32>  { colorBuffer   .begin() + oldSize, colorBuffer   .end() }
 		};
 
@@ -167,7 +167,7 @@ private:
 	DBuffer_impl<u64>   instanceTextureHandleBuffer;
 	DBuffer_impl<float> instanceTextureIndexBuffer;
 	DBuffer_impl<vec2>  instanceScaleBuffer;
-	DBuffer_impl<float> instanceRotationBuffer;
+	DBuffer_impl<mat2>  instanceRotationBuffer;
 	DBuffer_impl<u32>   instanceColorBuffer;
 	// clang-format on
 
@@ -183,7 +183,7 @@ private:
 
 	// OpenGL
 
-	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u32 color);
+	void addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, mat2 rotation, u32 color);
 
 	// update for id changes
 	void updateVAM();

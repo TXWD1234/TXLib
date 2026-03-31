@@ -17,6 +17,15 @@ struct mat2 {
 	vec2 i, j;
 };
 
+inline mat2 findRotationMat(float degree) {
+	// update with tx::sin (fast sin) <--------------------------------------------------------------------------------------------------------
+
+	mat2 o;
+	o.i = vec2{ std::cosf(degree), std::sinf(degree) };
+	o.j = tx::leftPerp(o.i);
+	return o;
+}
+
 template <class T>
 struct glAttributeParameter {
 	// use false_v to input the T, to make compiler don't evaluate this when parsing it, and only trigger it when instanciating it
@@ -74,7 +83,7 @@ struct glAttributeParameter<tx::Coord> {
 };
 template <>
 struct glAttributeParameter<mat2> {
-	using underlying = int;
+	using underlying = float;
 	static constexpr u32 type = gl::enums::FLOAT;
 	static constexpr u32 count = 4; // count of component / count of element
 	static constexpr bool is_int = false;

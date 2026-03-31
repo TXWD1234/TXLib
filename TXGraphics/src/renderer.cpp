@@ -54,7 +54,7 @@ void Renderer::initBuffers_impl() {
 		instanceTextureHandleBuffer.buffer.id = initer.addAttribInstanced<u64>  ();
 		instanceTextureIndexBuffer .buffer.id = initer.addAttribInstanced<float>();
 		instanceScaleBuffer        .buffer.id = initer.addAttribInstanced<vec2> ();
-		instanceRotationBuffer     .buffer.id = initer.addAttribInstanced<float>();
+		instanceRotationBuffer     .buffer.id = initer.addAttribInstanced<mat2> ();
 		instanceColorBuffer        .buffer.id = initer.addAttribInstanced<u32>  ();
 	});
 	meshPositionBuffer.bo.alloc(6, SquareVertexPositions_CenterOrigin);
@@ -110,7 +110,7 @@ bool Renderer::updateRingBufferOffset() {
 	       ringBufferOffset == instanceColorBuffer        .buffer.bo.getNext(FMSubmiter{ fm });
 }
 
-void Renderer::addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, float rotation, u32 color) {
+void Renderer::addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, mat2 rotation, u32 color) {
 	instancePositionBuffer     .stage[section].push_back(position);
 	instanceTextureHandleBuffer.stage[section].push_back(textureHandle);
 	instanceTextureIndexBuffer .stage[section].push_back(textureIndex);
