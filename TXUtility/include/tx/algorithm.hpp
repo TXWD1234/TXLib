@@ -12,6 +12,7 @@
 namespace tx {
 
 template <class Pred, std::contiguous_iterator it_t, std::contiguous_iterator... multi_it_t>
+    requires std::invocable<Pred, std::iter_value_t<it_t>, std::iter_value_t<it_t>>
 void multi_sort(it_t begin, it_t end, Pred&& pred, multi_it_t const&... byProducts) {
 	std::vector<u32> indexArray(static_cast<u32>(end - begin));
 	for (u32 i = 0; i < indexArray.size(); i++) {
@@ -53,5 +54,9 @@ void multi_sort(it_t begin, it_t end, Pred&& pred, multi_it_t const&... byProduc
 			    tempByProduct);
 		}
 	}(std::to_address(byProducts)...);
+}
+template <std::contiguous_iterator it_t, std::contiguous_iterator... multi_it_t>
+void multi_sort(it_t begin, it_t end, multi_it_t const&... byProducts) {
+	multi_sort(begin, end, std::less<>{}, byProducts...);
 }
 }

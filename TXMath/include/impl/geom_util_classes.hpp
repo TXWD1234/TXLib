@@ -6,13 +6,12 @@
 #pragma once
 #include "impl/basic_utils.hpp"
 #include "impl/geometry.hpp"
+#include <concepts>
 
 namespace tx {
 
-template <class Func>
-inline void applyGridRange(Func f, const Coord& bottomLeft, uint32_t width, uint32_t height) {
-	static_assert(std::is_invocable_v<Func, const Coord&>,
-	              "tx::applyGridRange(): invalid lambda callback parameter. The lambda provided need to have parameter of: (const tx::Coord&)");
+template <std::invocable<const Coord&> Func>
+inline void applyGridRange(Func&& f, const Coord& bottomLeft, uint32_t width, uint32_t height) {
 	Coord cur = bottomLeft;
 	Coord end = bottomLeft.offset(width, height);
 	for (; cur.y() < end.y(); cur.moveY(1)) {
@@ -40,7 +39,7 @@ public:
 	inline float width() const { return m_width; }
 	inline float height() const { return m_height; }
 
-	template <class Func>
+	template <std::invocable<const Coord&> Func>
 	inline void apply(Func&& f) const {
 		u32 w = static_cast<u32>(std::floorf(m_bottomLeft.x() + m_width) - std::floorf(m_bottomLeft.x())) + (isInt(m_width) ? 0 : 1),
 		    h = static_cast<u32>(std::floorf(m_bottomLeft.y() + m_height) - std::floorf(m_bottomLeft.y())) + (isInt(m_height) ? 0 : 1);
@@ -75,7 +74,7 @@ public:
 	u32 width() const { return m_width; }
 	u32 height() const { return m_height; }
 
-	template <class Func>
+	template <std::invocable<const Coord&> Func>
 	inline void apply(Func&& f) const {
 		applyGridRange(std::forward<Func>(f), m_bottomLeft, m_width, m_height);
 	}

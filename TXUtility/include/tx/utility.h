@@ -4,4 +4,5 @@
 // File: utility.h
 
 #pragma once
-#include "impl/type_traits.hpp"
+#include "tx/type_traits.hpp"
+#include "tx/algorithm.hpp"

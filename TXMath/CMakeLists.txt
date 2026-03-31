@@ -25,6 +25,7 @@ add_library(TXMath INTERFACE
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/geom_util_classes.hpp"
 )
 tx_add_release_ops_interface(TXMath)
+target_compile_features(TXMath INTERFACE cxx_std_20)
 
 target_include_directories(TXMath INTERFACE 
 	"${CMAKE_CURRENT_SOURCE_DIR}/include"
