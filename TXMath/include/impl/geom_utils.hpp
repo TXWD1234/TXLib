@@ -20,6 +20,11 @@ inline vec2 unify(const vec2& in, float* len = nullptr) {
 		*len = scalar;
 	return vec2(in.getX() / scalar, in.getY() / scalar);
 }
+inline vec2 unify(const vec2& in, float len) {
+	if (len == 0.0f)
+		return vec2(0, 0);
+	return vec2(in.getX() / len, in.getY() / len);
+}
 constexpr inline vec2 unify(const vec2& in, float dist) {
 	if (dist == 0.0f)
 		return vec2(0, 0);

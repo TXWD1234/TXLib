@@ -127,6 +127,27 @@ public:
 	void reserveSprites(u32 sectionIndex, u32 count);
 	// clang-format on
 
+	void drawLine(u32 sectionIndex, vec2 start, vec2 end, float thickness = 0.001f, u32 color = 0xFFFFFFFF) {
+		vec2 diff = end - start;
+		float len = diff.length();
+		if (len <= tx::epsilon) return;
+		vec2 center = start + diff * 0.5f;
+		vec2 nuv = unify(diff, len);
+		mat2 rotation = { nuv, leftPerp(nuv) };
+		vec2 wh = { len, thickness };
+
+		addInstance_impl(
+		    sectionIndex,
+		    center,
+		    0, 0.0f,
+		    wh,
+		    rotation,
+		    color);
+	}
+
+
+
+
 
 	// draw call
 	void draw();

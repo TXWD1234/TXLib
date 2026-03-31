@@ -43,6 +43,10 @@ public:
 		void drawSprites(std::span<const vec2> positions, TextureId textureId, vec2 scale = { 1.0f, 1.0f }, float rotation = 0.0f, u32 color = 0xFFFFFFFF) {
 			engine->drawSprites(id, positions, textureId, scale, rotation, color);
 		}
+		void drawLine(vec2 start, vec2 end, float thickness = 0.001f, u32 color = 0xFFFFFFFF) {
+			engine->drawLine(id, start, end, thickness, color);
+		}
+
 		void reserveSprites(u32 count) { engine->reserveSprites(id, count); }
 
 		bool valid() const { return id != UINT32_MAX && engine; }
@@ -96,6 +100,7 @@ public:
 			std::fill(attribs.colorBuffer.begin(), attribs.colorBuffer.end(), color);
 		});
 	}
+	void drawLine(u32 sectionIndex, vec2 start, vec2 end, float thickness = 0.001f, u32 color = 0xFFFFFFFF) { rr.drawLine(sectionIndex, start, end, thickness, color); }
 	void reserveSprites(u32 sectionIndex, u32 count) { rr.reserveSprites(sectionIndex, count); }
 	void draw() { rr.draw(); }
 	auto& getFM() { return rr.getFM(); }
