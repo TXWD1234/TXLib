@@ -28,10 +28,10 @@ void CoordMap::append(const CoordMap& in) {
 	unique();
 }
 bool CoordMap::Compare::operator()(const Coord& a, const Coord& b) {
-	if (a.y() == b.y()) {
-		return a.x() < b.x();
+	if (a.y == b.y) {
+		return a.x < b.x;
 	} else {
-		return a.y() < b.y();
+		return a.y < b.y;
 	}
 }
 } // namespace tx

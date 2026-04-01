@@ -54,14 +54,14 @@ public:
 		return *this;
 	}
 
-	int getWidth() const noexcept { return dimension.x(); }
-	int getHeight() const noexcept { return dimension.y(); }
-	int getPosX() const noexcept { return pos.x(); }
-	int getPosY() const noexcept { return pos.y(); }
+	int getWidth() const noexcept { return dimension.x; }
+	int getHeight() const noexcept { return dimension.y; }
+	int getPosX() const noexcept { return pos.x; }
+	int getPosY() const noexcept { return pos.y; }
 
 	MakeWindow& setPos(int x, int y) noexcept {
-		pos.setX(x);
-		pos.setY(y);
+		pos.x = x;
+		pos.y = y;
 		return *this;
 	}
 	MakeWindow& setPos(const Coord& in_pos) noexcept {
@@ -70,16 +70,16 @@ public:
 	}
 
 	MakeWindow& setWidth(int w) noexcept {
-		dimension.setX(w);
+		dimension.x = w;
 		return *this;
 	}
 	MakeWindow& setHeight(int h) noexcept {
-		dimension.setY(h);
+		dimension.y = h;
 		return *this;
 	}
 	MakeWindow& setSize(int w, int h) noexcept {
-		dimension.setX(w);
-		dimension.setY(h);
+		dimension.x = w;
+		dimension.y = h;
 		return *this;
 	}
 	MakeWindow& setSize(const Coord& size) noexcept {

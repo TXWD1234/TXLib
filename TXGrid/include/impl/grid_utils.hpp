@@ -207,7 +207,7 @@ void GridLine::gen_impl(Func&& f) const {
 	Coord current = start;
 	if (current == end) {
 		if (inRange(current, CoordOrigin, rangeEnd)) f(current);
-	} else if (current.x() == end.x() || current.y() == end.y()) {
+	} else if (current.x == end.x || current.y == end.y) {
 		//cout << "march straight\n";
 		marchStraight_impl(std::forward<Func>(f), current);
 	} else {

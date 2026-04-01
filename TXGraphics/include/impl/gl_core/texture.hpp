@@ -128,13 +128,13 @@ private:
 	[[nodiscard]] TextureDeleter resize_impl(u32 newLayerCount);
 
 	void alloc_impl(TextureFormat format, Coord dimension, u32 mipmapLevel, u32 layerCount) {
-		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);
+		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x, dimension.y, layerCount);
 	}
 	void setLayerRegion_impl(u32 layer, Coord offset, Coord dimension, u8* data) {
 		gl::textureSubImage3D(
 		    m_id, 0,
-		    offset.x(), offset.y(), layer,
-		    dimension.x(), dimension.y(), 1,
+		    offset.x, offset.y, layer,
+		    dimension.x, dimension.y, 1,
 		    getFormat_impl(m_format), gl::enums::UNSIGNED_BYTE, data);
 	}
 	void init_impl() {
@@ -267,13 +267,13 @@ private:
 	[[nodiscard]] TextureDeleter resize_impl(u32 newLayerCount);
 
 	void alloc_impl(TextureFormat format, Coord dimension, u32 mipmapLevel, u32 layerCount) {
-		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x(), dimension.y(), layerCount);
+		gl::textureStorage3D(m_id, mipmapLevel, getFormatInternal_impl(format), dimension.x, dimension.y, layerCount);
 	}
 	void setLayerRegion_impl(u32 layer, Coord offset, Coord dimension, u8* data) {
 		gl::textureSubImage3D(
 		    m_id, 0,
-		    offset.x(), offset.y(), layer,
-		    dimension.x(), dimension.y(), 1,
+		    offset.x, offset.y, layer,
+		    dimension.x, dimension.y, 1,
 		    getFormat_impl(m_format), gl::enums::UNSIGNED_BYTE, data);
 	}
 	void init_impl() {

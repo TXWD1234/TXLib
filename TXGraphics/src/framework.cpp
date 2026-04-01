@@ -17,15 +17,15 @@ bool MakeWindow::make(GLFWwindow*& window) {
 	if (fullscreen != FullscreenConfig::None) {
 		monitor = glfwGetPrimaryMonitor();
 		mode = glfwGetVideoMode(monitor);
-		dimension.setX(mode->width);
-		dimension.setY(mode->height);
+		dimension.x = mode->width;
+		dimension.y = mode->height;
 	}
 	if (fullscreen == FullscreenConfig::Windowed) {
 		glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
 	}
 
 	window = glfwCreateWindow(
-	    dimension.x(), dimension.y(), title.c_str(),
+	    dimension.x, dimension.y, title.c_str(),
 	    fullscreen == FullscreenConfig::Exclusive ? monitor : NULL,
 	    NULL);
 
@@ -38,7 +38,7 @@ bool MakeWindow::make(GLFWwindow*& window) {
 	if (fullscreen == FullscreenConfig::Windowed) {
 		glfwSetWindowPos(window, 0, 0);
 	} else {
-		glfwSetWindowPos(window, pos.x(), pos.y());
+		glfwSetWindowPos(window, pos.x, pos.y);
 	}
 
 	return 1;

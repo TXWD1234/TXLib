@@ -23,7 +23,7 @@ public:
 		this->map.assign(in_width * in_height, T{});
 	}
 	GridSystem(const Coord& in_dimension) : dimension(in_dimension) {
-		this->map.assign(in_dimension.x() * in_dimension.y(), T{});
+		this->map.assign(in_dimension.x * in_dimension.y, T{});
 	}
 
 	void fill(const CoordMap& coords, const T& val) {
@@ -45,12 +45,12 @@ public:
 
 	inline T& atIndex(int index) { return this->map[index]; }
 	inline const T& atIndex(int index) const { return this->map[index]; }
-	inline T& at(const tx::Coord& pos) { return this->at(pos.x(), pos.y()); }
-	inline const T& at(const tx::Coord& pos) const { return this->at(pos.x(), pos.y()); }
+	inline T& at(const tx::Coord& pos) { return this->at(pos.x, pos.y); }
+	inline const T& at(const tx::Coord& pos) const { return this->at(pos.x, pos.y); }
 	inline T& at(int x, int y) { return this->map[index(x, y)]; }
 	inline const T& at(int x, int y) const { return this->map[index(x, y)]; }
-	inline T* atSafe(const tx::Coord& pos) { return this->atSafe(pos.x(), pos.y()); }
-	inline const T* atSafe(const tx::Coord& pos) const { return this->atSafe(pos.x(), pos.y()); }
+	inline T* atSafe(const tx::Coord& pos) { return this->atSafe(pos.x, pos.y); }
+	inline const T* atSafe(const tx::Coord& pos) const { return this->atSafe(pos.x, pos.y); }
 	inline T* atSafe(int x, int y) {
 		if (valid(x, y))
 			return &this->map[index(x, y)];
@@ -64,7 +64,7 @@ public:
 			return nullptr;
 	}
 	inline void set(const tx::Coord& pos, const T& val) {
-		this->at(pos.x(), pos.y()) = val;
+		this->at(pos.x, pos.y) = val;
 	}
 	inline void set(int x, int y, const T& val) {
 		this->at(x, y) = val;
@@ -78,12 +78,12 @@ public:
 	inline bool valid(int x, int y) const {
 		return inRange_p(Coord{ x, y }, dimension);
 	}
-	inline int getWidth() const { return dimension.x(); }
-	inline int getHeight() const { return dimension.y(); }
+	inline int getWidth() const { return dimension.x; }
+	inline int getHeight() const { return dimension.y; }
 	inline int size() const { return this->map.size(); }
-	//inline tx::Coord getCoord(const tx::vec2& in) const { return tx::Coord{ static_cast<int>((in.x() + 1.0f) / 2.0f * Width), static_cast<int>((in.y() + 1.0f) / 2.0f * Height) }; }
-	inline int index(int x, int y) const { return y * dimension.x() + x; }
-	inline int index(const tx::Coord& in) const { return index(in.x(), in.y()); }
+	//inline tx::Coord getCoord(const tx::vec2& in) const { return tx::Coord{ static_cast<int>((in.x + 1.0f) / 2.0f * Width), static_cast<int>((in.y + 1.0f) / 2.0f * Height) }; }
+	inline int index(int x, int y) const { return y * dimension.x + x; }
+	inline int index(const tx::Coord& in) const { return index(in.x, in.y); }
 
 
 	inline void reinit(int in_sideLen) {
@@ -98,7 +98,7 @@ public:
 	}
 	inline void reinit(const Coord& in_dimension) {
 		map.clear();
-		this->map.assign(in_dimension.x() * in_dimension.y(), T{});
+		this->map.assign(in_dimension.x * in_dimension.y, T{});
 		dimension = in_dimension;
 	}
 
@@ -113,11 +113,11 @@ public:
 
 		if constexpr (std::is_invocable_v<Func, T&, tx::Coord&>) {
 			tx::Coord cur{ 0, 0 };
-			for (; cur.y() < dimension.y(); cur.moveY(1)) {
-				for (; cur.x() < dimension.x(); cur.moveX(1)) {
+			for (; cur.y < dimension.y; cur.moveY(1)) {
+				for (; cur.x < dimension.x; cur.moveX(1)) {
 					func(at(cur), cur);
 				}
-				cur.setX(0);
+				cur.x = 0;
 			}
 		} else {
 			for (T& i : map) {

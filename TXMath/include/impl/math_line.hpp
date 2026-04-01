@@ -28,31 +28,31 @@ public:
 
 	inline const vec2& getAB() const { return AB; }
 	inline const vec2& ab() const { return AB; }
-	inline float a() const { return AB.x(); }
-	inline float b() const { return AB.y(); }
+	inline float a() const { return AB.x; }
+	inline float b() const { return AB.y; }
 	inline float getC() const { return C; }
 	inline float c() const { return C; }
 
 	inline void moveX(float offset) {
-		C += AB.x() * -offset;
+		C += AB.x * -offset;
 	}
 	inline void moveY(float offset) {
-		C += AB.y() * -offset;
+		C += AB.y * -offset;
 	}
 	inline void move(float offsetX, float offsetY) {
-		C += AB.x() * -offsetX + AB.y() * -offsetY;
+		C += AB.x * -offsetX + AB.y * -offsetY;
 	}
 	inline void move(const vec2& offset) {
 		C += dot(AB, -offset);
 	}
 	inline LineEquation offsetX(float offset) const {
-		return LineEquation{ AB, C + AB.x() * -offset };
+		return LineEquation{ AB, C + AB.x * -offset };
 	}
 	inline LineEquation offsetY(float offset) const {
-		return LineEquation{ AB, C + AB.y() * -offset };
+		return LineEquation{ AB, C + AB.y * -offset };
 	}
 	inline LineEquation offset(float offsetX, float offsetY) const {
-		return LineEquation{ AB, C + AB.x() * -offsetX + AB.y() * -offsetY };
+		return LineEquation{ AB, C + AB.x * -offsetX + AB.y * -offsetY };
 	}
 	inline LineEquation offset(const vec2& offset) const {
 		return LineEquation{ AB, C + dot(AB, -offset) };
@@ -124,16 +124,16 @@ inline MathLine offset(const MathLine& l, float offsetX, float offsetY) {
 }
 
 inline bool isRightOfLine(const MathLine& l, const vec2& p) {
-	return p.x() > findLineX(l, p.y());
+	return p.x > findLineX(l, p.y);
 }
 inline bool isLeftOfLine(const MathLine& l, const vec2& p) {
-	return p.x() < findLineX(l, p.y());
+	return p.x < findLineX(l, p.y);
 }
 inline bool isAboveLine(const MathLine& l, const vec2& p) {
-	return p.y() > findLineY(l, p.x());
+	return p.y > findLineY(l, p.x);
 }
 inline bool isBelowLine(const MathLine& l, const vec2& p) {
-	return p.y() < findLineY(l, p.x());
+	return p.y < findLineY(l, p.x);
 }
 
 
@@ -156,16 +156,16 @@ public:
 	// topRight
 	inline const vec2& end() const { return m_end; }
 
-	inline float length() const { return std::hypotf(m_end.x() - m_start.x(), m_end.y() - m_start.x()); }
+	inline float length() const { return std::hypotf(m_end.x - m_start.x, m_end.y - m_start.x); }
 
 private:
 	MathLine m_line;
 	vec2 m_start, m_end;
 
-	static inline float _startX(const vec2& start, const vec2& end) { return min(start.x(), end.x()); }
-	static inline float _startY(const vec2& start, const vec2& end) { return min(start.y(), end.y()); }
-	static inline float _endX(const vec2& start, const vec2& end) { return max(start.x(), end.x()); }
-	static inline float _endY(const vec2& start, const vec2& end) { return max(start.y(), end.y()); }
+	static inline float _startX(const vec2& start, const vec2& end) { return min(start.x, end.x); }
+	static inline float _startY(const vec2& start, const vec2& end) { return min(start.y, end.y); }
+	static inline float _endX(const vec2& start, const vec2& end) { return max(start.x, end.x); }
+	static inline float _endY(const vec2& start, const vec2& end) { return max(start.y, end.y); }
 };
 
 inline vec2 findIntersection(const MathLine& l, const LineSegment& ls) {
@@ -190,7 +190,7 @@ public:
 	DLineSegment() {}
 	DLineSegment(const vec2& in_start, float in_dx, float in_dy) : m_start(in_start), m_dx(in_dx), m_dy(in_dy) {
 	}
-	DLineSegment(const vec2& in_start, const vec2& in_offsetVec) : m_start(in_start), m_dx(in_offsetVec.x()), m_dy(in_offsetVec.y()) {
+	DLineSegment(const vec2& in_start, const vec2& in_offsetVec) : m_start(in_start), m_dx(in_offsetVec.x), m_dy(in_offsetVec.y) {
 	}
 
 	const vec2& start() const { return m_start; }
@@ -199,12 +199,12 @@ public:
 	float dy() const { return m_dy; }
 	vec2 dVec() const { return vec2{ m_dx, m_dy }; }
 
-	float findTviaX(float x) const { return (x - m_start.x()) / m_dx; }
-	float findTviaY(float y) const { return (y - m_start.y()) / m_dy; }
+	float findTviaX(float x) const { return (x - m_start.x) / m_dx; }
+	float findTviaY(float y) const { return (y - m_start.y) / m_dy; }
 	float findDX(float t) const { return t * m_dx; }
 	float findDY(float t) const { return t * m_dy; }
-	float findX(float t) const { return m_start.x() + findDX(t); }
-	float findY(float t) const { return m_start.y() + findDY(t); }
+	float findX(float t) const { return m_start.x + findDX(t); }
+	float findY(float t) const { return m_start.y + findDY(t); }
 	vec2 findPoint(float t) const { return vec2{ findX(t), findY(t) }; }
 	float findXviaY(float y) const { return findX(findTviaY(y)); }
 	float findYviaX(float x) const { return findY(findTviaX(x)); }
