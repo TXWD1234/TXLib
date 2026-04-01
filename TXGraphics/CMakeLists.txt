@@ -27,6 +27,7 @@ file(GLOB_RECURSE TX_GRAPHICS_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_
 add_library(TXGraphics STATIC ${TX_GRAPHICS_HEADERS} ${TX_GRAPHICS_SOURCES})
 
 tx_add_release_ops(TXGraphics)
+target_compile_features(TXGraphics PUBLIC cxx_std_20)
 target_link_libraries(TXGraphics PUBLIC 
 	glfw
 	glad
@@ -36,7 +37,6 @@ target_link_libraries(TXGraphics PUBLIC
 	TXData
 )
 
-target_compile_features(TXGraphics PUBLIC cxx_std_20)
 
 target_include_directories(TXGraphics PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include"

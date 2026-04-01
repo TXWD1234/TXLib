@@ -1,9 +1,9 @@
 // Copyright@TXLib All rights reserved.
 // Author: TX Studio: TX_Jerry
 // Module: TXResource
-// File: resource.cpp
+// File: io_file.cpp
 
-#include "impl/detail.hpp"
+#include "impl/io_file.hpp"
 #include <fstream>
 
 namespace tx {

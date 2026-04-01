@@ -1,8 +1,11 @@
 // Copyright@TXLib All rights reserved.
 // Author: TX Studio: TX_Jerry
 // Module: TXResource
-// File: resource.h
+// File: image.cpp
 
-#pragma once
-#include "impl/io_file.hpp"
 #include "impl/image.hpp"
+
+namespace tx {
+
+
+}

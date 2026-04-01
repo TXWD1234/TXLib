@@ -1,7 +1,7 @@
 // Copyright@TXLib All rights reserved.
 // Author: TX Studio: TX_Jerry
 // Module: TXResource
-// File: detail.h
+// File: io_file.h
 
 #pragma once
 #include <filesystem>
