@@ -16,7 +16,7 @@ constexpr float epsilon = 1e-6f;
 // 2 direction vector
 class vec2;
 class Coord;
-inline float dot(const vec2& in1, const vec2& in2);
+constexpr inline float dot(const vec2& in1, const vec2& in2);
 class vec2 {
 public:
 	float x, y;
@@ -169,9 +169,6 @@ constexpr vec2 directionVec[] = {
     {  0.0f, -1.0f },
     {  1.0f, -1.0f }
 };
-
-constexpr float PI = 3.1415926f;
-constexpr float ONE_DEGREE = 0.017453292f;
 
 constexpr Coord _8wayIncrement[] = {
     {  1,  0 },

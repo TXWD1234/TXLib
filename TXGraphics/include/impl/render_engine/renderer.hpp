@@ -83,6 +83,21 @@ public:
 		    findRotationMat(rotation),
 		    color);
 	}
+	void drawSprite(u32 sectionIndex,
+	                vec2 position,
+	                u64 textureArrHandle,
+	                float textureIndex,
+	                vec2 scale = { 1.0f, 1.0f },
+	                u32 color = 0xFFFFFFFF) {
+		addInstance_impl(
+		    sectionIndex,
+		    position,
+		    textureArrHandle,
+		    textureIndex,
+		    scale,
+		    mat2{ { 1.0f, 0.0f }, { 0.0f, 1.0f } },
+		    color);
+	}
 	// clang-format off
 
 	struct SpriteAtrribs {
