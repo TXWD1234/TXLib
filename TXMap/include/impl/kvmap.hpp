@@ -190,6 +190,76 @@ public:
 		if (!this->m_valid) validate_impl();
 	}
 
+	inline void merge(const KVMap& other) {
+		validate();
+		size_t originalSize = pairs.size();
+		pairs.insert(pairs.end(), other.pairs.begin(), other.pairs.end());
+		iterator otherBegin = pairs.begin() + originalSize;
+
+		if (!other.m_valid) {
+			sort_impl(otherBegin + other.disorderIndex, pairs.end());
+			std::inplace_merge(otherBegin, otherBegin + other.disorderIndex, pairs.end(), PairCompare{ this->cmp });
+		}
+		std::inplace_merge(pairs.begin(), otherBegin, pairs.end(), PairCompare{ this->cmp });
+
+		this->m_valid = 1;
+		this->disorderIndex = pairs.size();
+	}
+	inline void merge(KVMap&& other) {
+		validate();
+		other.validate();
+
+		// Choose the vector with the larger capacity to minimize memory allocations
+		if (other.pairs.capacity() > pairs.capacity()) {
+			size_t otherOriginalSize = other.pairs.size();
+			other.pairs.insert(other.pairs.end(), std::make_move_iterator(pairs.begin()), std::make_move_iterator(pairs.end()));
+			std::inplace_merge(other.pairs.begin(), other.pairs.begin() + otherOriginalSize, other.pairs.end(), PairCompare{ this->cmp });
+			pairs = std::move(other.pairs);
+		} else {
+			size_t originalSize = pairs.size();
+			pairs.insert(pairs.end(), std::make_move_iterator(other.pairs.begin()), std::make_move_iterator(other.pairs.end()));
+			std::inplace_merge(pairs.begin(), pairs.begin() + originalSize, pairs.end(), PairCompare{ this->cmp });
+		}
+
+		other.pairs.clear();
+		other.m_valid = 1;
+		other.disorderIndex = 0;
+
+		this->m_valid = 1;
+		this->disorderIndex = pairs.size();
+	}
+
+	// Resolves duplicate keys by applying a user-defined lambda
+	// The lambda should take two `Pair`s and return the `Pair` to keep.
+	template <class ResolveFunc>
+	inline void unique(ResolveFunc resolve) {
+		validate();
+		if (pairs.empty()) return;
+		auto dest = pairs.begin();
+		for (auto it = pairs.begin() + 1; it != pairs.end(); ++it) {
+			if (isSame_impl(dest->k(), it->k())) {
+				*dest = resolve(std::move(*dest), std::move(*it));
+			} else {
+				++dest;
+				if (dest != it) {
+					*dest = std::move(*it);
+				}
+			}
+		}
+		pairs.erase(dest + 1, pairs.end());
+		this->disorderIndex = pairs.size();
+	}
+	template <class ResolveFunc>
+	inline void merge(const KVMap& other, ResolveFunc resolve) {
+		this->merge(other);
+		this->unique(resolve);
+	}
+	template <class ResolveFunc>
+	inline void merge(KVMap&& other, ResolveFunc resolve) {
+		this->merge(std::move(other));
+		this->unique(resolve);
+	}
+
 	// iterator
 
 	inline iterator begin() { return pairs.begin(); }
@@ -200,9 +270,7 @@ public:
 private:
 	std::vector<Pair> pairs;
 	mutable bool m_valid = 0; // is sorted
-	mutable int disorderIndex = 0;
-	CompareFunc cmp;
-
+	mutable int disorderIndex = 0; // the index of where the pairs start to become disorder
 
 	// base functions
 
@@ -211,28 +279,29 @@ private:
 	template <class It>
 	inline bool validIt_impl(const It& it, const KT& key) const { return (it != pairs.end() && isSame_impl(it->k(), key)); }
 
+	struct PairCompare {
+		const CompareFunc& cmp;
+		inline bool operator()(const Pair& a, const Pair& b) const { return cmp(a.k(), b.k()); }
+		inline bool operator()(const Pair& element, const KT& key) const { return cmp(element.k(), key); }
+		inline bool operator()(const KT& key, const Pair& element) const { return cmp(key, element.k()); }
+	};
+
+	inline void sort_impl(iterator begin, iterator end) {
+		std::sort(begin, end, PairCompare{ this->cmp });
+	}
 
 	// findIt in range (from start)
 	// before calling this must make sure that the provided range is sorted
 	inline iterator findIt__impl(const KT& key, int end) {
-		return std::lower_bound(
-		    pairs.begin(), pairs.begin() + end, key,
-		    [this](const Pair& element, const KT& key) {
-			    return this->cmp(element.k(), key);
-		    });
+		return std::lower_bound(pairs.begin(), pairs.begin() + end, key, PairCompare{ this->cmp });
 	}
 	inline const_iterator findIt__impl(const KT& key, int end) const {
-		return std::lower_bound(
-		    pairs.begin(), pairs.begin() + end, key,
-		    [this](const Pair& element, const KT& key) {
-			    return this->cmp(element.k(), key);
-		    });
+		return std::lower_bound(pairs.begin(), pairs.begin() + end, key, PairCompare{ this->cmp });
 	}
 
 	inline void validate_impl() {
-		std::sort(pairs.begin(), pairs.end(), [this](const Pair& a, const Pair& b) {
-			return this->cmp(a.k(), b.k());
-		});
+		sort_impl(pairs.begin() + disorderIndex, pairs.end());
+		std::inplace_merge(pairs.begin(), pairs.begin() + disorderIndex, pairs.end(), PairCompare{ this->cmp });
 		this->m_valid = 1;
 		this->disorderIndex = this->pairs.size();
 	}
