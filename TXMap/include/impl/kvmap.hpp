@@ -12,6 +12,8 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <concepts>
+#include <sstream>
 
 namespace tx {
 
@@ -32,48 +34,78 @@ private:
 	KT m_key;
 	VT m_value;
 };
+
+template <class Func, class KT, class VT>
+concept ConflictResolveFunc = std::is_invocable_r_v<KVPair<KT, VT>, Func, KVPair<KT, VT>&&, KVPair<KT, VT>&&>;
+
 template <class KT, class VT, class CompareFunc = std::less<KT>>
+    requires std::is_invocable_r_v<bool, CompareFunc, KT, KT>
 class KVMap;
 // Handle to access value without key
 // Keep in mind that after any operation that involve key, all old handles will become invalid
-template <class KT, class VT>
+template <class KT, class VT, class CompareFunc = std::less<KT>>
 class KVMapHandle {
 public:
-	KVMapHandle(KVMap<KT, VT>* in_map, int in_index) : map(in_map), index(in_index) {
+	KVMapHandle(KVMap<KT, VT, CompareFunc>* in_map, int in_index) : map(in_map), index(in_index) {
 	}
 	VT& get() {
 		return this->map->atIndex(index).v();
 	}
 
 private:
-	KVMap<KT, VT>* map;
+	KVMap<KT, VT, CompareFunc>* map;
 	int index;
 };
+// built-in map conflict resolution methods
+// used for duplicates when insert or merge
+namespace Map {
+struct Replace {
+	template <class KT, class VT>
+	KVPair<KT, VT> operator()(KVPair<KT, VT>&& a, KVPair<KT, VT>&& b) const {
+		return std::move(b);
+	}
+};
+struct Ignore {
+	template <class KT, class VT>
+	KVPair<KT, VT> operator()(KVPair<KT, VT>&& a, KVPair<KT, VT>&& b) const {
+		return a;
+	}
+};
+struct Error {
+	template <class KT, class VT>
+	KVPair<KT, VT> operator()(KVPair<KT, VT>&& a, KVPair<KT, VT>&& b) const {
+		if constexpr (std::is_convertible_v<KT, std::string>) {
+			std::ostringstream oss;
+			oss << "tx::KVMap: conflicting keys: \"" << a.k() << "\"";
+			throw std::runtime_error{ oss.str() };
+		} else {
+			throw std::runtime_error{ "tx::KVMap: conflicting keys" };
+		}
+	}
+};
+} // namespace Map
 // key value map
 // Any insertion, removal, or validation invalidates all iterators.
 template <class KT, class VT, class CompareFunc>
+    requires std::is_invocable_r_v<bool, CompareFunc, KT, KT>
 class KVMap {
-	friend KVMapHandle<KT, VT>;
+	friend KVMapHandle<KT, VT, CompareFunc>;
 	using Pair = KVPair<KT, VT>;
-	using Handle = KVMapHandle<KT, VT>;
+	using Handle = KVMapHandle<KT, VT, CompareFunc>;
 
 public:
 	using iterator = typename std::vector<Pair>::iterator;
 	using const_iterator = typename std::vector<Pair>::const_iterator;
 
+	using key_type = KT;
+	using value_type = VT;
+	using cmp_type = CompareFunc;
+
 public:
-	KVMap(CompareFunc in_cmp = std::less<KT>{}) : cmp(std::move(in_cmp)) {
-		/*static_assert(std::is_convertible_v<decltype(std::declval<KT>() < std::declval<KT>()), bool>,
-				"tx::KVMap: the type of key need to be comparable with operator<. The provided type don;t match the requirements.");*/
-		static_assert(std::is_invocable_r_v<bool, CompareFunc, KT, KT>,
-		              "tx::KVMap: the type of key need to be comparable with a compare function. The provided type or CompareFunction don't match the requirements.");
-	}
+	KVMap(CompareFunc in_cmp = std::less<KT>{}) : cmp(std::move(in_cmp)) {}
 	KVMap(std::initializer_list<Pair> in_data, CompareFunc in_cmp = std::less<KT>{}) : pairs(in_data), cmp(std::move(in_cmp)) {
-		static_assert(std::is_invocable_r_v<bool, CompareFunc, KT, KT>,
-		              "tx::KVMap: the type of key need to be comparable with a compare function. The provided type or CompareFunction don't match the requirements.");
 		validate();
 	}
-
 
 	// general
 
@@ -112,11 +144,12 @@ public:
 		if (validIt_impl(it, key))
 			return it->v();
 		else
-			throw_impl(key);
+			throw_impl();
 	}
 
-	inline Handle insertMulti(const KT& key, const VT& value = VT{}) {
-		return insertDisorder_impl(key, value);
+	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	inline Handle insertMulti(const KT& key, const VT& value = VT{}, ResolveFunc&& f = Map::Replace{}) {
+		return insertDisorder_impl(key, value, std::forward<ResolveFunc>(f));
 	}
 
 	inline const_iterator find(const KT& key) const {
@@ -142,16 +175,14 @@ public:
 	inline VT& at(const KT& key) {
 		validate();
 		auto it = findItOrder_impl(key);
-		if (validIt_impl(it, key))
-			return it->v();
-		else
-			throw_impl(key);
+		if (!validIt_impl(it, key)) throw_impl();
+		return it->v();
 	}
 
 	inline Handle set(const KT& key, const VT& value) {
 		validate();
 		auto it = findItOrder_impl(key);
-		if (!validIt_impl(it, key)) throw_impl(key);
+		if (!validIt_impl(it, key)) throw_impl();
 		it->v() = value;
 		return Handle(this, static_cast<int>(it - this->pairs.begin()));
 	}
@@ -159,7 +190,7 @@ public:
 	inline void remove(const KT& key) {
 		validate();
 		auto it = findItOrder_impl(key);
-		if (!validIt_impl(it, key)) throw_impl(key);
+		if (!validIt_impl(it, key)) throw_impl();
 		if (pairs.size() < 100) {
 			std::swap(*it, pairs.back());
 			pairs.pop_back();
@@ -170,9 +201,10 @@ public:
 		}
 	}
 
-	inline Handle insertSingle(const KT& key, const VT& value = VT{}) {
+	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	inline Handle insertSingle(const KT& key, const VT& value = VT{}, ResolveFunc&& f = Map::Replace{}) {
 		validate();
-		return insertOrder_impl(key, value);
+		return insertOrder_impl(key, value, std::forward<ResolveFunc>(f));
 	}
 
 	inline iterator find(const KT& key) {
@@ -190,7 +222,38 @@ public:
 		if (!this->m_valid) validate_impl();
 	}
 
-	inline void merge(const KVMap& other) {
+
+
+	// Resolves duplicate keys by applying a user-defined lambda
+	// The lambda should take two `Pair`s and return the `Pair` to keep.
+
+	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	inline void merge(const KVMap& other, ResolveFunc resolve = Map::Replace{}) {
+		this->merge_impl(other);
+		this->unique_impl(resolve);
+	}
+	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	inline void merge(KVMap&& other, ResolveFunc resolve = Map::Replace{}) {
+		bool reversed = this->merge_impl(std::move(other));
+		this->unique_impl(resolve, reversed);
+	}
+
+	// iterator
+
+	inline iterator begin() { return pairs.begin(); }
+	inline const_iterator begin() const { return pairs.begin(); }
+	inline iterator end() { return pairs.end(); }
+	inline const_iterator end() const { return pairs.end(); }
+
+private:
+	std::vector<Pair> pairs;
+	mutable bool m_valid = 0; // is sorted
+	mutable int disorderIndex = 0; // the index of where the pairs start to become disorder
+	CompareFunc cmp;
+
+	// utilities
+
+	inline void merge_impl(const KVMap& other) {
 		validate();
 		size_t originalSize = pairs.size();
 		pairs.insert(pairs.end(), other.pairs.begin(), other.pairs.end());
@@ -205,17 +268,19 @@ public:
 		this->m_valid = 1;
 		this->disorderIndex = pairs.size();
 	}
-	inline void merge(KVMap&& other) {
+	inline bool merge_impl(KVMap&& other) {
 		validate();
 		other.validate();
 
+		bool reversed = false;
 		// Choose the vector with the larger capacity to minimize memory allocations
-		if (other.pairs.capacity() > pairs.capacity()) {
+		if (other.pairs.capacity() > pairs.capacity()) { // use other's vector
 			size_t otherOriginalSize = other.pairs.size();
 			other.pairs.insert(other.pairs.end(), std::make_move_iterator(pairs.begin()), std::make_move_iterator(pairs.end()));
 			std::inplace_merge(other.pairs.begin(), other.pairs.begin() + otherOriginalSize, other.pairs.end(), PairCompare{ this->cmp });
 			pairs = std::move(other.pairs);
-		} else {
+			reversed = true;
+		} else { // use own vector
 			size_t originalSize = pairs.size();
 			pairs.insert(pairs.end(), std::make_move_iterator(other.pairs.begin()), std::make_move_iterator(other.pairs.end()));
 			std::inplace_merge(pairs.begin(), pairs.begin() + originalSize, pairs.end(), PairCompare{ this->cmp });
@@ -227,18 +292,19 @@ public:
 
 		this->m_valid = 1;
 		this->disorderIndex = pairs.size();
+		return reversed;
 	}
-
-	// Resolves duplicate keys by applying a user-defined lambda
-	// The lambda should take two `Pair`s and return the `Pair` to keep.
-	template <class ResolveFunc>
-	inline void unique(ResolveFunc resolve) {
-		validate();
+	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	inline void unique_impl(ResolveFunc&& resolve, bool reversed = false) {
 		if (pairs.empty()) return;
 		auto dest = pairs.begin();
 		for (auto it = pairs.begin() + 1; it != pairs.end(); ++it) {
 			if (isSame_impl(dest->k(), it->k())) {
-				*dest = resolve(std::move(*dest), std::move(*it));
+				if (reversed) {
+					*dest = resolve(std::move(*it), std::move(*dest));
+				} else {
+					*dest = resolve(std::move(*dest), std::move(*it));
+				}
 			} else {
 				++dest;
 				if (dest != it) {
@@ -249,28 +315,6 @@ public:
 		pairs.erase(dest + 1, pairs.end());
 		this->disorderIndex = pairs.size();
 	}
-	template <class ResolveFunc>
-	inline void merge(const KVMap& other, ResolveFunc resolve) {
-		this->merge(other);
-		this->unique(resolve);
-	}
-	template <class ResolveFunc>
-	inline void merge(KVMap&& other, ResolveFunc resolve) {
-		this->merge(std::move(other));
-		this->unique(resolve);
-	}
-
-	// iterator
-
-	inline iterator begin() { return pairs.begin(); }
-	inline const_iterator begin() const { return pairs.begin(); }
-	inline iterator end() { return pairs.end(); }
-	inline const_iterator end() const { return pairs.end(); }
-
-private:
-	std::vector<Pair> pairs;
-	mutable bool m_valid = 0; // is sorted
-	mutable int disorderIndex = 0; // the index of where the pairs start to become disorder
 
 	// base functions
 
@@ -309,16 +353,19 @@ private:
 	// Order
 	// all private function don't account for validate()
 	// before public funcitons call private functions, make sure validate() was called
-
-	inline Handle insertOrder_impl(const KT& key, const VT& value) {
+	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	inline Handle insertOrder_impl(const KT& key, const VT& value, ResolveFunc&& resolve) {
 		auto it = findItOrder_impl(key);
-		if (validIt_impl(it, key)) throw_impl(key);
+		if (validIt_impl(it, key)) { // if conflict
+			*it = resolve(std::move(*it), Pair{ key, value });
+			return Handle{ this, static_cast<int>(it - this->pairs.begin()) };
+		}
 		if (it == this->pairs.end()) {
 			this->pairs.emplace_back(key, value);
-			return Handle{ this, this->pairs.size() - 1 };
+			return Handle{ this, static_cast<int>(this->pairs.size() - 1) };
 		} else {
-			this->pairs.insert(it, Pair{ key, value });
-			return Handle{ this, static_cast<int>(it - this->pairs.begin()) };
+			auto new_it = this->pairs.insert(it, Pair{ key, value });
+			return Handle{ this, static_cast<int>(new_it - this->pairs.begin()) };
 		}
 	}
 
@@ -331,11 +378,13 @@ private:
 	}
 
 	// Disorder
-
-	inline Handle insertDisorder_impl(const KT& key, const VT& value) {
-		// check if exist
-		if (existDisorder_impl(key)) throw_impl(key);
-
+	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	inline Handle insertDisorder_impl(const KT& key, const VT& value, ResolveFunc&& resolve) {
+		auto it = findItDisorder_impl(key);
+		if (validIt_impl(it, key)) { // if conflict
+			*it = resolve(std::move(*it), Pair{ key, value });
+			return Handle{ this, static_cast<int>(it - this->pairs.begin()) };
+		}
 		this->pairs.emplace_back(key, value);
 		if (this->m_valid) {
 			this->m_valid = 0;
@@ -343,30 +392,32 @@ private:
 		}
 		return Handle(this, this->pairs.size() - 1);
 	}
-
-	inline auto findItDisorder_impl(const KT& key) const {
+	inline const_iterator findItDisorder_impl(const KT& key) const {
 		auto it = findIt__impl(key, this->disorderIndex);
 		if (validIt_impl(it, key)) return it;
-		for (int i = this->disorderIndex; i < pairs.size(); ++i) {
-			if (pairs[i].k() == key) { return pairs.begin() + i; }
+		for (size_t i = this->disorderIndex; i < pairs.size(); ++i) {
+			if (isSame_impl(pairs[i].k(), key)) { return pairs.begin() + i; }
+		}
+		return pairs.end();
+	}
+	inline iterator findItDisorder_impl(const KT& key) {
+		auto it = findIt__impl(key, this->disorderIndex);
+		if (validIt_impl(it, key)) return it;
+		for (size_t i = this->disorderIndex; i < pairs.size(); ++i) {
+			if (isSame_impl(pairs[i].k(), key)) { return pairs.begin() + i; }
 		}
 		return pairs.end();
 	}
 
 	inline bool existDisorder_impl(const KT& key) const {
-		if (validIt_impl(findIt__impl(key, this->disorderIndex), key)) return 1;
-		for (int i = this->disorderIndex; i < pairs.size(); ++i) {
-			if (pairs[i].k() == key) { return 1; }
-		}
-		return 0;
+		return validIt_impl(findItDisorder_impl(key), key);
 	}
 
 
 
 	// throw
-	inline void throw_impl(const std::string& key) const {
-		std::string message = std::string{ "tx::KVMap::at():" } + key + " key not found.";
-		throw std::out_of_range{ message };
+	inline void throw_impl() const {
+		throw std::runtime_error{ "tx::KVMap:: error" };
 	}
 };
 } // namespace tx

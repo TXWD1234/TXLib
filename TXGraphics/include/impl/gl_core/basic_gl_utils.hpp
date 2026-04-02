@@ -19,7 +19,7 @@ struct mat2 {
 
 inline mat2 findRotationMat(float degree) {
 	mat2 o;
-	o.i = vec2{ fast_cos(degree), fast_sin(degree) };
+	o.i = vec2{ std::cosf(degree), std::sinf(degree) };
 	o.j = tx::leftPerp(o.i);
 	return o;
 }
