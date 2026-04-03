@@ -34,10 +34,6 @@ private:
 	KT m_key;
 	VT m_value;
 };
-
-template <class Func, class KT, class VT>
-concept ConflictResolveFunc = std::is_invocable_r_v<KVPair<KT, VT>, Func, KVPair<KT, VT>&&, KVPair<KT, VT>&&>;
-
 template <class KT, class VT, class CompareFunc = std::less<KT>>
     requires std::is_invocable_r_v<bool, CompareFunc, KT, KT>
 class KVMap;
@@ -59,6 +55,9 @@ private:
 // built-in map conflict resolution methods
 // used for duplicates when insert or merge
 namespace Map {
+template <class Func, class KT, class VT>
+concept ConflictResolveFunc = std::is_invocable_r_v<KVPair<KT, VT>, Func, KVPair<KT, VT>&&, KVPair<KT, VT>&&>;
+
 struct Replace {
 	template <class KT, class VT>
 	KVPair<KT, VT> operator()(KVPair<KT, VT>&& a, KVPair<KT, VT>&& b) const {
@@ -147,7 +146,7 @@ public:
 			throw_impl();
 	}
 
-	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
 	inline Handle insertMulti(const KT& key, const VT& value = VT{}, ResolveFunc&& f = Map::Replace{}) {
 		return insertDisorder_impl(key, value, std::forward<ResolveFunc>(f));
 	}
@@ -201,7 +200,7 @@ public:
 		}
 	}
 
-	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
 	inline Handle insertSingle(const KT& key, const VT& value = VT{}, ResolveFunc&& f = Map::Replace{}) {
 		validate();
 		return insertOrder_impl(key, value, std::forward<ResolveFunc>(f));
@@ -227,15 +226,28 @@ public:
 	// Resolves duplicate keys by applying a user-defined lambda
 	// The lambda should take two `Pair`s and return the `Pair` to keep.
 
-	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
 	inline void merge(const KVMap& other, ResolveFunc resolve = Map::Replace{}) {
 		this->merge_impl(other);
 		this->unique_impl(resolve);
 	}
-	template <ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc = Map::Replace>
 	inline void merge(KVMap&& other, ResolveFunc resolve = Map::Replace{}) {
 		bool reversed = this->merge_impl(std::move(other));
 		this->unique_impl(resolve, reversed);
+	}
+
+	template <std::invocable<VT&> Func>
+	void foreach (Func&& f) {
+		for (Pair& i : pairs) {
+			f(i.v());
+		}
+	}
+	template <std::invocable<const VT&> Func>
+	void foreach (Func&& f) const {
+		for (const Pair& i : pairs) {
+			f(i.v());
+		}
 	}
 
 	// iterator
@@ -294,7 +306,7 @@ private:
 		this->disorderIndex = pairs.size();
 		return reversed;
 	}
-	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc>
 	inline void unique_impl(ResolveFunc&& resolve, bool reversed = false) {
 		if (pairs.empty()) return;
 		auto dest = pairs.begin();
@@ -353,7 +365,7 @@ private:
 	// Order
 	// all private function don't account for validate()
 	// before public funcitons call private functions, make sure validate() was called
-	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc>
 	inline Handle insertOrder_impl(const KT& key, const VT& value, ResolveFunc&& resolve) {
 		auto it = findItOrder_impl(key);
 		if (validIt_impl(it, key)) { // if conflict
@@ -378,7 +390,7 @@ private:
 	}
 
 	// Disorder
-	template <ConflictResolveFunc<KT, VT> ResolveFunc>
+	template <Map::ConflictResolveFunc<KT, VT> ResolveFunc>
 	inline Handle insertDisorder_impl(const KT& key, const VT& value, ResolveFunc&& resolve) {
 		auto it = findItDisorder_impl(key);
 		if (validIt_impl(it, key)) { // if conflict

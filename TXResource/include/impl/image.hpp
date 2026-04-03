@@ -15,8 +15,10 @@ class Image {
 public:
 	Image() = default;
 	Image(const std::fs::path& filePath)
-	    : m_data(stbi_load(filePath.string().c_str(), &m_dimension.x, &m_dimension.y, &m_channelCount, 4)),
-	      m_loaded(true), m_valid(m_data) {}
+	    : m_loaded(true) {
+		m_data = stbi_load(filePath.string().c_str(), &m_dimension.x, &m_dimension.y, &m_channelCount, 4);
+		m_valid = m_data;
+	}
 	~Image() {
 		if (m_data)
 			stbi_image_free(m_data);

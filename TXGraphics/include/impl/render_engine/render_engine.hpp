@@ -143,6 +143,7 @@ public:
 	TextureId addTexture(Coord dimension, std::span<u8> data) { return tm.addTexture(dimension, data); }
 	TextureId addTexture(u32 dimensionId, std::span<u8> data) { return tm.addTexture(dimensionId, data); }
 	TextureArray& getTexture(TextureId id) { return tm.getTexture(id); }
+	Coord getTextureDimension(u32 dimensionId) const { return tm.getDimension(dimensionId); }
 
 private:
 	Renderer rr;

@@ -30,6 +30,7 @@ void clearColor(float red, float green, float blue, float alpha);
 void enable(enum_t cap);
 void disable(enum_t cap);
 void blendFunc(enum_t sfactor, enum_t dfactor);
+enum_t getError();
 
 // --- Buffers (DSA) ---
 void createBuffers(sizei_t n, uint_t* buffers);

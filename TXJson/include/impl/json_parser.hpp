@@ -27,6 +27,12 @@ using JsonMap = KVMap<std::string, JsonValue>;
 using JsonMapHandle = KVMapHandle<std::string, JsonValue>;
 using JsonPair = KVPair<std::string, JsonValue>;
 
+using JsonMergeReplace = Map::Replace;
+using JsonMergeIgnore = Map::Ignore;
+
+template <class Func>
+concept JsonConflictResolveFunc = Map::ConflictResolveFunc<Func, std::string, JsonValue>;
+
 class JsonObject {
 	friend class JsonParser;
 
@@ -38,6 +44,9 @@ public:
 	inline JsonValue& operator[](const std::string& key) { return this->members.at(key); }
 	inline const JsonValue& operator[](const std::string& key) const { return this->members.at(key); }
 
+	inline JsonValue& get(const std::string& key) { return this->members.at(key); }
+	inline const JsonValue& get(const std::string& key) const { return this->members.at(key); }
+
 	inline JsonPair& atIndex(int index) { return this->members.atIndex(index); }
 	inline const JsonPair& atIndex(int index) const { return this->members.atIndex(index); }
 
@@ -47,12 +56,30 @@ public:
 	inline bool exist(const std::string& key) const { return members.exist(key); }
 
 	template <class T>
-	inline const T& getOr(const std::string& key, const T& fallback) const;
+	inline T getOr(const std::string& key, const T& fallback) const;
+	template <class T>
+	inline T* get(const std::string& key);
+	template <class T>
+	inline const T* get(const std::string& key) const;
+
+	inline iterator find(const std::string& key) { return members.find(key); }
+	inline const_iterator find(const std::string& key) const { return members.find(key); }
 
 	inline iterator begin() { return members.begin(); }
 	inline const_iterator begin() const { return members.begin(); }
 	inline iterator end() { return members.end(); }
 	inline const_iterator end() const { return members.end(); }
+
+	// utilities
+
+	template <JsonConflictResolveFunc Func = JsonMergeReplace>
+	inline void merge(const JsonObject& other, Func&& resolve = JsonMergeReplace{}) {
+		members.merge(other.members, std::forward<Func>(resolve));
+	}
+	template <JsonConflictResolveFunc Func = JsonMergeReplace>
+	inline void merge(JsonObject&& other, Func&& resolve = JsonMergeReplace{}) {
+		members.merge(std::move(other.members), std::forward<Func>(resolve));
+	}
 
 private:
 	JsonMap members;
@@ -156,8 +183,24 @@ private:
 };
 
 template <class T>
-inline const T& JsonObject::getOr(const std::string& key, const T& fallback) const {
-	return (exist(key) ? members.at(key).get<T>() : fallback);
+inline T* JsonObject::get(const std::string& key) {
+	if (!exist(key)) return nullptr;
+	JsonValue& val = get(key);
+	if (val.is<T>()) return &val.get<T>();
+	return nullptr;
+}
+template <class T>
+inline const T* JsonObject::get(const std::string& key) const {
+	if (!exist(key)) return nullptr;
+	const JsonValue& val = get(key);
+	if (val.is<T>()) return &val.get<T>();
+	return nullptr;
+}
+template <class T>
+inline T JsonObject::getOr(const std::string& key, const T& fallback) const {
+	T* valptr = get<T>(key);
+	if (valptr) return *valptr;
+	return fallback;
 }
 
 

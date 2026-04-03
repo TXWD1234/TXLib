@@ -19,6 +19,7 @@ namespace tx::RenderEngine {
 struct TextureId {
 	u32 dimensionId;
 	u32 index;
+	bool valid() const { return dimensionId != InvalidU32 && index != InvalidU32; }
 };
 
 template <InstantiationOf<FenceManagerBase> fmT>
@@ -55,6 +56,8 @@ public:
 	}
 
 	void setFenceManager(fmT& in_fm) { fm = &in_fm; }
+
+	Coord getDimension(u32 dimensionId) const { return m_textures[dimensionId].dimension(); }
 
 private:
 	inline static const u32 TextureArraySize = 64;

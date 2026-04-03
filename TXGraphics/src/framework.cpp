@@ -11,6 +11,11 @@ bool MakeWindow::make(GLFWwindow*& window) {
 	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHintString(GLFW_WAYLAND_APP_ID, "TXStudio_Project"); // set window class for hyprland
 
+	// Explicitly request OpenGL 4.5 Core Profile for DSA support
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
 	// full screen
 	GLFWmonitor* monitor = NULL;
 	const GLFWvidmode* mode = NULL;

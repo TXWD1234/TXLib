@@ -36,6 +36,7 @@ void clearColor(float red, float green, float blue, float alpha) { glClearColor(
 void enable(enum_t cap) { glEnable(cap); }
 void disable(enum_t cap) { glDisable(cap); }
 void blendFunc(enum_t sfactor, enum_t dfactor) { glBlendFunc(sfactor, dfactor); }
+enum_t getError() { return glGetError(); }
 
 // --- Buffers (DSA) ---
 void createBuffers(sizei_t n, uint_t* buffers) { glCreateBuffers(n, buffers); }
