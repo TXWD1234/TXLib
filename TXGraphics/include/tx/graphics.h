@@ -6,7 +6,6 @@
 #include "impl/render_engine/render_engine.hpp"
 #include "impl/framework/framework.hpp"
 #include "impl/utility/rgb.hpp"
-#include "impl/utility/animation.hpp"
 
 namespace tx {
 namespace RE = RenderEngine;

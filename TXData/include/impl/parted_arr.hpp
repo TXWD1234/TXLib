@@ -23,7 +23,7 @@ public:
 
 public:
 	PartedArr(u32 partLen = 64) : PartLen(partLen) {}
-	PartedArr(u32 partCount, u32 partLen)
+	PartedArr(u32 partCount, u32 partLen = 64)
 	    : m_data(std::vector<T>(partCount * partLen)),
 	      partAttribs(std::vector<PartAttrib_impl>(partCount)),
 	      PartLen(partLen) {
@@ -33,6 +33,10 @@ public:
 		}
 	}
 
+	PartedArr(const PartedArr&) = default;
+	PartedArr(PartedArr&&) noexcept = default;
+	PartedArr& operator=(const PartedArr&) = default;
+	PartedArr& operator=(PartedArr&&) noexcept = default;
 
 	class PartAttrib_impl {
 	public:
@@ -53,6 +57,10 @@ public:
 
 		void push_back(const T& val) {
 			parent->push_back_impl(partIndex, val);
+		}
+		template <class... Args>
+		void emplace_back(Args&&... args) {
+			parent->emplace_back_impl(partIndex, std::forward<Args>(args)...);
 		}
 
 		void clear() {
@@ -124,6 +132,25 @@ public:
 	u32 size() { return partAttribs.size(); }
 	u32 dataSize() { return m_data.size(); }
 
+	template <std::invocable<T&, u32> Func>
+	void foreachLinear(Func&& f) {
+		for (u32 i : partOrder) {
+			PartAttrib_impl attrib = partAttribs[i];
+			for (u32 j = attrib.offset; j < attrib.offset + attrib.len; j++) {
+				f(m_data[j], i);
+			}
+		}
+	}
+	template <std::invocable<const T&, u32> Func>
+	void foreachLinear(Func&& f) const {
+		for (u32 i : partOrder) {
+			PartAttrib_impl attrib = partAttribs[i];
+			for (u32 j = attrib.offset; j < attrib.offset + attrib.len; j++) {
+				f(m_data[j], i);
+			}
+		}
+	}
+
 	It_t begin() { return m_data.begin(); }
 	It_t end() { return m_data.end(); }
 	ConstIt_t begin() const { return m_data.begin(); }
@@ -132,8 +159,8 @@ public:
 private:
 	std::vector<T> m_data;
 	std::vector<PartAttrib_impl> partAttribs;
-	std::vector<u32> partOrder;
-	const u32 PartLen;
+	std::vector<u32> partOrder; // stores index of partAttribs; it's the physical position in the memory of the partitions
+	u32 PartLen;
 
 	// memory operations
 
@@ -194,12 +221,19 @@ private:
 
 
 	// linear reallocate
-	void push_back_impl(u32 partIndex, const T& val) {
+	T& pushSlot_impl(u32 partIndex) {
 		PartAttrib_impl& attrib = partAttribs[partIndex];
 		if (attrib.len >= attrib.partCount * PartLen) { // if exceeded -> resize
 			reservePart_impl(partIndex, attrib.len + 1);
 		}
-		m_data[attrib.offset + attrib.len++] = val;
+		return m_data[attrib.offset + attrib.len++];
+	}
+	void push_back_impl(u32 partIndex, const T& val) {
+		pushSlot_impl(partIndex) = val;
+	}
+	template <class... Args>
+	void emplace_back_impl(u32 partIndex, Args&&... args) {
+		pushSlot_impl(partIndex) = T(std::forward<Args>(args)...);
 	}
 };
 
