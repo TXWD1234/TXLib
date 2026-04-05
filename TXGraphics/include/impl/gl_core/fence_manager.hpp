@@ -26,6 +26,15 @@ public:
 			executeOperationBuffer_impl(operationBuffer);
 		}
 	}
+
+	// Disable Copy
+	FenceManagerBase(const FenceManagerBase&) = delete;
+	FenceManagerBase& operator=(const FenceManagerBase&) = delete;
+
+	// Move Semantics
+	FenceManagerBase(FenceManagerBase&&) noexcept = default;
+	FenceManagerBase& operator=(FenceManagerBase&&) noexcept = default;
+
 	// call this before draw call
 	void update() {
 		fenceQueue.emplace_back();

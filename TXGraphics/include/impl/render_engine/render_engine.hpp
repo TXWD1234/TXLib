@@ -55,6 +55,15 @@ public:
 
 		void reserveSprites(u32 count) { engine->reserveSprites(id, count); }
 
+		// utilities
+
+		void drawLineHorizontal(float y, float thickness = 0.001f, u32 color = 0xFFFFFFFF) {
+			engine->drawLine(id, vec2{ -1.0f, y }, vec2{ 1.0f, y }, thickness, color);
+		}
+		void drawLineVertical(float x, float thickness = 0.001f, u32 color = 0xFFFFFFFF) {
+			engine->drawLine(id, vec2{ x, -1.0f }, vec2{ x, 1.0f }, thickness, color);
+		}
+
 		bool valid() const { return id != UINT32_MAX && engine; }
 	};
 

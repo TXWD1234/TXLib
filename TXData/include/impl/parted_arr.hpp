@@ -53,6 +53,7 @@ public:
 		T& operator[](u32 index) { return parent->m_data[attrib().offset + index]; }
 
 		u32 size() const { return attrib().len; }
+		u32 len() const { return attrib().len; }
 		u32 offset() const { return attrib().offset; }
 
 		void push_back(const T& val) {
