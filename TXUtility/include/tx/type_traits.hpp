@@ -19,6 +19,8 @@ inline constexpr u32 enumval(T in) noexcept {
 template <class>
 inline constexpr bool false_v = false;
 
+// Concepts
+
 // is instantiatin of
 template <typename T, template <typename...> class Template>
 struct is_instantiation_of : std::false_type {};
@@ -27,6 +29,8 @@ struct is_instantiation_of<Template<Args...>, Template> : std::true_type {};
 template <typename T, template <typename...> class Template>
 concept InstantiationOf = is_instantiation_of<T, Template>::value;
 
+template <class RetT, class Func, class... Args>
+concept invocable_r = std::is_invocable_r_v<RetT, Func, Args...>;
 
 enum class TypeEnum : u32 {
 	Float,

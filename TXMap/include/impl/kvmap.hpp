@@ -34,12 +34,12 @@ private:
 	KT m_key;
 	VT m_value;
 };
-template <class KT, class VT, class CompareFunc = std::less<KT>>
+template <class KT, class VT, class CompareFunc = std::less<>>
     requires std::is_invocable_r_v<bool, CompareFunc, KT, KT>
 class KVMap;
 // Handle to access value without key
 // Keep in mind that after any operation that involve key, all old handles will become invalid
-template <class KT, class VT, class CompareFunc = std::less<KT>>
+template <class KT, class VT, class CompareFunc = std::less<>>
 class KVMapHandle {
 public:
 	KVMapHandle(KVMap<KT, VT, CompareFunc>* in_map, int in_index) : map(in_map), index(in_index) {
@@ -101,8 +101,8 @@ public:
 	using cmp_type = CompareFunc;
 
 public:
-	KVMap(CompareFunc in_cmp = std::less<KT>{}) : cmp(std::move(in_cmp)) {}
-	KVMap(std::initializer_list<Pair> in_data, CompareFunc in_cmp = std::less<KT>{}) : pairs(in_data), cmp(std::move(in_cmp)) {
+	KVMap(CompareFunc in_cmp = std::less<>{}) : cmp(std::move(in_cmp)) {}
+	KVMap(std::initializer_list<Pair> in_data, CompareFunc in_cmp = std::less<>{}) : pairs(in_data), cmp(std::move(in_cmp)) {
 		validate();
 	}
 
@@ -116,8 +116,10 @@ public:
 
 	void reserve(int count) { this->pairs.reserve(count); }
 #ifdef TX_JERRY_IMPL
-	inline VT& operator[](const KT& key) { return this->at(key); }
-	inline const VT& operator[](const KT& key) const { return this->at(key); }
+	template <class K>
+	inline VT& operator[](const K& key) { return this->at(key); }
+	template <class K>
+	inline const VT& operator[](const K& key) const { return this->at(key); }
 #endif
 
 
@@ -134,11 +136,13 @@ public:
 	// Disorder
 	// note that all const functions are disorder because they cannot sort the array
 
-	inline bool exist(const KT& key) const {
+	template <class K>
+	inline bool exist(const K& key) const {
 		return validIt_impl(findItDisorder_impl(key), key);
 	}
 
-	inline const VT& at(const KT& key) const {
+	template <class K>
+	inline const VT& at(const K& key) const {
 		auto it = findItDisorder_impl(key);
 		if (validIt_impl(it, key))
 			return it->v();
@@ -151,7 +155,8 @@ public:
 		return insertDisorder_impl(key, value, std::forward<ResolveFunc>(f));
 	}
 
-	inline const_iterator find(const KT& key) const {
+	template <class K>
+	inline const_iterator find(const K& key) const {
 		auto it = findItDisorder_impl(key);
 		if (validIt_impl(it, key))
 			return it;
@@ -166,19 +171,22 @@ public:
 	// Order
 	// the first line of any order function must be validate()
 
-	inline bool exist(const KT& key) {
+	template <class K>
+	inline bool exist(const K& key) {
 		validate();
 		return existOrder_impl(key);
 	}
 
-	inline VT& at(const KT& key) {
+	template <class K>
+	inline VT& at(const K& key) {
 		validate();
 		auto it = findItOrder_impl(key);
 		if (!validIt_impl(it, key)) throw_impl();
 		return it->v();
 	}
 
-	inline Handle set(const KT& key, const VT& value) {
+	template <class K>
+	inline Handle set(const K& key, const VT& value) {
 		validate();
 		auto it = findItOrder_impl(key);
 		if (!validIt_impl(it, key)) throw_impl();
@@ -186,7 +194,8 @@ public:
 		return Handle(this, static_cast<int>(it - this->pairs.begin()));
 	}
 
-	inline void remove(const KT& key) {
+	template <class K>
+	inline void remove(const K& key) {
 		validate();
 		auto it = findItOrder_impl(key);
 		if (!validIt_impl(it, key)) throw_impl();
@@ -206,7 +215,8 @@ public:
 		return insertOrder_impl(key, value, std::forward<ResolveFunc>(f));
 	}
 
-	inline iterator find(const KT& key) {
+	template <class K>
+	inline iterator find(const K& key) {
 		validate();
 		auto it = findItOrder_impl(key);
 		if (validIt_impl(it, key))
@@ -331,15 +341,18 @@ private:
 	// base functions
 
 	//inline bool isSame_impl(const T& a, const T& b) const { return cmp(a, b) == cmp(b, a); }
-	inline bool isSame_impl(const KT& a, const KT& b) const { return !cmp(a, b) && !cmp(b, a); }
-	template <class It>
-	inline bool validIt_impl(const It& it, const KT& key) const { return (it != pairs.end() && isSame_impl(it->k(), key)); }
+	template <class K1, class K2>
+	inline bool isSame_impl(const K1& a, const K2& b) const { return !cmp(a, b) && !cmp(b, a); }
+	template <class It, class K>
+	inline bool validIt_impl(const It& it, const K& key) const { return (it != pairs.end() && isSame_impl(it->k(), key)); }
 
 	struct PairCompare {
 		const CompareFunc& cmp;
 		inline bool operator()(const Pair& a, const Pair& b) const { return cmp(a.k(), b.k()); }
-		inline bool operator()(const Pair& element, const KT& key) const { return cmp(element.k(), key); }
-		inline bool operator()(const KT& key, const Pair& element) const { return cmp(key, element.k()); }
+		template <class K>
+		inline bool operator()(const Pair& element, const K& key) const { return cmp(element.k(), key); }
+		template <class K>
+		inline bool operator()(const K& key, const Pair& element) const { return cmp(key, element.k()); }
 	};
 
 	inline void sort_impl(iterator begin, iterator end) {
@@ -348,10 +361,12 @@ private:
 
 	// findIt in range (from start)
 	// before calling this must make sure that the provided range is sorted
-	inline iterator findIt__impl(const KT& key, int end) {
+	template <class K>
+	inline iterator findIt__impl(const K& key, int end) {
 		return std::lower_bound(pairs.begin(), pairs.begin() + end, key, PairCompare{ this->cmp });
 	}
-	inline const_iterator findIt__impl(const KT& key, int end) const {
+	template <class K>
+	inline const_iterator findIt__impl(const K& key, int end) const {
 		return std::lower_bound(pairs.begin(), pairs.begin() + end, key, PairCompare{ this->cmp });
 	}
 
@@ -381,11 +396,13 @@ private:
 		}
 	}
 
-	inline auto findItOrder_impl(const KT& key) {
+	template <class K>
+	inline auto findItOrder_impl(const K& key) {
 		return findIt__impl(key, pairs.size());
 	}
 
-	inline bool existOrder_impl(const KT& key) {
+	template <class K>
+	inline bool existOrder_impl(const K& key) {
 		return validIt_impl(findItOrder_impl(key), key);
 	}
 
@@ -404,7 +421,8 @@ private:
 		}
 		return Handle(this, this->pairs.size() - 1);
 	}
-	inline const_iterator findItDisorder_impl(const KT& key) const {
+	template <class K>
+	inline const_iterator findItDisorder_impl(const K& key) const {
 		auto it = findIt__impl(key, this->disorderIndex);
 		if (validIt_impl(it, key)) return it;
 		for (size_t i = this->disorderIndex; i < pairs.size(); ++i) {
@@ -412,7 +430,8 @@ private:
 		}
 		return pairs.end();
 	}
-	inline iterator findItDisorder_impl(const KT& key) {
+	template <class K>
+	inline iterator findItDisorder_impl(const K& key) {
 		auto it = findIt__impl(key, this->disorderIndex);
 		if (validIt_impl(it, key)) return it;
 		for (size_t i = this->disorderIndex; i < pairs.size(); ++i) {
@@ -421,7 +440,8 @@ private:
 		return pairs.end();
 	}
 
-	inline bool existDisorder_impl(const KT& key) const {
+	template <class K>
+	inline bool existDisorder_impl(const K& key) const {
 		return validIt_impl(findItDisorder_impl(key), key);
 	}
 
