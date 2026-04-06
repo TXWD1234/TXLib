@@ -5,3 +5,4 @@
 
 #pragma once
 #include "impl/json_parser.hpp"
+#include "impl/json_type_traits.hpp"

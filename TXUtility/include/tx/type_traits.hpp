@@ -11,13 +11,8 @@ namespace tx {
 
 // all enum should have underlying type of u32
 template <class T>
+    requires std::is_enum_v<T> || std::is_same_v<std::underlying_type_t<T>, u32>
 inline constexpr u32 enumval(T in) noexcept {
-	static_assert(
-	    std::is_enum_v<T>,
-	    "tx::enumval(): invalid parameter: parameter must be an enum");
-	static_assert(
-	    std::is_same_v<std::underlying_type_t<T>, u32>,
-	    "tx::enumval(): invalid enum type: all enum type should have underlying type of u32 / uint32_t");
 	return static_cast<u32>(in);
 }
 
