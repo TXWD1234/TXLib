@@ -9,7 +9,7 @@
 namespace tx {
 
 BinaryArray readWholeFileBin(const std::filesystem::path& filePath) {
-	if (!std::fs::exists(filePath)) throw std::runtime_error("tx::readWholeFileBin(): file path don't exist.");
+	if (!fs::exists(filePath)) throw std::runtime_error("tx::readWholeFileBin(): file path don't exist.");
 	size_t fileSize = std::filesystem::file_size(filePath);
 
 	BinaryArray buffer(fileSize);
@@ -20,7 +20,7 @@ BinaryArray readWholeFileBin(const std::filesystem::path& filePath) {
 	return buffer;
 }
 std::string readWholeFileText(const std::filesystem::path& filePath) {
-	if (!std::fs::exists(filePath)) throw std::runtime_error("tx::readWholeFileBin(): file path don't exist.");
+	if (!fs::exists(filePath)) throw std::runtime_error("tx::readWholeFileBin(): file path don't exist.");
 	size_t fileSize = std::filesystem::file_size(filePath);
 
 	std::string buffer(fileSize, '\0');

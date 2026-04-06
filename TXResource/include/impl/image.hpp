@@ -14,7 +14,7 @@ namespace tx {
 class Image {
 public:
 	Image() = default;
-	Image(const std::fs::path& filePath)
+	Image(const fs::path& filePath)
 	    : m_loaded(true) {
 		m_data = stbi_load(filePath.string().c_str(), &m_dimension.x, &m_dimension.y, &m_channelCount, 4);
 		m_valid = m_data;

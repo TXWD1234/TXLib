@@ -14,9 +14,8 @@
 #include <unistd.h>
 #endif
 
-namespace std {
-namespace fs = filesystem;
-}
+namespace fs = std::filesystem;
+
 
 namespace tx {
 
