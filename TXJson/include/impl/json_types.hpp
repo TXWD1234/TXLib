@@ -9,6 +9,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <string_view>
 
 namespace tx {
 class JsonParser;
@@ -40,11 +41,11 @@ public:
 	using const_iterator = JsonMap::const_iterator;
 	//JsonObject(JsonObject* in_parent = nullptr) : parent(in_parent) {}
 
-	inline JsonValue& operator[](const std::string& key) { return this->members.at(key); }
-	inline const JsonValue& operator[](const std::string& key) const { return this->members.at(key); }
+	inline JsonValue& operator[](std::string_view key) { return this->members.at(key); }
+	inline const JsonValue& operator[](std::string_view key) const { return this->members.at(key); }
 
-	inline JsonValue& get(const std::string& key) { return this->members.at(key); }
-	inline const JsonValue& get(const std::string& key) const { return this->members.at(key); }
+	inline JsonValue& get(std::string_view key) { return this->members.at(key); }
+	inline const JsonValue& get(std::string_view key) const { return this->members.at(key); }
 
 	inline JsonPair& atIndex(int index) { return this->members.atIndex(index); }
 	inline const JsonPair& atIndex(int index) const { return this->members.atIndex(index); }
@@ -52,17 +53,17 @@ public:
 	inline int size() const { return this->members.size(); }
 	inline bool empty() const { return this->members.empty(); }
 
-	inline bool exist(const std::string& key) const { return members.exist(key); }
+	inline bool exist(std::string_view key) const { return members.exist(key); }
 
 	template <class T>
-	inline T getOr(const std::string& key, const T& fallback) const;
+	inline T getOr(std::string_view key, const T& fallback) const;
 	template <class T>
-	inline T* get(const std::string& key);
+	inline T* get(std::string_view key);
 	template <class T>
-	inline const T* get(const std::string& key) const;
+	inline const T* get(std::string_view key) const;
 
-	inline iterator find(const std::string& key) { return members.find(key); }
-	inline const_iterator find(const std::string& key) const { return members.find(key); }
+	inline iterator find(std::string_view key) { return members.find(key); }
+	inline const_iterator find(std::string_view key) const { return members.find(key); }
 
 	inline iterator begin() { return members.begin(); }
 	inline const_iterator begin() const { return members.begin(); }
@@ -139,9 +140,9 @@ public:
 	inline explicit operator bool() const { return std::get<bool>(this->m_var); }
 
 	inline JsonValue& operator[](int index) { return std::get<JsonArray>(this->m_var)[index]; }
-	inline JsonValue& operator[](const std::string& key) { return std::get<JsonObject>(this->m_var)[key]; }
+	inline JsonValue& operator[](std::string_view key) { return std::get<JsonObject>(this->m_var)[key]; }
 	inline const JsonValue& operator[](int index) const { return std::get<JsonArray>(this->m_var)[index]; }
-	inline const JsonValue& operator[](const std::string& key) const { return std::get<JsonObject>(this->m_var)[key]; }
+	inline const JsonValue& operator[](std::string_view key) const { return std::get<JsonObject>(this->m_var)[key]; }
 
 	inline JsonValue& operator=(bool val) {
 		this->m_var = val;
@@ -182,22 +183,22 @@ private:
 };
 
 template <class T>
-inline T* JsonObject::get(const std::string& key) {
+inline T* JsonObject::get(std::string_view key) {
 	if (!exist(key)) return nullptr;
 	JsonValue& val = get(key);
 	if (val.is<T>()) return &val.get<T>();
 	return nullptr;
 }
 template <class T>
-inline const T* JsonObject::get(const std::string& key) const {
+inline const T* JsonObject::get(std::string_view key) const {
 	if (!exist(key)) return nullptr;
 	const JsonValue& val = get(key);
 	if (val.is<T>()) return &val.get<T>();
 	return nullptr;
 }
 template <class T>
-inline T JsonObject::getOr(const std::string& key, const T& fallback) const {
-	T* valptr = get<T>(key);
+inline T JsonObject::getOr(std::string_view key, const T& fallback) const {
+	const auto* valptr = get<T>(key);
 	if (valptr) return *valptr;
 	return fallback;
 }
