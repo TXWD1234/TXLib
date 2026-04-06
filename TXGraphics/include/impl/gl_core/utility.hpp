@@ -39,7 +39,7 @@ inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& han
 // sm
 
 template <SMStyle style>
-bool addShaderPair(const std::string& vertSource, const std::string& fragSource, ShaderManager<style>& sm, ProgramId& output, const std::string& vertName = "", const std::string& fragName = "") {
+bool addShaderPair(ShaderManager<style>& sm, const std::string& vertSource, const std::string& fragSource, ProgramId& output, const std::string& vertName = "", const std::string& fragName = "") {
 	ShaderId vertId = sm.addVertexShader(vertSource);
 	std::cerr << "Compiling & Linking vertex shader... " << vertName << '\n'
 	          << sm.getCompileLog(vertId) << "Done.\n";

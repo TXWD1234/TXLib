@@ -31,8 +31,8 @@ constexpr inline vec2 mirror(const vec2& in) { return vec2(in.y, in.x); }
 
 constexpr inline vec2 orbitalPos(float degree) { return vec2{ std::cosf(degree), std::sinf(degree) }; }
 constexpr inline vec2 abs(const vec2& in) { return vec2{ std::fabs(in.x), std::fabs(in.y) }; }
-constexpr inline bool isValid(double in) { return !std::isnan(in) && !std::isinf(in); }
-constexpr inline bool isValid(const vec2& in) { return isValid(in.x) && isValid(in.y); }
+constexpr inline bool valid(double in) { return !std::isnan(in) && !std::isinf(in); }
+constexpr inline bool valid(const vec2& in) { return valid(in.x) && valid(in.y); }
 constexpr inline vec2 leftPerp(const vec2& in) { return vec2{ -in.y, in.x }; }
 constexpr inline vec2 rightPerp(const vec2& in) { return vec2{ in.y, -in.x }; }
 

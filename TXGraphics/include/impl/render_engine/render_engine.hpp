@@ -83,7 +83,7 @@ public:
 
 	u32 registerSection(const std::string& vertSource, const std::string& fragSource) {
 		ProgramId product;
-		if (!addShaderPair(vertSource, fragSource, sm, product)) {
+		if (!addShaderPair(sm, vertSource, fragSource, product)) {
 			std::cerr << "[Error]: failed to add shaders.\n";
 			return UINT32_MAX;
 		}

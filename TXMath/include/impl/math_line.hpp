@@ -170,7 +170,7 @@ private:
 
 inline vec2 findIntersection(const MathLine& l, const LineSegment& ls) {
 	vec2 intersection = findIntersection(l, ls.line());
-	if (isValid(intersection) && inRange(intersection, ls.start(), ls.end())) {
+	if (valid(intersection) && inRange(intersection, ls.start(), ls.end())) {
 		return intersection;
 	} else {
 		return InvalidVec;
@@ -178,7 +178,7 @@ inline vec2 findIntersection(const MathLine& l, const LineSegment& ls) {
 }
 inline vec2 findIntersection(const LineSegment& ls1, const LineSegment& ls2) {
 	vec2 intersection = findIntersection(ls1.line(), ls2.line());
-	if (isValid(intersection) && inRange(intersection, ls1.start(), ls1.end()) && inRange(intersection, ls2.start(), ls2.end())) {
+	if (valid(intersection) && inRange(intersection, ls1.start(), ls1.end()) && inRange(intersection, ls2.start(), ls2.end())) {
 		return intersection;
 	} else {
 		return InvalidVec;
