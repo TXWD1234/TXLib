@@ -1,7 +1,7 @@
 // Copyright@TXLib All rights reserved.
 // Author: TX Studio: TX_Jerry
 // Module: TXGraphics
-// File: renderer.cpp
+// File: renderer_framework.cpp
 
 #include "impl/render_engine/renderer.hpp"
 
@@ -23,6 +23,27 @@ void Renderer::reserveSprites(u32 sectionIndex, u32 count) {
 	scaleBuffer   .reserve(targetSize);
 	rotationBuffer.reserve(targetSize);
 	colorBuffer   .reserve(targetSize);
+}
+
+void Renderer::draw() {
+	// get metadata
+	for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
+		if (!getStageBufferSectionMetaData_impl(i))
+			throw std::runtime_error(std::string("tx::RE::Renderer: unidentical dynamic buffer section: " + std::to_string(i)));
+	}
+	// update buffers
+	updateDynamicBuffers_impl();
+	if (!updateRingBufferOffset())
+		throw std::runtime_error("tx::RE::Renderer: Mismatched ring buffer offsets between dynamic buffers.");
+	updateVAM();
+
+	// draw call
+	fm.update();
+	for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
+		draw_impl(i);
+	}
+	// clean up
+	clearStage_impl();
 }
 
 void Renderer::initBuffers_impl() {
@@ -118,16 +139,6 @@ void Renderer::updateDynamicBuffers_impl() {
 	updateDynamicBuffer_impl(instanceColorBuffer        );
 }
 
-void Renderer::clearStage_impl() {
-	instancePositionBuffer     .stage.clearData();
-	instanceTextureHandleBuffer.stage.clearData();
-	instanceTextureIndexBuffer .stage.clearData();
-	instanceScaleBuffer        .stage.clearData();
-	instanceRotationBuffer     .stage.clearData();
-	instanceColorBuffer        .stage.clearData();
-}
-// clang-format on
-
 void Renderer::draw_impl(u32 sectionIndex) {
 	SectionMeta& section = sectionMetaDatas[sectionIndex];
 	if (!section.size) return; // skip empty draw calls
@@ -143,27 +154,15 @@ void Renderer::draw_impl(u32 sectionIndex) {
 	// draw call
 	dcm.drawInstancedOffset(0, 6, section.size, ringBufferOffset + section.offset);
 }
-void Renderer::draw() {
-	// get metadata
-	for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
-		if (!getStageBufferSectionMetaData_impl(i))
-			throw std::runtime_error(std::string("tx::RE::Renderer: unidentical dynamic buffer section: " + std::to_string(i)));
-	}
-	// update buffers
-	updateDynamicBuffers_impl();
-	if (!updateRingBufferOffset())
-		throw std::runtime_error("tx::RE::Renderer: Mismatched ring buffer offsets between dynamic buffers.");
-	updateVAM();
 
-	// draw call
-	fm.update();
-	for (u32 i = 0; i < sectionMetaDatas.size(); i++) {
-		draw_impl(i);
-	}
-	// clean up
-	clearStage_impl();
+void Renderer::clearStage_impl() {
+	instancePositionBuffer     .stage.clearData();
+	instanceTextureHandleBuffer.stage.clearData();
+	instanceTextureIndexBuffer .stage.clearData();
+	instanceScaleBuffer        .stage.clearData();
+	instanceRotationBuffer     .stage.clearData();
+	instanceColorBuffer        .stage.clearData();
 }
 
-
-
+// clang-format on
 } // namespace tx::RenderEngine

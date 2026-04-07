@@ -132,6 +132,7 @@ public:
 	T* data() { return m_data.data(); }
 	u32 size() { return partAttribs.size(); }
 	u32 dataSize() { return m_data.size(); }
+	u32 sizeData() { return m_data.size(); }
 
 	template <std::invocable<T&, u32> Func>
 	void foreachLinear(Func&& f) {
