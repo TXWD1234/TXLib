@@ -20,16 +20,78 @@ namespace tx::RenderEngine {
 
 
 
+class RendererFramework;
+class RendererBufferBase {
+	friend RendererFramework;
+	virtual void regVAM(VAMIniter&);
+	virtual void init(VAM&);
+};
+using RendererSBufferBase = RendererBufferBase;
+class RendererDBufferBase : RendererBufferBase {
+	friend RendererFramework;
+	using ShaderProduct = std::variant<
+	    ShaderProgram*,
+	    ShaderPipeline*>;
+	virtual void addSection();
+	virtual u32 getOffset(u32 sectionIndex);
+	virtual u32 getSize(u32 sectionIndex);
+	[[nodiscard]] virtual u64 updateRingBufferOffset(FenceManager&);
+	virtual void updateVAM(VAM& vam);
+	// and a updateDynamicBuffer -> update ring buffer
+};
+
+template <class T>
+class RendererSBuffer : RendererSBufferBase {
+public:
+	RendererSBuffer(std::span<T> data, bool isInstanced = 0)
+	    : m_data(data), m_isInstanced(isInstanced) {}
+
+private:
+	BufferHandle<StaticBufferObject<T>> buffer;
+	std::span<T> m_data;
+	bool m_isInstanced = 0;
+
+	void regVAM(VAMIniter& initer) override {
+		if (m_isInstanced)
+			buffer.id = initer.addAttrib<T>();
+		else
+			buffer.id = initer.addAttribInstanced<T>();
+	}
+	void init(VAM& vam) override {
+		buffer.bo.alloc(m_data.size(), m_data.data());
+		VAMSetBuffer(vam, buffer);
+	}
+};
+template <class T>
+class RendererDBuffer : RendererDBufferBase {
+public:
+	std::span<T> getSpan(u32 sectionIndex) { return std::span<T>{ stage[sectionIndex].begin(), stage[sectionIndex].end() }; }
+	void push_back(u32 sectionIndex, const T& val) { stage[sectionIndex].push_back(val); }
+	void push_back(u32 sectionIndex, T&& val) { stage[sectionIndex].push_back(std::move(val)); }
+
+private:
+	PartedArr<T> stage;
+	BufferHandle<RingBufferObject<T>> buffer;
+
+	void addSection() override { stage.addPartition(); }
+	u32 getOffset(u32 sectionIndex) override { return stage[sectionIndex].offset(); }
+	u32 getSize(u32 sectionIndex) override { return stage[sectionIndex].size(); }
+	[[nodiscard]] u64 updateRingBufferDrawCall(FenceManager& fm) override { return buffer.bo.getNext(FMSubmiter{ fm }); }
+	void updateVAM(VAM& vam) override { VAMSetBuffer(vam, buffer); }
+};
 
 
 // ***** render content that's calculated every frame *****
+// The RenderContent is only a attrib reading layer
 
 // abstraction class for type erasure
 class RenderContentBufferBase {
 public:
 	virtual u32 getOffset(u32 sectionIndex) const = 0;
 	virtual u32 getSize(u32 sectionIndex) const = 0;
-	virtual void copyTo(u32 sectionIndex, std::span<std::byte> destination) const = 0;
+	virtual std::span<const std::byte> getData(u32 sectionIndex) const = 0;
+
+	virtual TypeEnum type() const = 0;
 };
 template <class T>
 class RenderContentBuffer : public RenderContentBufferBase {
@@ -39,10 +101,12 @@ public:
 public:
 	u32 getOffset(u32 sectionIndex) const override { return (*m_data)[sectionIndex].offset(); }
 	u32 getSize(u32 sectionIndex) const override { return (*m_data)[sectionIndex].size(); }
-	void copyTo(u32 sectionIndex, std::span<std::byte> dest) const override {
-		std::span<std::byte> data = std::as_bytes(std::span<T>{ (*m_data)[sectionIndex].begin(), (*m_data)[sectionIndex].end() });
-		if (dest.size_bytes() < data.size_bytes()) std::runtime_error("tx::RenderContentBuffer::copyTo(): provided destination is smaller then m_data.");
-		std::copy(data.begin(), data.end(), dest.begin());
+	std::span<const std::byte> getData(u32 sectionIndex) const override {
+		return std::as_bytes(std::span<T>{ (*m_data)[sectionIndex].begin(), (*m_data)[sectionIndex].end() });
+	}
+
+	TypeEnum type() const override {
+		return type_enum_v<T>;
 	}
 
 private:
@@ -106,6 +170,8 @@ private:
 using RC = RenderContent;
 using RCIniter = RenderContent::Initer;
 
+
+
 struct RenderContent2D {
 	PartedArr<vec2> position;
 	PartedArr<vec2> scale;
@@ -131,24 +197,152 @@ public:
 	}
 };
 
-// ***** the  *****
 
-class RenderContextBufferBase {
-public:
+// ***** the context for renderer *****
+// manages vam. FenceManage, and buffers (static buffer and ring buffers)
+
+struct RenderContextBufferBase {
+	virtual void regVAM(VAMIniter& initer);
+	virtual void init(VAM& vam);
+
+	virtual TypeEnum type() const = 0;
 };
+
+struct RenderContextStaticBufferBase : public RenderContextBufferBase {
+	virtual u64 size() const = 0;
+};
+// static buffer cannot be instanced
+template <class T>
+struct RenderContextStaticBuffer : public RenderContextStaticBufferBase {
+	RenderContextStaticBuffer(std::span<T> data)
+	    : m_data(data) {}
+
+	// static buffer must be non instanced
+	void regVAM(VAMIniter& initer) override {
+		m_buffer.id = initer.addAttrib<T>();
+	}
+	void init(VAM& vam) override {
+		m_buffer.bo.alloc(m_data.size(), m_data.data());
+		VAMSetBuffer(vam, m_buffer);
+	}
+	u64 size() const override {
+		return m_buffer.bo.size();
+	}
+
+	TypeEnum type() const override {
+		return type_enum_v<T>;
+	}
+
+	BufferHandle<StaticBufferObject<T>> m_buffer;
+	std::span<T> m_data;
+};
+
+struct RenderContextDynamicBufferBase : public RenderContextBufferBase {
+public:
+	virtual void pushRingBuffer(std::span<const std::byte> data, FenceManager& fm, VAM& vam) = 0;
+	[[nodiscard]] virtual u32 getDrawCallOffset(FenceManager& fm) = 0;
+};
+template <class T>
+struct RenderContextDynamicBuffer : public RenderContextDynamicBufferBase {
+public:
+	RenderContextDynamicBuffer(bool instanced) : m_instanced(instanced) {}
+
+	void regVAM(VAMIniter& initer) override {
+		if (m_instanced)
+			m_buffer.id = initer.addAttribInstanced<T>();
+		else
+			m_buffer.id = initer.addAttrib<T>();
+	}
+	void init(VAM& vam) {
+		m_buffer.bo.alloc();
+		VAMSetBuffer(vam, m_buffer);
+	}
+
+	void pushRingBuffer(std::span<const std::byte> data, FenceManager& fm, VAM& vam) override {
+		m_buffer.bo.push(data, FMSubmiter{ fm });
+		VAMSetBuffer(vam, m_buffer);
+	}
+	[[nodiscard]] u32 getDrawCallOffset(FenceManager& fm) override {
+		return m_buffer.bo.getNext(FMSubmiter{ fm });
+	}
+
+	TypeEnum type() const override {
+		return type_enum_v<T>;
+	}
+
+	bool instanced() const { return m_instanced; }
+
+private:
+	BufferHandle<RingBufferObject<T>> m_buffer;
+	bool m_instanced;
+};
+
+
 
 
 
 class RenderContext {
 public:
 	struct Initer {
+		friend class RenderContext;
+
 	public:
+		template <class T>
+		void addSBuffer(std::span<T> data) {
+			m_SBuffers.emplace_back(std::make_unique<RenderContextStaticBuffer<T>>(data));
+		}
+		template <class T>
+		void addDBufferInstanced() {
+			m_DBuffersInstanced.emplace_back(std::make_unique<RenderContextDynamicBuffer<T>>(true));
+		}
+
 	private:
+		// static buffer cannot be instanced
+		std::vector<std::unique_ptr<RenderContextStaticBufferBase>> m_SBuffers;
+		// std::vector<std::unique_ptr<RenderContextDynamicBufferBase>> m_DBuffers; add this later: Dynamic Mesh <---------------------------------
+		std::vector<std::unique_ptr<RenderContextDynamicBufferBase>> m_DBuffersInstanced;
 	};
+	template <std::invocable<Initer&> Func>
+	RenderContext(Func&& f) {
+		Initer initer;
+		f(initer);
+		init_impl(std::move(initer));
+	}
 
 
 
 private:
+	VAM vam;
+	FenceManager fm;
+
+	std::vector<std::unique_ptr<RenderContextStaticBufferBase>> m_SBuffers;
+	std::vector<std::unique_ptr<RenderContextDynamicBufferBase>> m_DBuffersInstanced;
+
+	void init_impl(Initer&& initer) {
+		m_SBuffers = std::move(initer.m_SBuffers);
+		m_DBuffersInstanced = std::move(initer.m_DBuffersInstanced);
+
+		// init vam
+		vam = VAM([&](VAMIniter& initer) {
+			foreach_impl([&](RenderContextBufferBase* buffer) {
+				buffer->regVAM(initer);
+			});
+		});
+
+		foreach_impl([&](RenderContextBufferBase* buffer) {
+			buffer->init(vam);
+		});
+	}
+
+	template <std::invocable<RenderContextBufferBase*> Func>
+	void foreach_impl(Func&& f) {
+		for (std::unique_ptr<RenderContextStaticBufferBase>& i : m_SBuffers) {
+			f(i.get());
+		}
+		for (std::unique_ptr<RenderContextDynamicBufferBase>& i : m_DBuffersInstanced) {
+			f(i.get());
+		}
+	}
 };
 
 

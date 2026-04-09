@@ -98,5 +98,6 @@ using FenceManager = FenceManagerBase<
     RingBufferObjectDeleter,
     RingBufferObjectMarker,
     TextureDeleter>;
+using FM = FenceManager;
 
 } // namespace tx::RenderEngine

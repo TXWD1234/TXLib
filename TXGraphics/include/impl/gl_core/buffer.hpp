@@ -84,7 +84,7 @@ public:
 	StaticBufferObject()
 	    : BufferObject<T>() {}
 	StaticBufferObject(u64 count, const T* ptr = nullptr)
-	    : BufferObject<T>() { alloc(count, ptr); }
+	    : BufferObject<T>(), { alloc(count, ptr); }
 
 	void alloc(u64 count, const T* ptr = nullptr) {
 		if (m_allocated)
@@ -92,10 +92,14 @@ public:
 		if (!this->m_id) gl::createBuffers(1, &this->m_id);
 		gl::namedBufferStorage(this->m_id, count * sizeof(T), (void*)ptr, enumval(ioMode::Static));
 		m_allocated = 1;
+		m_size = count;
 	}
+
+	u64 size() const { return m_size; }
 
 private:
 	bool m_allocated = 0;
+	u32 m_size;
 };
 template <class T>
 using SBO = StaticBufferObject<T>;
@@ -235,6 +239,17 @@ public:
 	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
 	void push(std::span<T> dataBuffer, SubmitDeleter&& submitDeleter) {
 		this->push(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) { std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin()); }, std::forward<SubmitDeleter>(submitDeleter));
+	}
+	template <class SubmitDeleter>
+	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
+	void push(std::span<std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {
+		this->push(
+		    dataBuffer.size(),
+		    [dataBuffer](std::span<T> mappedData) {
+			    std::span<std::byte> mappedDataByte = std::as_writable_bytes(mappedData);
+			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedDataByte.begin());
+		    },
+		    std::forward<SubmitDeleter>(submitDeleter));
 	}
 
 	// draw call associated

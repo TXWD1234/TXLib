@@ -23,7 +23,7 @@ namespace tx::RenderEngine {
 template <class BufferT>
 struct BufferHandle {
 	u32 id; // id in vam
-	BufferT bo; // Buffer Obejct
+	BufferT bo; // Buffer Object
 };
 
 template <class BufferT>
