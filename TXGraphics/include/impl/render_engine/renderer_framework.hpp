@@ -84,6 +84,10 @@ private:
 // ***** render content that's calculated every frame *****
 // The RenderContent is only a attrib reading layer
 
+using ShaderProduct = std::variant<
+    ShaderProgram*,
+    ShaderPipeline*>;
+
 // abstraction class for type erasure
 class RenderContentBufferBase {
 public:
@@ -122,9 +126,15 @@ public:
 		void addBuffer(const RenderContentBufferBase& buffer) {
 			m_buffers.push_back(&buffer);
 		}
+		void setShaderRegBuffer(const std::vector<ShaderProduct>& shaderRegBuffer) {
+			m_shaderReg = &shaderRegBuffer;
+			m_shaderRegSetted = 1;
+		}
 
 	private:
 		std::vector<const RenderContentBufferBase*> m_buffers;
+		const std::vector<ShaderProduct>* m_shaderReg;
+		bool m_shaderRegSetted = 0;
 	};
 	template <std::invocable<Initer&> Func>
 	RenderContent(Func&& f) {
@@ -134,37 +144,46 @@ public:
 	}
 
 	template <std::invocable<const RenderContentBufferBase*> Func>
-	void foreach (Func&& f) {
+	void foreach (Func&& f) const {
 		for (const RenderContentBufferBase* i : m_buffers) {
 			f(i);
 		}
 	}
 
-	bool empty() { return m_buffers.empty(); }
+	bool empty() const { return m_buffers.empty() || m_shaderReg->empty(); }
+	bool valid() const { return m_valid; }
+	u32 bufferCount() const { return m_buffers.size(); }
+	u32 sectionCount() const { return m_shaderReg->size(); }
 
+	const RenderContentBufferBase* buffer(u32 bufferIndex) const { return m_buffers[bufferIndex]; }
+	std::span<const std::byte> getData(u32 bufferIndex, u32 sectionIndex) const { return m_buffers[bufferIndex]->getData(sectionIndex); }
 
-	u32 getOffset(u32 sectionIndex) {
-		if (m_buffers.empty()) return InvalidU32;
+	bool checkOffsetSame(u32 sectionIndex) const {
+		if (m_buffers.empty()) throw std::runtime_error("tx::RE::RenderContent::checkOffsetSame(): parameter sectionIndex out of bound");
 		u32 offset = m_buffers[0]->getOffset(sectionIndex);
 		for (size_t i = 1; i < m_buffers.size(); i++) {
-			if (offset != m_buffers[i]->getOffset(sectionIndex)) return InvalidU32;
+			if (offset != m_buffers[i]->getOffset(sectionIndex)) return false;
 		}
-		return offset;
+		return true;
 	}
-	u32 getSize(u32 sectionIndex) {
-		if (m_buffers.empty()) return InvalidU32;
+	bool checkSizeSame(u32 sectionIndex) const {
+		if (m_buffers.empty()) throw std::runtime_error("tx::RE::RenderContent::checkOffsetSame(): parameter sectionIndex out of bound");
 		u32 offset = m_buffers[0]->getSize(sectionIndex);
 		for (size_t i = 1; i < m_buffers.size(); i++) {
-			if (offset != m_buffers[i]->getSize(sectionIndex)) return InvalidU32;
+			if (offset != m_buffers[i]->getSize(sectionIndex)) return false;
 		}
-		return offset;
+		return true;
 	}
 
 private:
 	std::vector<const RenderContentBufferBase*> m_buffers;
+	const std::vector<ShaderProduct>* m_shaderReg; // defines sections
+	bool m_valid = 0;
 
 	void init_impl(Initer&& initer) {
 		m_buffers = std::move(initer.m_buffers);
+		m_shaderReg = std::move(initer.m_shaderReg);
+		m_valid = initer.m_shaderRegSetted;
 	}
 };
 using RC = RenderContent;
@@ -180,6 +199,10 @@ private:
 	RenderContentBuffer<vec2> positionBuffer_impl;
 	RenderContentBuffer<vec2> scaleBuffer_impl;
 
+private:
+	std::vector<ShaderProduct> m_shaderRegBuffer;
+	bool m_valid = 0;
+
 public:
 	RenderContent content;
 
@@ -193,8 +216,13 @@ public:
 	      content([&](RCIniter& initer) {
 		      initer.addBuffer(positionBuffer_impl);
 		      initer.addBuffer(scaleBuffer_impl);
+		      initer.setShaderRegBuffer(m_shaderRegBuffer);
 	      }) {
+		m_valid = content.valid();
 	}
+
+public:
+	bool valid() const { return m_valid; }
 };
 
 
@@ -262,6 +290,7 @@ public:
 		m_buffer.bo.push(data, FMSubmiter{ fm });
 		VAMSetBuffer(vam, m_buffer);
 	}
+	// get offset of the ring buffer
 	[[nodiscard]] u32 getDrawCallOffset(FenceManager& fm) override {
 		return m_buffer.bo.getNext(FMSubmiter{ fm });
 	}
@@ -282,6 +311,8 @@ private:
 
 
 class RenderContext {
+	struct RingBufferPushDataComposer;
+
 public:
 	struct Initer {
 		friend class RenderContext;
@@ -309,6 +340,27 @@ public:
 		init_impl(std::move(initer));
 	}
 
+	void push(const RenderContent& content) {
+		if (!content.valid()) throw std::runtime_error("tx::RE::RenderContext::push(): invalid content input");
+		if (content.bufferCount() != m_DBuffersInstanced.size()) throw std::runtime_error("tx::RE::RenderContext::push(): content input buffer size don't match");
+		if (!pushTypeCheck(content)) throw std::runtime_error("tx::RE::RenderContext::push(): content input type don't match");
+		if (content.empty()) return;
+
+		for (u32 section = 0; section < content.sectionCount(); section++) {
+			if (!content.checkSizeSame(section)) continue; // maybe use throw instead? <------------------------------------------------------------------------------
+			for (u32 buffer = 0; buffer < content.bufferCount(); buffer++)
+				m_DBuffersInstanced[buffer]->pushRingBuffer(
+				    content.getData(buffer, section),
+				    fm, vam);
+		}
+	}
+
+
+	// getters for renderer
+
+	u32 getStaticSize() const { return m_staticMeta.size; }
+	bool staticSizeValid() const { return m_staticMeta.size && tx::valid(m_staticMeta.size); }
+
 
 
 private:
@@ -317,6 +369,11 @@ private:
 
 	std::vector<std::unique_ptr<RenderContextStaticBufferBase>> m_SBuffers;
 	std::vector<std::unique_ptr<RenderContextDynamicBufferBase>> m_DBuffersInstanced;
+
+	struct staticBufferMeta_impl {
+		u32 size = InvalidU32;
+	} m_staticMeta;
+
 
 	void init_impl(Initer&& initer) {
 		m_SBuffers = std::move(initer.m_SBuffers);
@@ -329,9 +386,21 @@ private:
 			});
 		});
 
+		// init buffer
 		foreach_impl([&](RenderContextBufferBase* buffer) {
 			buffer->init(vam);
 		});
+
+		// init sbuf meta
+		if (!m_SBuffers.empty()) {
+			m_staticMeta.size = m_SBuffers[0]->size();
+			for (u32 i = 1; i < m_SBuffers.size(); i++) {
+				if (m_SBuffers[i]->size() != m_staticMeta.size) {
+					m_staticMeta.size = tx::InvalidU32;
+					break;
+				}
+			}
+		}
 	}
 
 	template <std::invocable<RenderContextBufferBase*> Func>
@@ -343,6 +412,32 @@ private:
 			f(i.get());
 		}
 	}
+
+	bool pushTypeCheck(const RenderContent& content) const {
+		bool valid = 1;
+		u32 i = 0;
+		content.foreach ([&](const RenderContentBufferBase* contentBuf) {
+			if (!valid) {
+				i++;
+				return;
+			}
+			valid = contentBuf->type() == m_DBuffersInstanced[i]->type();
+			i++;
+		});
+		return valid;
+	}
+
+	struct RingBufferPushDataComposer {
+		RingBufferPushDataComposer(RenderContext* context) {
+		}
+
+		void push() {
+		}
+
+	private:
+		RenderContext* context;
+		std::vector<std::vector<std::span<std::byte>>>
+	};
 };
 
 
@@ -364,9 +459,6 @@ public:
 		initBuffers_impl();
 	}
 
-	using ShaderProduct = std::variant<
-	    ShaderProgram*,
-	    ShaderPipeline*>;
 
 	u32 registerSection(ShaderProduct sp) {
 		return addSection_impl(sp);
