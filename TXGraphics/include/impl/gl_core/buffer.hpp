@@ -84,7 +84,7 @@ public:
 	StaticBufferObject()
 	    : BufferObject<T>() {}
 	StaticBufferObject(u64 count, const T* ptr = nullptr)
-	    : BufferObject<T>(), { alloc(count, ptr); }
+	    : BufferObject<T>() { alloc(count, ptr); }
 
 	void alloc(u64 count, const T* ptr = nullptr) {
 		if (m_allocated)

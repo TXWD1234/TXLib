@@ -123,8 +123,8 @@ public:
 		u32 expandSize = newSize - currentSize;
 
 		m_data.reserve(findExpandNewSize_impl(expandSize));
-		partOrder.reserve([partOrder.size() + expandSize]);
-		partOrderAttribs.reserve([partAttribs.size() + expandSize]);
+		partOrder.reserve(partOrder.size() + expandSize);
+		partAttribs.reserve(partAttribs.size() + expandSize);
 		for (u32 i = 0; i < expandSize; i++) {
 			addPartition();
 		}
