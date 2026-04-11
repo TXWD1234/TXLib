@@ -160,19 +160,27 @@ public:
 
 	bool checkOffsetSame(u32 sectionIndex) const {
 		if (m_buffers.empty()) throw std::runtime_error("tx::RE::RenderContent::checkOffsetSame(): parameter sectionIndex out of bound");
-		u32 offset = m_buffers[0]->getOffset(sectionIndex);
+		u32 expected = m_buffers[0]->getOffset(sectionIndex);
 		for (size_t i = 1; i < m_buffers.size(); i++) {
-			if (offset != m_buffers[i]->getOffset(sectionIndex)) return false;
+			if (expected != m_buffers[i]->getOffset(sectionIndex)) return false;
 		}
 		return true;
 	}
 	bool checkSizeSame(u32 sectionIndex) const {
-		if (m_buffers.empty()) throw std::runtime_error("tx::RE::RenderContent::checkOffsetSame(): parameter sectionIndex out of bound");
-		u32 offset = m_buffers[0]->getSize(sectionIndex);
+		if (m_buffers.empty() || sectionIndex >= m_buffers.size()) throw std::runtime_error("tx::RE::RenderContent::checkOffsetSame(): parameter sectionIndex out of bound");
+		u32 expected = m_buffers[0]->getSize(sectionIndex);
 		for (size_t i = 1; i < m_buffers.size(); i++) {
-			if (offset != m_buffers[i]->getSize(sectionIndex)) return false;
+			if (expected != m_buffers[i]->getSize(sectionIndex)) return false;
 		}
 		return true;
+	}
+	bool getSize(u32 sectionIndex) const {
+		if (m_buffers.empty() || sectionIndex >= m_buffers.size()) throw std::runtime_error("tx::RE::RenderContent::getSize(): parameter sectionIndex out of bound");
+		u32 expected = m_buffers[0]->getSize(sectionIndex);
+		for (size_t i = 1; i < m_buffers.size(); i++) {
+			if (expected != m_buffers[i]->getSize(sectionIndex)) return InvalidU32;
+		}
+		return expected;
 	}
 
 private:
@@ -267,7 +275,7 @@ struct RenderContextStaticBuffer : public RenderContextStaticBufferBase {
 
 struct RenderContextDynamicBufferBase : public RenderContextBufferBase {
 public:
-	virtual void pushRingBuffer(std::span<const std::byte> data, FenceManager& fm, VAM& vam) = 0;
+	virtual void pushRingBuffer(std::span<std::span<const std::byte>> data, FenceManager& fm, VAM& vam) = 0;
 	[[nodiscard]] virtual u32 getDrawCallOffset(FenceManager& fm) = 0;
 };
 template <class T>
@@ -286,8 +294,21 @@ public:
 		VAMSetBuffer(vam, m_buffer);
 	}
 
-	void pushRingBuffer(std::span<const std::byte> data, FenceManager& fm, VAM& vam) override {
-		m_buffer.bo.push(data, FMSubmiter{ fm });
+	void pushRingBuffer(std::span<std::span<const std::byte>> data, FenceManager& fm, VAM& vam) override {
+		u32 size = 0;
+		for (std::span<const std::byte> i : data) {
+			size += i.size();
+		}
+		m_buffer.bo.push(
+		    size,
+		    [&](std::span<std::byte> mappedData) {
+			    u32 offset = 0;
+			    for (std::span<const std::byte> i : data) {
+				    std::copy(i.begin(), i.end(), mappedData.begin() + offset);
+				    offset += i.size();
+			    }
+		    },
+		    FMSubmiter{ fm });
 		VAMSetBuffer(vam, m_buffer);
 	}
 	// get offset of the ring buffer
@@ -428,15 +449,21 @@ private:
 	}
 
 	struct RingBufferPushDataComposer {
-		RingBufferPushDataComposer(RenderContext* context) {
-		}
+		RingBufferPushDataComposer(RenderContext* context, u32 bufferCount) : m_context(context), m_data(bufferCount, 64) {}
 
-		void push() {
+		void push(std::span<const std::byte> data, u32 bufferIndex) {
+			m_data[bufferIndex].push_back(data);
+		}
+		void compose() {
+			for (u32 i = 0; i < m_context->m_DBuffersInstanced.size(); i++) {
+				m_context->m_DBuffersInstanced[i]->pushRingBuffer(m_data[i].span(), m_context->fm, m_context->vam);
+			}
+			m_data.clearData();
 		}
 
 	private:
-		RenderContext* context;
-		std::vector<std::vector<std::span<std::byte>>>
+		RenderContext* m_context;
+		PartedArr<std::span<const std::byte>> m_data; // replacing vector<vector> - each partition is a buffer's data
 	};
 };
 

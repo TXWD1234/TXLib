@@ -7,6 +7,7 @@
 #include "impl/basic_utils.hpp"
 #include <cstring>
 #include <algorithm>
+#include <span>
 
 namespace tx {
 
@@ -23,7 +24,7 @@ public:
 
 public:
 	PartedArr(u32 partLen = 64) : PartLen(partLen) {}
-	PartedArr(u32 partCount, u32 partLen = 64)
+	PartedArr(u32 partCount, u32 partLen)
 	    : m_data(std::vector<T>(partCount * partLen)),
 	      partAttribs(std::vector<PartAttrib_impl>(partCount)),
 	      PartLen(partLen) {
@@ -68,7 +69,7 @@ public:
 			attrib().len = 0;
 		}
 
-		void resize(u32 newsize) {
+		void resize(u32 newsize) { // maybe add deletion of erased elements?
 			parent->reservePart_impl(partIndex, newsize);
 			attrib().len = newsize;
 		}
@@ -78,6 +79,8 @@ public:
 
 		It_t begin() { return parent->begin() + attrib().offset; }
 		It_t end() { return parent->begin() + attrib().offset + attrib().len; }
+
+		std::span<T> span() { return std::span<T>{ begin(), end() }; }
 
 	private:
 		PartedArr<T>* parent;
@@ -97,6 +100,8 @@ public:
 		ConstIt_t begin() const { return parent->begin() + attrib().offset; }
 		ConstIt_t end() const { return parent->begin() + attrib().offset + attrib().len; }
 
+		std::span<const T> span() const { return std::span<const T>{ begin(), end() }; }
+
 	private:
 		const PartedArr<T>* parent;
 		u32 partIndex;
@@ -111,6 +116,18 @@ public:
 		partOrder.push_back(partAttribs.size());
 		partAttribs.push_back(PartAttrib_impl{ static_cast<u32>(m_data.size()), 0, static_cast<u32>(partAttribs.size()), 1 });
 		pushPart_impl(1);
+	}
+	void expandToFit(u32 newSize) {
+		u32 currentSize = static_cast<u32>(partAttribs.size());
+		if (currentSize >= newSize) return;
+		u32 expandSize = newSize - currentSize;
+
+		m_data.reserve(findExpandNewSize_impl(expandSize));
+		partOrder.reserve([partOrder.size() + expandSize]);
+		partOrderAttribs.reserve([partAttribs.size() + expandSize]);
+		for (u32 i = 0; i < expandSize; i++) {
+			addPartition();
+		}
 	}
 
 	void clear() {
@@ -130,9 +147,9 @@ public:
 	}
 
 	T* data() { return m_data.data(); }
-	u32 size() { return partAttribs.size(); }
-	u32 dataSize() { return m_data.size(); }
-	u32 sizeData() { return m_data.size(); }
+	u32 size() const { return partAttribs.size(); }
+	u32 dataSize() const { return m_data.size(); }
+	u32 sizeData() const { return m_data.size(); }
 
 	template <std::invocable<T&, u32> Func>
 	void foreachLinear(Func&& f) {
@@ -166,8 +183,9 @@ private:
 
 	// memory operations
 
+	u32 findExpandNewSize_impl(u32 n) const { return m_data.size() + PartLen * n; }
 	void pushPart_impl(u32 n = 1) { // add n empty partition at the end
-		m_data.resize(m_data.size() + PartLen * n);
+		m_data.resize(findExpandNewSize_impl(n));
 	}
 	void moveData_impl(u32 dest, u32 src, u32 len) {
 		if (len == 0) return;
@@ -221,7 +239,6 @@ private:
 		}
 	}
 
-
 	// linear reallocate
 	T& pushSlot_impl(u32 partIndex) {
 		PartAttrib_impl& attrib = partAttribs[partIndex];
@@ -238,9 +255,17 @@ private:
 		pushSlot_impl(partIndex) = T(std::forward<Args>(args)...);
 	}
 };
+// add deletion
 
 template <class T>
 using PartedArr_Partition = typename PartedArr<T>::Partition_impl;
 template <class T>
 using PartedArr_ConstPartition = typename PartedArr<T>::ConstPartition_impl;
+
+template <class T, class AttribT>
+class PartedArrAttrib {
+public:
+	PartedArr<T> arr;
+	std::vector<AttribT> attrib;
+};
 } // namespace tx

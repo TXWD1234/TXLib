@@ -212,7 +212,7 @@ public:
 	//const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
 
 	template <class Func, class SubmitDeleter>
-	    requires std::invocable<Func, std::span<T>> && std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
+	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&> && (std::invocable<Func, std::span<T>> || std::invocable<Func, std::span<std::byte>>)
 	void push(u32 size, Func&& f, SubmitDeleter&& submitDeleter) {
 		if (!size) return;
 
@@ -229,7 +229,11 @@ public:
 		}
 		isFirstIteration = 0;
 
-		f(std::span<T>(buffer.data() + current.offset, size));
+		if constexpr (std::is_invocable_v<Func, std::span<std::byte>>) {
+			f(std::as_writable_bytes(std::span<T>(buffer.data() + current.offset, size)));
+		} else {
+			f(std::span<T>(buffer.data() + current.offset, size));
+		}
 
 		previous = current;
 		current.offset = current.end();
@@ -242,7 +246,7 @@ public:
 	}
 	template <class SubmitDeleter>
 	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
-	void push(std::span<std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {
+	void push(std::span<const std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {
 		this->push(
 		    dataBuffer.size(),
 		    [dataBuffer](std::span<T> mappedData) {
