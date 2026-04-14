@@ -18,13 +18,11 @@ inline float findC(const vec2& p, const vec2& AB) { // C = -(Ax + By)
 // Ax + By + C = 0
 class LineEquation {
 public:
-	LineEquation(const vec2& pa, const vec2& pb) {
-		AB = leftPerp(pa - pb);
-		C = findC(pa, AB);
-	}
+	LineEquation(const vec2& pa, const vec2& pb)
+	    : AB(leftPerp(pa - pb)), C(findC(pa, AB)) {}
 	constexpr LineEquation(float in_A, float in_B, float in_C) : AB(in_A, in_B), C(in_C) {}
 	constexpr LineEquation(const vec2& in_AB, float in_C) : AB(in_AB), C(in_C) {}
-	constexpr LineEquation() : C(0.0f) {}
+	constexpr LineEquation() : AB(0.0f, 0.0f), C(0.0f) {}
 
 	inline const vec2& getAB() const { return AB; }
 	inline const vec2& ab() const { return AB; }
@@ -60,8 +58,8 @@ public:
 
 
 private:
-	float C;
 	vec2 AB;
+	float C;
 };
 using MathLine = LineEquation;
 constexpr MathLine x_axis = MathLine{ 0.0f, 1.0f, 0.0f };

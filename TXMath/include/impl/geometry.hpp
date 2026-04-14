@@ -93,6 +93,7 @@ public:
 		this->x = in_x;
 		this->y = in_y;
 	}
+	constexpr Coord(const Coord&) = default;
 
 	constexpr inline Coord operator+(const Coord& other) const { return Coord(this->x + other.x, this->y + other.y); }
 	constexpr inline Coord operator-(const Coord& other) const { return Coord(this->x - other.x, this->y - other.y); }

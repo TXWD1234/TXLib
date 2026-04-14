@@ -23,7 +23,7 @@ inline void applyGridRange(Func&& f, const Coord& bottomLeft, uint32_t width, ui
 
 class Rect {
 public:
-	Rect(const vec2& in_pos, float in_w, float in_h) : m_bottomLeft(in_pos), m_dimension(in_w, in_h) {}
+	Rect(const vec2& in_pos, float in_w, float in_h) : m_dimension(in_w, in_h), m_bottomLeft(in_pos) {}
 	Rect(const vec2& in_pos, const vec2& diagonalVec)
 	    : m_dimension(std::abs(diagonalVec.x), std::abs(diagonalVec.y)),
 	      m_bottomLeft(vec2{
@@ -69,8 +69,8 @@ public:
 	}
 
 private:
-	vec2 m_bottomLeft;
 	vec2 m_dimension;
+	vec2 m_bottomLeft;
 };
 inline Rect makeRange(const vec2& in_bottomLeft, const vec2& in_topRight) {
 	return Rect{ in_bottomLeft, in_topRight - in_bottomLeft };
@@ -82,10 +82,10 @@ public:
 	DiscreteRect(const Coord& in_bottomLeft, int in_w, int in_h) : m_bottomLeft(in_bottomLeft), m_width(in_w), m_height(in_h) {}
 	// inclusive-inclusive
 	DiscreteRect(const Coord& start, const Coord& end)
-	    : m_width(std::abs(start.x - end.x + 1)), m_height(std::abs(start.y - end.y + 1)),
-	      m_bottomLeft(Coord{
+	    : m_bottomLeft(Coord{
 	          min(start.x, end.x),
-	          min(start.y, end.y) }) {}
+	          min(start.y, end.y) }),
+	      m_width(std::abs(start.x - end.x + 1)), m_height(std::abs(start.y - end.y + 1)) {}
 
 	Coord topRight() const { return Coord{ m_bottomLeft.x + m_width - 1, m_bottomLeft.y + m_height - 1 }; }
 	Coord topLeft() const { return Coord{ m_bottomLeft.x, m_bottomLeft.y + m_height - 1 }; }
