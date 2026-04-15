@@ -211,6 +211,7 @@ public:
 	//std::vector<T>& getStagingBuffer() { return dataBuffer; }
 	//const std::vector<T>& getStagingBuffer() const { return dataBuffer; }
 
+	// this function might cause a reallocation, changing the id of the ring buffer, therefore a VAMSetBuffer have to be called.
 	template <class Func, class SubmitDeleter>
 	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&> && (std::invocable<Func, std::span<T>> || std::invocable<Func, std::span<std::byte>>)
 	void push(u32 size, Func&& f, SubmitDeleter&& submitDeleter) {
@@ -239,11 +240,13 @@ public:
 		current.offset = current.end();
 		current.count = 0;
 	}
+	// this function might cause a reallocation, changing the id of the ring buffer, therefore a VAMSetBuffer have to be called.
 	template <class SubmitDeleter>
 	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
 	void push(std::span<T> dataBuffer, SubmitDeleter&& submitDeleter) {
 		this->push(dataBuffer.size(), [dataBuffer](std::span<T> mappedData) { std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin()); }, std::forward<SubmitDeleter>(submitDeleter));
 	}
+	// this function might cause a reallocation, changing the id of the ring buffer, therefore a VAMSetBuffer have to be called.
 	template <class SubmitDeleter>
 	    requires std::invocable<SubmitDeleter, RingBufferObjectDeleter&&>
 	void push(std::span<const std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {

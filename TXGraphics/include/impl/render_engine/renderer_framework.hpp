@@ -309,7 +309,7 @@ public:
 			    }
 		    },
 		    FMSubmiter{ fm });
-		VAMSetBuffer(vam, m_buffer);
+		VAMSetBuffer(vam, m_buffer); // ring buffer's push() might cause a reallocation, changing the id of the ring buffer, therefore a VAMSetBuffer have to be called.
 	}
 	// get offset of the ring buffer
 	[[nodiscard]] u32 getDrawCallOffset(FenceManager& fm) override {
@@ -364,18 +364,18 @@ public:
 	void push(const RenderContent& content) {
 		if (!content.valid()) throw std::runtime_error("tx::RE::RenderContext::push(): invalid content input");
 		if (content.bufferCount() != m_DBuffersInstanced.size()) throw std::runtime_error("tx::RE::RenderContext::push(): content input buffer size don't match");
-		if (!pushTypeCheck(content)) throw std::runtime_error("tx::RE::RenderContext::push(): content input type don't match");
+		if (!pushTypeCheck_impl(content)) throw std::runtime_error("tx::RE::RenderContext::push(): content input type don't match");
 		if (content.empty()) return;
 
 		for (u32 section = 0; section < content.sectionCount(); section++) {
 			if (!content.checkSizeSame(section)) continue; // maybe use throw instead? <------------------------------------------------------------------------------
 			for (u32 buffer = 0; buffer < content.bufferCount(); buffer++)
-				m_DBuffersInstanced[buffer]->pushRingBuffer(
+				m_dataComposer.push(
 				    content.getData(buffer, section),
-				    fm, vam);
+				    buffer);
 		}
+		m_dataComposer.compose();
 	}
-
 
 	// getters for renderer
 
@@ -391,7 +391,7 @@ private:
 	std::vector<std::unique_ptr<RenderContextStaticBufferBase>> m_SBuffers;
 	std::vector<std::unique_ptr<RenderContextDynamicBufferBase>> m_DBuffersInstanced;
 
-	struct staticBufferMeta_impl {
+	struct StaticBufferMeta_impl {
 		u32 size = InvalidU32;
 	} m_staticMeta;
 
@@ -434,7 +434,7 @@ private:
 		}
 	}
 
-	bool pushTypeCheck(const RenderContent& content) const {
+	bool pushTypeCheck_impl(const RenderContent& content) const {
 		bool valid = 1;
 		u32 i = 0;
 		content.foreach ([&](const RenderContentBufferBase* contentBuf) {
@@ -449,7 +449,8 @@ private:
 	}
 
 	struct RingBufferPushDataComposer {
-		RingBufferPushDataComposer(RenderContext* context, u32 bufferCount) : m_context(context), m_data(bufferCount, 64) {}
+		RingBufferPushDataComposer() : m_context(nullptr) {}
+		RingBufferPushDataComposer(RenderContext* context) : m_context(context), m_data(context->m_DBuffersInstanced.size(), 64) {}
 
 		void push(std::span<const std::byte> data, u32 bufferIndex) {
 			m_data[bufferIndex].push_back(data);
@@ -464,7 +465,7 @@ private:
 	private:
 		RenderContext* m_context;
 		PartedArr<std::span<const std::byte>> m_data; // replacing vector<vector> - each partition is a buffer's data
-	};
+	} m_dataComposer;
 };
 
 
@@ -480,18 +481,7 @@ private:
 
 class RendererFramework {
 public:
-	RendererFramework() {
-	}
-	void init() {
-		initBuffers_impl();
-	}
-
-
-	u32 registerSection(ShaderProduct sp) {
-		return addSection_impl(sp);
-	}
-	u32 registerSection(ShaderPipeline& shaderPipeline) { return registerSection(&shaderPipeline); }
-	u32 registerSection(ShaderProgram& shaderProgram) { return registerSection(&shaderProgram); }
+	RendererFramework() = default;
 
 
 	// draw call
@@ -499,23 +489,14 @@ public:
 
 
 
-
-
-
-	FenceManager& getFM() { return fm; }
-
-private:
-	template <class T>
-	struct DBuffer_impl {
-		PartedArr<T> stage;
-		BufferHandle<RingBufferObject<T>> buffer;
-	};
-
 	// sections are separated by different shaders
 	struct SectionMeta {
 		ShaderProduct shader;
 		u32 offset, size;
-	};
+	}; // <---------------------------- !!!!!!!!!!!!!!!!!!! Current refernce
+
+
+
 
 private:
 	DrawCallManager dcm;
