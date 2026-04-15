@@ -75,9 +75,9 @@ public:
 		preDrawOperations_impl();
 		drawArraysInstancedOffset_impl(m_begin, m_count, m_instanceCount, m_instanceOffset);
 	}
-	void drawInstancedOffset(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) {
+	void drawInstancedOffset(u32 begin, u32 count, u32 instanceBegin, u32 instanceCount) {
 		preDrawOperations_impl();
-		drawArraysInstancedOffset_impl(begin, count, instanceCount, instanceOffset);
+		drawArraysInstancedOffset_impl(begin, count, instanceBegin, instanceCount);
 	}
 
 	// configure
@@ -96,9 +96,10 @@ public:
 		setParameters(begin, count);
 		m_instanceCount = instanceCount;
 	}
-	void setParameters(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) {
-		setParameters(begin, count, instanceCount);
-		m_instanceOffset = instanceOffset;
+	void setParameters(u32 begin, u32 count, u32 instanceBegin, u32 instanceCount) {
+		setParameters(begin, count);
+		m_instanceOffset = instanceBegin;
+		m_instanceCount = instanceCount;
 	}
 
 	void setShaderProgram(const ShaderProgram& program) {
@@ -137,8 +138,8 @@ private:
 	void drawArraysInstanced_impl(u32 begin, u32 count, u32 instanceCount) const {
 		gl::drawArraysInstanced(gl::enums::TRIANGLES, begin, count, instanceCount);
 	}
-	void drawArraysInstancedOffset_impl(u32 begin, u32 count, u32 instanceCount, u32 instanceOffset) const {
-		gl::drawArraysInstancedBaseInstance(gl::enums::TRIANGLES, begin, count, instanceCount, instanceOffset);
+	void drawArraysInstancedOffset_impl(u32 begin, u32 count, u32 instanceBegin, u32 instanceCount) const {
+		gl::drawArraysInstancedBaseInstance(gl::enums::TRIANGLES, begin, count, instanceCount, instanceBegin);
 	}
 
 	// draw call variables

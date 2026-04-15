@@ -183,6 +183,8 @@ public:
 		return expected;
 	}
 
+	const std::vector<ShaderProduct>* getShaderRegBuffer() const { return m_shaderReg; }
+
 private:
 	std::vector<const RenderContentBufferBase*> m_buffers;
 	const std::vector<ShaderProduct>* m_shaderReg; // defines sections
@@ -330,7 +332,22 @@ private:
 
 
 
-
+/**
+ * RenderContext contains the GL Context for rendering, including:
+ * - Static Buffers
+ * - Ring Buffers
+ * - VAM
+ * - FM
+ * - Shader Informations (forwarded from `RenderContent`)
+ * 
+ * It's the bridge between gl world and CPU data processing
+ * It accepts a `RenderContent` object and push it into `RingBufferObject`s, and provide metadata for the `RendererFramework`.
+ * Main Functions:
+ * - `push(const RenderContent& content)`
+ *    input `RenderContent` into `RenderContext`. Called by user, per frame
+ * - `processDynamicSections(Func)` / *(alias)*`draw(Func)`
+ *    process the metadata of the ring buffers. Called by `RendererFramework`, per frame
+ */
 class RenderContext {
 	struct RingBufferPushDataComposer;
 
@@ -367,22 +384,59 @@ public:
 		if (!pushTypeCheck_impl(content)) throw std::runtime_error("tx::RE::RenderContext::push(): content input type don't match");
 		if (content.empty()) return;
 
+		// clear and resize m_dynamicInstancedMeta
+		m_dynamicInstancedMeta.prepare(content.sectionCount(), content.getShaderRegBuffer());
+
 		for (u32 section = 0; section < content.sectionCount(); section++) {
 			if (!content.checkSizeSame(section)) continue; // maybe use throw instead? <------------------------------------------------------------------------------
+			m_dynamicInstancedMeta.sectionSize[section] = content.getSize(section);
 			for (u32 buffer = 0; buffer < content.bufferCount(); buffer++)
 				m_dataComposer.push(
 				    content.getData(buffer, section),
 				    buffer);
 		}
-		m_dataComposer.compose();
+		m_dataComposer.compose(); // push to ring buffer
 	}
 
 	// getters for renderer
 
 	u32 getStaticSize() const { return m_staticMeta.size; }
-	bool staticSizeValid() const { return m_staticMeta.size && tx::valid(m_staticMeta.size); }
+	bool getStaticSizeValid() const { return validSize_impl(getStaticSize()); }
 
+	u32 getDynamicSectionCount() const { return m_dynamicInstancedMeta.sectionSize.size(); }
+	u32 getDynamicSectionSize(u32 sectionIndex) const { return m_dynamicInstancedMeta.sectionSize[sectionIndex]; }
+	bool getDynamicSizeValid(u32 sectionIndex) const { return validSize_impl(getDynamicSectionSize(sectionIndex)); }
+	ShaderProduct getDynamicSectionShader(u32 sectionIndex) const { return m_dynamicInstancedMeta.sectionShader->operator[](sectionIndex); }
+	// if returned InvalidU32, that means there's no DBuffer or they have different offset
+	u32 getDynamicBufferOffset() {
+		if (m_DBuffersInstanced.empty()) return InvalidU32;
+		u32 offset = m_DBuffersInstanced[0]->getDrawCallOffset(fm);
+		for (u32 i = 1; i < m_DBuffersInstanced.size(); i++) {
+			if (m_DBuffersInstanced[i]->getDrawCallOffset(fm) != offset) return InvalidU32;
+		}
+		return offset;
+	}
 
+	// @brief The function for drawcall to get all the metadata it needs
+	// @param Func function that takes parameter of `u32 sectionBegin, u32 sectionSize, const auto& sectionShader`
+	template <class Func>
+	    requires std::invocable<Func, u32, u32, const ShaderProgram&> || std::invocable<u32, u32, const ShaderPipeline&>
+	void processDynamicSections(Func&& f) {
+		u32 offset = getDynamicBufferOffset();
+		if (!tx::valid(offset)) return; // maybe throw? <------------------------------------
+		for (u32 section = 0; section < getDynamicSectionCount(); section++) {
+			u32 sectionSize = getDynamicSectionSize(section);
+			std::visit(
+			    [&](auto& sp) {
+				    f(offset, sectionSize, sp);
+			    },
+			    getDynamicSectionShader(section));
+			offset += sectionSize;
+		}
+	}
+	template <class Func>
+	    requires std::invocable<Func, u32, u32, const ShaderProgram&> || std::invocable<u32, u32, const ShaderPipeline&>
+	void draw(Func&& f) { processDynamicSections(std::forawrd<Func>(f)); }
 
 private:
 	VAM vam;
@@ -394,6 +448,16 @@ private:
 	struct StaticBufferMeta_impl {
 		u32 size = InvalidU32;
 	} m_staticMeta;
+	struct DynamicBufferInstancedMeta_impl {
+		std::vector<u32> sectionSize;
+		const std::vector<ShaderProduct>* sectionShader;
+
+		void prepare(u32 sectionCount, const std::vector<ShaderProduct>* sectionShaderPtr) {
+			sectionShader = sectionShaderPtr;
+			sectionSize.clear();
+			sectionSize.resize(sectionCount, InvalidU32);
+		}
+	} m_dynamicInstancedMeta;
 
 
 	void init_impl(Initer&& initer) {
@@ -466,6 +530,10 @@ private:
 		RenderContext* m_context;
 		PartedArr<std::span<const std::byte>> m_data; // replacing vector<vector> - each partition is a buffer's data
 	} m_dataComposer;
+
+	static bool validSize_impl(u32 size) {
+		return size && tx::valid(size);
+	}
 };
 
 

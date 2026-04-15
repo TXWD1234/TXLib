@@ -141,7 +141,7 @@ void Renderer::draw_impl(u32 sectionIndex) {
 	    section.shader);
 
 	// draw call
-	dcm.drawInstancedOffset(0, 6, section.size, ringBufferOffset + section.offset);
+	dcm.drawInstancedOffset(0, 6, ringBufferOffset + section.offset, section.size);
 }
 void Renderer::draw() {
 	// get metadata
