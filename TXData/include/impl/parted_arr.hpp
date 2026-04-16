@@ -1,7 +1,7 @@
 // Copyright@TXLib All rights reserved.
 // Author: TX Studio: TX_Jerry
-// Module: TXResource
-// File: detail.h
+// Module: TXData
+// File: parted_arr.h
 
 #pragma once
 #include "impl/basic_utils.hpp"
