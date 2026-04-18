@@ -29,8 +29,37 @@ struct is_instantiation_of<Template<Args...>, Template> : std::true_type {};
 template <typename T, template <typename...> class Template>
 concept InstantiationOf = is_instantiation_of<T, Template>::value;
 
+// std add on
+
+// std::invocable with return type
 template <class Func, class RetT, class... Args>
 concept invocable_r = std::is_invocable_r_v<RetT, Func, Args...>;
+
+// iterator with value type
+template <class It, class T>
+concept iterator_value_type =
+    std::same_as<std::remove_cv_t<std::iter_value_t<It>>, T>;
+template <class It, class T>
+concept input_iterator_value_type =
+    std::input_iterator<It> &&
+    iterator_value_type<It, T>;
+template <class It, class T>
+concept forward_iterator_value_type =
+    std::forward_iterator<It> &&
+    iterator_value_type<It, T>;
+template <class It, class T>
+concept bidirectional_iterator_value_type =
+    std::bidirectional_iterator<It> &&
+    iterator_value_type<It, T>;
+template <class It, class T>
+concept random_access_iterator_value_type =
+    std::random_access_iterator<It> &&
+    iterator_value_type<It, T>;
+template <class It, class T>
+concept contiguous_iterator_value_type =
+    std::contiguous_iterator<It> &&
+    iterator_value_type<It, T>;
+
 
 enum class TypeEnum : u32 {
 	Float,

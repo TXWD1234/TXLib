@@ -6,6 +6,7 @@
 #pragma once
 #include "impl/basic_utils.hpp"
 #include "tx/type_traits.hpp"
+#include "tx/algorithm.hpp"
 #include <algorithm>
 #include <initializer_list>
 #include <span>
@@ -18,6 +19,8 @@ class SortedArr {
 	class Sort_impl;
 
 public:
+	using value_type = T;
+
 	using It_t = typename std::vector<T>::iterator;
 	using ConstIt_t = typename std::vector<T>::const_iterator;
 
@@ -27,9 +30,9 @@ public:
 	    : m_data(size), cmp(std::move(cmp)) { sort_impl(); }
 	SortedArr(size_t size, const T& value, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(size, value), cmp(std::move(cmp)) { sort_impl(); }
-	template <std::input_iterator It>
-	SortedArr(It first, It last, CmpFunc&& cmp = CmpFunc{})
-	    : m_data(first, last), cmp(std::move(cmp)) {
+	template <tx::input_iterator_value_type<T> It>
+	SortedArr(It begin, It end, CmpFunc&& cmp = CmpFunc{})
+	    : m_data(begin, end), cmp(std::move(cmp)) {
 		sort_impl();
 	}
 	SortedArr(std::span<const T> data, CmpFunc&& cmp = CmpFunc{})
@@ -71,6 +74,36 @@ public:
 		if (validIt_impl(it, value)) return it;
 		return m_data.end();
 	}
+	ConstIt_t find(u32 begin, const T& value) const {
+		ConstIt_t it = find_impl(begin, m_data.size(), value);
+		if (validIt_impl(it, value)) return it;
+		return m_data.end();
+	}
+	ConstIt_t find(u32 begin, u32 count, const T& value) const {
+		ConstIt_t it = find_impl(begin, begin + count, value);
+		if (validIt_impl(it, value)) return it;
+		return m_data.end();
+	}
+	ConstIt_t find(ConstIt_t first, ConstIt_t last, const T& value) const {
+		ConstIt_t it = std::lower_bound(first, last, value, cmp);
+		if (it != last && isSame_impl(*it, value)) return it;
+		return last;
+	}
+
+	ConstIt_t lower_bound(const T& value) const {
+		return find_impl(value);
+	}
+	ConstIt_t lower_bound(u32 begin, const T& value) const {
+		return find_impl(begin, m_data.size(), value);
+	}
+	ConstIt_t lower_bound(u32 begin, u32 count, const T& value) const {
+		return find_impl(begin, begin + count, value);
+	}
+	ConstIt_t lower_bound(ConstIt_t first, ConstIt_t last, const T& value) const {
+		return std::lower_bound(first, last, value, cmp);
+	}
+
+
 
 	bool exist(const T& value) const {
 		return validIt_impl(find_impl(value), value);
@@ -85,12 +118,23 @@ public:
 		return m_data.insert(it, std::move(value));
 	}
 
+	/**
+	 * @note This is not a true in-place construction. A temporary object is
+	 *       created to find the correct insertion position, and then the element is
+	 *       move-inserted.
+	 */
+	template <class... Args>
+	ConstIt_t insertEmplace(Args&&... args) {
+		return insert(T(std::forward<Args>(args)...));
+	}
+
 	ConstIt_t erase(ConstIt_t pos) {
 		return m_data.erase(pos);
 	}
 	ConstIt_t erase(ConstIt_t first, ConstIt_t last) {
 		return m_data.erase(first, last);
 	}
+	// @return return the count of the erased elements
 	size_t erase(const T& value) {
 		auto range = std::equal_range(m_data.begin(), m_data.end(), value, cmp);
 
@@ -99,6 +143,35 @@ public:
 
 		return count;
 	}
+	// @return the count of element erased
+	size_t erase(std::span<const T> values) {
+		std::vector<T> valuesSorted(values.begin(), values.end());
+		std::sort(valuesSorted.begin(), valuesSorted.end(), cmp);
+		size_t old_size = m_data.size();
+		m_data.erase(
+		    tx::remove_multi_sorted(
+		        m_data.begin(),
+		        m_data.end(),
+		        valuesSorted.begin(),
+		        valuesSorted.end(),
+		        cmp),
+		    m_data.end());
+		return old_size - m_data.size();
+	}
+	size_t erase(std::initializer_list<T> values) {
+		return erase(std::span<const T>(values.begin(), values.size()));
+	}
+	size_t erase(const SortedArr& other) {
+		size_t old_size = m_data.size();
+		m_data.erase(
+		    tx::remove_multi_sorted(
+		        m_data.begin(), m_data.end(),
+		        other.begin(), other.end(),
+		        cmp),
+		    m_data.end());
+		return old_size - m_data.size();
+	}
+
 
 	void merge(const SortedArr& other) {
 		size_t original_size = m_data.size();
@@ -144,8 +217,12 @@ public:
 		mergeTrailer(original_size);
 	}
 
+	void unique() {
+		m_data.erase(std::unique(m_data.begin(), m_data.end()), m_data.end());
+	}
 
-	u32 index(ConstIt_t it) const { return (it != m_data.end() ? tx::index(m_data.begin(), it) : InvalidU32); }
+
+	u32 index(ConstIt_t it) const { return index(m_data.begin(), it); }
 
 	void sort() { sort_impl(); }
 
@@ -154,31 +231,26 @@ private:
 	std::vector<T> m_data;
 	CmpFunc cmp;
 
-	struct Sort_impl {
-		SortedArr* m_parent;
-		Sort_impl(SortedArr* parent) : m_parent(parent) {}
-		void operator()() {
-			std::sort(m_parent->m_data.begin(), m_parent->m_data.end(), m_parent->cmp);
-		}
-	};
-	void sort_impl() {
-		Sort_impl{ this }();
+	void sort_impl(u32 offset = 0) {
+		std::sort(m_data.begin() + offset, m_data.end(), cmp);
 	}
 
 	bool isSame_impl(const T& a, const T& b) const { return !cmp(a, b) && !cmp(b, a); }
 	template <class ItT>
 	bool validIt_impl(const ItT& it, const T& val) const { return it != m_data.end() && isSame_impl(*it, val); }
 
-	ConstIt_t find_impl(const T& value) const {
-		return std::lower_bound(m_data.cbegin(), m_data.cend(), value, cmp);
-	}
 
-	It_t find_impl(const T& value) {
-		return std::lower_bound(m_data.begin(), m_data.end(), value, cmp);
+	ConstIt_t find_impl(const T& value) const { return find_impl(0, m_data.size(), value); }
+	ConstIt_t find_impl(u32 begin, u32 end, const T& value) const {
+		return std::lower_bound(m_data.cbegin() + begin, m_data.cbegin() + end, value, cmp);
+	}
+	It_t find_impl(const T& value) { return find_impl(0, m_data.size(), value); }
+	It_t find_impl(u32 begin, u32 end, const T& value) {
+		return std::lower_bound(m_data.begin() + begin, m_data.begin() + end, value, cmp);
 	}
 
 	void mergeTrailer(u32 trailerBegin) {
-		std::sort(m_data.begin() + trailerBegin, m_data.end(), cmp);
+		sort_impl(trailerBegin);
 		std::inplace_merge(m_data.begin(), m_data.begin() + trailerBegin, m_data.end(), cmp);
 	}
 };
