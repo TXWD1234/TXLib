@@ -17,6 +17,7 @@ namespace tx {
 template <class T, tx::invocable_r<bool, T, T> CmpFunc = std::less<T>>
 class SortedArr {
 	class Sort_impl;
+	struct Placeholder_impl;
 
 public:
 	using value_type = T;
@@ -174,33 +175,37 @@ public:
 
 
 	void merge(const SortedArr& other) {
-		size_t original_size = m_data.size();
-		m_data.insert(m_data.end(), other.begin(), other.end());
-		std::inplace_merge(m_data.begin(), m_data.begin() + original_size, m_data.end(), cmp);
+		merge_impl(other, Placeholder_impl{});
 	}
 	void merge(SortedArr&& other) {
-		// Choose the vector with the larger capacity to minimize memory allocations
-		if (other.m_data.capacity() > m_data.capacity()) {
-			size_t other_original_size = other.m_data.size();
-			other.m_data.insert(other.m_data.end(), std::make_move_iterator(m_data.begin()), std::make_move_iterator(m_data.end()));
-			std::inplace_merge(other.m_data.begin(), other.m_data.begin() + other_original_size, other.m_data.end(), cmp);
-			m_data = std::move(other.m_data);
-		} else {
-			size_t original_size = m_data.size();
-			m_data.insert(m_data.end(), std::make_move_iterator(other.m_data.begin()), std::make_move_iterator(other.m_data.end()));
-			std::inplace_merge(m_data.begin(), m_data.begin() + original_size, m_data.end(), cmp);
-			other.m_data.clear();
-		}
+		merge_impl(std::move(other), Placeholder_impl{});
 	}
 	void merge(std::span<const T> other) {
-		size_t original_size = m_data.size();
-		m_data.insert(m_data.end(), other.begin(), other.end());
-		mergeTrailer(original_size);
+		merge_impl(other, Placeholder_impl{});
 	}
 	void merge(std::initializer_list<T> ilist) {
-		size_t original_size = m_data.size();
-		m_data.insert(m_data.end(), ilist.begin(), ilist.end());
-		mergeTrailer(original_size);
+		merge_impl(ilist, Placeholder_impl{});
+	}
+
+	// @note predicate don't affect original data, only for incoming merging data
+	template <tx::invocable_r<bool, const T&> Pred>
+	void merge_if(const SortedArr& other, Pred&& pred) {
+		merge_impl(other, std::forward<Pred>(pred));
+	}
+	// @note predicate don't affect original data, only for incoming merging data
+	template <tx::invocable_r<bool, const T&> Pred>
+	void merge_if(SortedArr&& other, Pred&& pred) {
+		merge_impl(std::move(other), std::forward<Pred>(pred));
+	}
+	// @note predicate don't affect original data, only for incoming merging data
+	template <tx::invocable_r<bool, const T&> Pred>
+	void merge_if(std::span<const T> other, Pred&& pred) {
+		merge_impl(other, std::forward<Pred>(pred));
+	}
+	// @note predicate don't affect original data, only for incoming merging data
+	template <tx::invocable_r<bool, const T&> Pred>
+	void merge_if(std::initializer_list<T> ilist, Pred&& pred) {
+		merge_impl(ilist, std::forward<Pred>(pred));
 	}
 
 	struct Inserter {
@@ -218,7 +223,11 @@ public:
 	}
 
 	void unique() {
-		m_data.erase(std::unique(m_data.begin(), m_data.end()), m_data.end());
+		m_data.erase(
+		    std::unique(
+		        m_data.begin(), m_data.end(),
+		        [this](const T& a, const T& b) -> bool { return isSame_impl(a, b); }),
+		    m_data.end());
 	}
 
 
@@ -252,6 +261,61 @@ private:
 	void mergeTrailer(u32 trailerBegin) {
 		sort_impl(trailerBegin);
 		std::inplace_merge(m_data.begin(), m_data.begin() + trailerBegin, m_data.end(), cmp);
+	}
+
+	//struct ThisIsJustAPlaceHolderForTheLambdaInputInsertIfFunctionDontCareAboutIt_impl {
+	struct Placeholder_impl {
+		bool operator()(const T&) const { return 1; }
+	};
+
+	// @return old size
+	template <std::random_access_iterator It, tx::invocable_r<bool, const T&> Func>
+	size_t insert_if_impl(It begin, It end, Func&& f) {
+		size_t oldSize = m_data.size();
+		if constexpr (std::is_same_v<std::remove_cvref_t<Func>, Placeholder_impl>) { // not use copy_if
+			m_data.insert(m_data.end(), begin, end);
+		} else {
+			m_data.reserve(oldSize + std::distance(begin, end));
+			std::copy_if(begin, end, std::back_inserter(m_data), std::forward<Func>(f));
+		}
+		return oldSize;
+	}
+
+	template <tx::invocable_r<bool, const T&> Func>
+	void merge_impl(const SortedArr& other, Func&& f) {
+		size_t original_size = insert_if_impl(other.begin(), other.end(), std::forward<Func>(f));
+		std::inplace_merge(m_data.begin(), m_data.begin() + original_size, m_data.end(), cmp);
+	}
+	template <tx::invocable_r<bool, const T&> Func>
+	void merge_impl(SortedArr&& other, Func&& f) {
+		// Choose the vector with the larger capacity to minimize memory allocations
+		if (other.m_data.capacity() > m_data.capacity()) {
+			if constexpr (!std::is_same_v<std::remove_cvref_t<Func>, Placeholder_impl>) { // if use condition
+				other.m_data.erase(
+				    std::remove_if(other.m_data.begin(), other.m_data.end(),
+				                   [&f](const T& val) { return !f(val); }),
+				    other.m_data.end());
+			}
+			size_t other_original_size =
+			    other.insert_if_impl(std::make_move_iterator(m_data.begin()), std::make_move_iterator(m_data.end()), Placeholder_impl{});
+			std::inplace_merge(other.m_data.begin(), other.m_data.begin() + other_original_size, other.m_data.end(), cmp);
+			m_data = std::move(other.m_data);
+		} else {
+			size_t original_size =
+			    insert_if_impl(std::make_move_iterator(other.m_data.begin()), std::make_move_iterator(other.m_data.end()), std::forward<Func>(f));
+			std::inplace_merge(m_data.begin(), m_data.begin() + original_size, m_data.end(), cmp);
+			other.m_data.clear();
+		}
+	}
+	template <tx::invocable_r<bool, const T&> Func>
+	void merge_impl(std::span<const T> other, Func&& f) {
+		size_t original_size = insert_if_impl(other.begin(), other.end(), std::forward<Func>(f));
+		mergeTrailer(original_size);
+	}
+	template <tx::invocable_r<bool, const T&> Func>
+	void merge_impl(std::initializer_list<T> ilist, Func&& f) {
+		size_t original_size = insert_if_impl(ilist.begin(), ilist.end(), std::forward<Func>(f));
+		mergeTrailer(original_size);
 	}
 };
 template <class T>
