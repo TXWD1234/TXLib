@@ -23,11 +23,17 @@ public:
 	    : m_blacklist(std::move(blacklist)), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	template <tx::input_iterator_value_type<T> It>
 	RandDistBlacklist(T min, T max, It begin, It end)
-	    : m_blacklist(begin, end), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
+	    : m_range{ min, max } {
+		insertBlacklistEntry(begin, end);
+	}
 	RandDistBlacklist(T min, T max, std::span<const T> blacklist)
-	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
+	    : m_range{ min, max } {
+		insertBlacklistEntry(blacklist);
+	}
 	RandDistBlacklist(T min, T max, std::initializer_list<T> blacklist)
-	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
+	    : m_range{ min, max } {
+		insertBlacklistEntry(blacklist);
+	}
 	RandDistBlacklist() = default;
 
 	void insertBlacklistEntry(T val) {
@@ -36,12 +42,22 @@ public:
 		rebuildDist_impl();
 	}
 	void insertBlacklistEntry(std::span<const T> vals) {
-		m_blacklist.merge(vals);
+		m_blacklist.merge_if(vals, [&](const T& val) { return inRange(val, m_range.min, m_range.max); });
+		m_blacklist.unique();
+		rebuildDist_impl();
+	}
+	template <tx::input_iterator_value_type<T> It>
+	void insertBlacklistEntry(It begin, It end) {
+		m_blacklist.insertMulti([&](auto& inserter) {
+			std::for_each(begin, end, [&](const T& val) {
+				if (inRange(val, m_range.min, m_range.max)) { inserter.insert(val); }
+			});
+		});
 		m_blacklist.unique();
 		rebuildDist_impl();
 	}
 	void insertBlacklistEntry(std::initializer_list<T> vals) {
-		m_blacklist.merge(vals);
+		m_blacklist.merge_if(vals, [&](const T& val) { return inRange(val, m_range.min, m_range.max); });
 		m_blacklist.unique();
 		rebuildDist_impl();
 	}

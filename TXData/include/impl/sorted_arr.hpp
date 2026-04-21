@@ -5,6 +5,7 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include "impl/data_utils.hpp"
 #include "tx/type_traits.hpp"
 #include "tx/algorithm.hpp"
 #include <algorithm>
@@ -231,7 +232,7 @@ public:
 	}
 
 
-	u32 index(ConstIt_t it) const { return index(m_data.begin(), it); }
+	u32 index(ConstIt_t it) const { return tx::index(m_data.begin(), it); }
 
 	void sort() { sort_impl(); }
 
