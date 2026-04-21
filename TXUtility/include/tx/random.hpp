@@ -16,22 +16,22 @@ public:
 	using value_type = T;
 
 	RandDistBlacklist(T min, T max)
-	    : m_dist(min, max) {}
+	    : m_dist(min, max), m_range{ min, max } {}
 	RandDistBlacklist(T min, T max, SortedArr<T>& blacklist)
-	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()) {}
+	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	RandDistBlacklist(T min, T max, SortedArr<T>&& blacklist)
-	    : m_blacklist(std::move(blacklist)), m_dist(min, max - m_blacklist.size()) {}
+	    : m_blacklist(std::move(blacklist)), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	template <tx::input_iterator_value_type<T> It>
 	RandDistBlacklist(T min, T max, It begin, It end)
-	    : m_blacklist(begin, end), m_dist(min, max - m_blacklist.size()) {}
+	    : m_blacklist(begin, end), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	RandDistBlacklist(T min, T max, std::span<const T> blacklist)
-	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()) {}
+	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	RandDistBlacklist(T min, T max, std::initializer_list<T> blacklist)
-	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()) {}
+	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	RandDistBlacklist() = default;
 
 	void insertBlacklistEntry(T val) {
-		if (m_blacklist.exist(val)) return;
+		if (m_blacklist.exist(val) || !inRange(val, m_range.min, m_range.max)) return;
 		m_blacklist.insert(val);
 		rebuildDist_impl();
 	}
@@ -69,40 +69,49 @@ public:
 	void unban(std::initializer_list<T> vals) { removeBlacklistEntry(vals); }
 
 	template <std::uniform_random_bit_generator GeneratorT>
-	T operator()(GeneratorT& gen) const {
+	T operator()(GeneratorT& gen) { // not count because std::uniform_int_distribution::operator() is not const
 		T result = m_dist(gen);
 		u32 begin = 0;
 		while (marchBlacklist_impl(result, begin)) {}
-		return result;
+		return result + static_cast<T>(begin);
 	}
 
 private:
 	SortedArr<T> m_blacklist;
 	std::uniform_int_distribution<T> m_dist;
+	struct Range_impl {
+		T min = 0, max = 0;
+		std::uniform_int_distribution<T> makeDist_impl(u32 blacklistCount) {
+			return std::uniform_int_distribution<T>(min, max - blacklistCount);
+		}
+	} m_range;
 
-	// @return 1 for continue, 0 for end
-	bool marchBlacklist_impl(T& result, u32& begin) {
+	// @return true for continue, false for end
+	bool marchBlacklist_impl(T result, u32& begin) const {
+		result += static_cast<T>(begin); // just to get the new result
 		u32 index = m_blacklist.index(m_blacklist.lower_bound(begin, result));
-		if (index <= begin) return 0; // if `it` is before the valid range
-		// index become the increment for the result value
+		if (index == m_blacklist.size()) {
+			begin = index;
+			return false;
+		}
+		// if there's no more blacklist entry that the `result` can reach
+		if (index == begin && m_blacklist[index] != result) return false;
+		// index become the increment for the result value, which is the total accounted "holes" / blacklist entries that the result can reach
 
 		// dealing with the continuous stride of blacklist value
 		u32 count = 0;
 		while (index + count < m_blacklist.size() &&
-		       m_blacklist[index + count] == result + count) {
+		       m_blacklist[index + count] == result + static_cast<T>(count)) {
 			count++;
 		}
-		index += count;
 
-		result += index;
-		return 1;
+		begin = index + count; // the total accounted "holes" / blacklist entries
+		return true;
 	}
 
-	void rebuildDist_impl(T min, T max) {
-		m_dist = std::uniform_int_distribution<T>(
-		    min, max - m_blacklist.size());
+	void rebuildDist_impl() {
+		m_dist = m_range.makeDist_impl(m_blacklist.size());
 	}
-	void rebuildDist_impl() { rebuldDist_impl(m_dist.min(), m_dist.max()); }
 };
 
 template <class T>
