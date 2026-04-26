@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
-// Module: TXResource
-// File: data.h
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
+// Module: TXData
 
 #pragma once
 #include "impl/parted_arr.hpp"

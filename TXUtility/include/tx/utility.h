@@ -1,9 +1,8 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXUtility
-// File: utility.h
 
 #pragma once
 #include "tx/type_traits.hpp"
 #include "tx/algorithm.hpp"
 #include "tx/random.hpp"
+#include "tx/bit_trick.hpp"

@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
-// Module: Utility
-// File: random.hpp
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
+// Module: TXUtility
 
 #pragma once
 #include "impl/basic_utils.hpp"

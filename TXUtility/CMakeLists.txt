@@ -19,6 +19,7 @@ add_library(TXUtility INTERFACE
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/type_traits.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/algorithm.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/random.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/bit_trick.hpp"
 )
 tx_add_release_ops_interface(TXUtility)
 target_compile_features(TXUtility INTERFACE cxx_std_20)

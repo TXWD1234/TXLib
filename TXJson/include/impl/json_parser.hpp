@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXJson
-// File: json_parser.hpp
 
 #pragma once
 #include "impl/kvmap.hpp"

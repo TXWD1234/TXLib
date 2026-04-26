@@ -1,4 +1,2 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXGrid
-// File: grid_system.cpp

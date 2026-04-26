@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXGraphics
-// File: texture_manager.hpp
 
 #pragma once
 #include "impl/gl_core/basic_gl_utils.hpp"

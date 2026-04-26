@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXMath
-// File: geom_util_classes.h
 
 #pragma once
 #include "impl/basic_utils.hpp"

@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXUtility
-// File: type_traits.h
 
 #pragma once
 #include "impl/basic_utils.hpp"
@@ -9,11 +7,11 @@
 
 namespace tx {
 
-// all enum should have underlying type of u32
 template <class T>
-    requires std::is_enum_v<T> || std::is_same_v<std::underlying_type_t<T>, u32>
-inline constexpr u32 enumval(T in) noexcept {
-	return static_cast<u32>(in);
+    requires std::is_enum_v<T>
+inline constexpr std::underlying_type_t<T>
+enumval(T in) noexcept {
+	return static_cast<std::underlying_type_t<T>>(in);
 }
 
 template <class>

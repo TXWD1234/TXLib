@@ -1,5 +1,4 @@
-# Copyright@TXLib All rights reserved.
-# Author: TX Studio: TX_Jerry
+# Copyright (c) 2025 TXLib. Licensed under the MIT License.
 # Module: TXData
 
 cmake_minimum_required(VERSION 4.2)

@@ -1,7 +1,5 @@
-// Copyright@TXLib All rights reserved.
-// Author: TX Studio: TX_Jerry
+// Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXGraphics
-// File: render_engine.cpp
 
 #include "impl/render_engine/render_engine.hpp"
 
