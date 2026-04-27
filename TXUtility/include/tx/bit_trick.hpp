@@ -118,7 +118,7 @@ T fliped(T target, T mask) {
  * @note for every `1` bit in mask, the same bit at `target` will be fliped
  */
 template <bit_eligible T>
-void flip(T& target, T mask) { target = flip(target, mask); }
+void flip(T& target, T mask) { target = fliped(target, mask); }
 
 // **************** getters ****************
 
