@@ -12,101 +12,137 @@ namespace tx::bit {
 template <class T>
 concept bit_eligible = std::integral<T> || std::is_enum_v<T>;
 
+// **************** setters ****************
+
 template <bit_eligible T>
-void combine(T& a, T b) {
-	if constexpr (std::is_enum_v<T>) {
-		using U = std::underlying_type_t<T>;
-		a = static_cast<T>(
-		    static_cast<U>(a) | static_cast<U>(b));
-	} else
-		a |= b;
-}
-template <bit_eligible T>
-T combined(T a, T b) {
+T combined(T target, T val) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
 		return static_cast<T>(
-		    static_cast<U>(a) | static_cast<U>(b));
+		    static_cast<U>(target) | static_cast<U>(val));
 	} else
-		return a | b;
+		return target | val;
 }
+template <bit_eligible T>
+void combine(T& target, T val) { target = combined(target, val); }
 
 template <bit_eligible T>
-void erase(T& a, T b) {
-	if constexpr (std::is_enum_v<T>) {
-		using U = std::underlying_type_t<T>;
-		a = static_cast<T>(
-		    static_cast<U>(a) & (~static_cast<U>(b)));
-	} else {
-		a &= (~b);
-	}
-}
-template <bit_eligible T>
-T erased(T a, T b) {
+T erased(T target, T val) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
 		return static_cast<T>(
-		    static_cast<U>(a) & (~static_cast<U>(b)));
+		    static_cast<U>(target) & (~static_cast<U>(val)));
 	} else {
-		return a & (~b);
+		return target & (~val);
 	}
 }
+template <bit_eligible T>
+void erase(T& target, T val) { target = erased(target, val); }
 
+// set_true / set_false
 template <bool boolean, bit_eligible T>
-void set(T& a, T b) {
+T setted(T& target, T val) {
 	if constexpr (boolean) {
-		combine(a, b); // set true
+		return combined(target, val); // set true
 	} else {
-		erase(a, b); // set false
+		return erased(target, val); // set false
 	}
 }
+// set_true / set_false
 template <bool boolean, bit_eligible T>
-T setted(T& a, T b) {
-	if constexpr (boolean) {
-		return combined(a, b); // set true
-	} else {
-		return erased(a, b); // set false
-	}
-}
+void set(T& target, T val) { target = set<boolean>(target, val); }
 
+// set_true / set_false
 template <bit_eligible T>
-void set(T& a, T b, bool boolean) {
+T setted(T& target, T val, bool boolean) {
 	if (boolean) {
-		combine(a, b); // set true
+		return combined(target, val); // set true
 	} else {
-		erase(a, b); // set false
+		return erased(target, val); // set false
 	}
 }
+// set_true / set_false
 template <bit_eligible T>
-T setted(T& a, T b, bool boolean) {
-	if (boolean) {
-		return combined(a, b); // set true
-	} else {
-		return erased(a, b); // set false
-	}
-}
+void set(T& target, T val, bool boolean) { target = setted(target, val, boolean); }
 
+// set bit mask
 template <bit_eligible T>
-bool includes(T a, T b) {
+void setted(T& target, T val, T mask) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
-		return static_cast<U>(a) & static_cast<U>(b) == static_cast<U>(b);
+		U UMask = static_cast<U>(mask);
+		return static_cast<T>(
+		    (UMask & static_cast<U>(val)) | (~UMask & static_cast<U>(target)));
 	} else {
-		return (a & b) == b;
+		return (mask & val) | (~mask & target);
 	}
 }
+// set bit mask
 template <bit_eligible T>
-bool contains(T a, T b) { return includes(a, b); }
+void set(T& target, T val, T mask) { target = setted(target, val, mask); }
 
+// flip each bit
 template <bit_eligible T>
-bool excludes(T a, T b) {
+T fliped(T target) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
-		return !(static_cast<U>(a) & static_cast<U>(b));
+		return static_cast<T>(~static_cast<U>(target));
 	} else {
-		return !(a & b);
+		return ~target;
+	}
+}
+// flip each bit
+template <bit_eligible T>
+void flip(T& target) { target = fliped(target); }
+
+/**
+ * @param target the data variable
+ * @param mask the bits that will be fliped
+ * @note for every `1` bit in mask, the same bit at `target` will be fliped
+ */
+template <bit_eligible T>
+T fliped(T target, T mask) {
+	if constexpr (std::is_enum_v<T>) {
+		using U = std::underlying_type_t<t>;
+		return setted(
+		    static_cast<U>(target),
+		    ~static_cast<U>(target),
+		    static_cast<U>(mask));
+	} else {
+		return setted(target, ~target, mask);
+	}
+}
+/**
+ * @param target the data variable
+ * @param mask the bits that will be fliped
+ * @note for every `1` bit in mask, the same bit at `target` will be fliped
+ */
+template <bit_eligible T>
+void flip(T& target, T mask) { target = flip(target, mask); }
+
+// **************** getters ****************
+
+template <bit_eligible T>
+bool includes(T target, T val) {
+	if constexpr (std::is_enum_v<T>) {
+		using U = std::underlying_type_t<T>;
+		return static_cast<U>(target) & static_cast<U>(val) == static_cast<U>(val);
+	} else {
+		return (target & val) == val;
 	}
 }
 template <bit_eligible T>
-bool contains_none(T a, T b) { return excludes(a, b); }
+bool contains(T target, T val) { return includes(target, val); }
+
+template <bit_eligible T>
+bool excludes(T target, T val) {
+	if constexpr (std::is_enum_v<T>) {
+		using U = std::underlying_type_t<T>;
+		return !(static_cast<U>(target) & static_cast<U>(val));
+	} else {
+		return !(target & val);
+	}
+}
+template <bit_eligible T>
+bool contains_none(T target, T val) { return excludes(target, val); }
 } // namespace tx::bit
