@@ -41,7 +41,7 @@ void erase(T& target, T val) { target = erased(target, val); }
 
 // set_true / set_false
 template <bool boolean, bit_eligible T>
-T setted(T& target, T val) {
+T setted(T target, T val) {
 	if constexpr (boolean) {
 		return combined(target, val); // set true
 	} else {
@@ -54,7 +54,7 @@ void set(T& target, T val) { target = set<boolean>(target, val); }
 
 // set_true / set_false
 template <bit_eligible T>
-T setted(T& target, T val, bool boolean) {
+T setted(T target, T val, bool boolean) {
 	if (boolean) {
 		return combined(target, val); // set true
 	} else {
@@ -67,7 +67,7 @@ void set(T& target, T val, bool boolean) { target = setted(target, val, boolean)
 
 // set bit mask
 template <bit_eligible T>
-void setted(T& target, T val, T mask) {
+void setted(T target, T val, T mask) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
 		U UMask = static_cast<U>(mask);
@@ -103,7 +103,7 @@ void flip(T& target) { target = fliped(target); }
 template <bit_eligible T>
 T fliped(T target, T mask) {
 	if constexpr (std::is_enum_v<T>) {
-		using U = std::underlying_type_t<t>;
+		using U = std::underlying_type_t<T>;
 		return setted(
 		    static_cast<U>(target),
 		    ~static_cast<U>(target),
