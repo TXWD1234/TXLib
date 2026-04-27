@@ -67,7 +67,7 @@ void set(T& target, T val, bool boolean) { target = setted(target, val, boolean)
 
 // set bit mask
 template <bit_eligible T>
-void setted(T target, T val, T mask) {
+T setted(T target, T val, T mask) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
 		U UMask = static_cast<U>(mask);
