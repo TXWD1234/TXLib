@@ -104,10 +104,10 @@ template <bit_eligible T>
 T fliped(T target, T mask) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
-		return setted(
+		return static_cast<T>(setted(
 		    static_cast<U>(target),
 		    ~static_cast<U>(target),
-		    static_cast<U>(mask));
+		    static_cast<U>(mask)));
 	} else {
 		return setted(target, ~target, mask);
 	}
