@@ -61,8 +61,25 @@ void set(T& a, T b) {
 	}
 }
 template <bool boolean, bit_eligible T>
-bool setted(T& a, T b) {
+T setted(T& a, T b) {
 	if constexpr (boolean) {
+		return combined(a, b); // set true
+	} else {
+		return erased(a, b); // set false
+	}
+}
+
+template <bit_eligible T>
+void set(T& a, T b, bool boolean) {
+	if (boolean) {
+		combine(a, b); // set true
+	} else {
+		erase(a, b); // set false
+	}
+}
+template <bit_eligible T>
+T setted(T& a, T b, bool boolean) {
+	if (boolean) {
 		return combined(a, b); // set true
 	} else {
 		return erased(a, b); // set false
