@@ -126,13 +126,13 @@ template <bit_eligible T>
 bool includes(T target, T val) {
 	if constexpr (std::is_enum_v<T>) {
 		using U = std::underlying_type_t<T>;
-		return static_cast<U>(target) & static_cast<U>(val) == static_cast<U>(val);
+		return (static_cast<U>(target) & static_cast<U>(val)) == static_cast<U>(val);
 	} else {
 		return (target & val) == val;
 	}
 }
 template <bit_eligible T>
-bool contains(T target, T val) { return includes(target, val); }
+bool contains_all(T target, T val) { return includes(target, val); }
 
 template <bit_eligible T>
 bool excludes(T target, T val) {
@@ -145,4 +145,13 @@ bool excludes(T target, T val) {
 }
 template <bit_eligible T>
 bool contains_none(T target, T val) { return excludes(target, val); }
+
+template <bit_eligible T>
+bool overlaps(T target, T val) {
+	return !excludes(target, val);
+}
+template <bit_eligible T>
+bool contains_any(T target, T val) {
+	return !excludes(target, val);
+}
 } // namespace tx::bit
