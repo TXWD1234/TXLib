@@ -21,7 +21,7 @@ namespace tx {
 
 namespace RenderEngine {
 
-const std::fs::path shaderPath = tx::getExeDir() / "assets/shaders";
+const fs::path shaderPath = tx::getExeDir() / "assets/shaders";
 
 std::string readShaderSource(const std::string& filename) {
 	return readWholeFileText(shaderPath / filename);
@@ -35,7 +35,7 @@ std::string readShaderSource(const std::string& filename) {
 } // namespace RenderEngine
 
 
-Coord getWindowSize(GLFWwindow* window) {
+inline Coord getWindowSize(GLFWwindow* window) {
 	int x, y;
 	glfwGetWindowSize(window, &x, &y);
 	return Coord{ x, y };
@@ -234,7 +234,7 @@ private:
 };
 
 using RGBMap = tx::GridSystem<tx::RGB>;
-RGBMap readBMP(const std::fs::path& fp) {
+RGBMap readBMP(const fs::path& fp) {
 	BMPFile file{ fp };
 
 	RGBMap map{ file.width, file.height };

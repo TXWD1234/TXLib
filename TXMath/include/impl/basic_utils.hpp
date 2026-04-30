@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 #include <concepts>
+#include <span>
+#include <algorithm>
 
 namespace tx {
 
@@ -50,7 +52,7 @@ constexpr inline T min(T a, T b) { return a < b ? a : b; }
 template <class T>
 constexpr inline T max(T a, T b) { return a > b ? a : b; }
 template <class T>
-constexpr inline T min(const std::vector<T>& vec) {
+constexpr inline T min(const std::span<T>& vec) {
 	if (!vec.size()) {
 		return T{};
 	}
@@ -62,7 +64,7 @@ constexpr inline T min(const std::vector<T>& vec) {
 	return minv;
 }
 template <class T>
-constexpr inline T max(const std::vector<T>& vec) {
+constexpr inline T max(const std::span<T>& vec) {
 	if (!vec.size()) {
 		return T{};
 	}
@@ -71,6 +73,22 @@ constexpr inline T max(const std::vector<T>& vec) {
 		maxv = max(maxv, i);
 	}
 	return maxv;
+}
+template <class T, T first, T... vals>
+    requires std::totally_ordered<T>
+inline constexpr T max() {
+	T maxVal = first;
+	((maxVal = std::max(maxVal, vals)),
+	 ...);
+	return maxVal;
+}
+template <class T, T first, T... vals>
+    requires std::totally_ordered<T>
+inline constexpr T min() {
+	T minVal = first;
+	((minVal = std::min(minVal, vals)),
+	 ...);
+	return minVal;
 }
 template <class T>
 constexpr inline T clamp(const T& val, const T& in_min, const T& in_max) {

@@ -66,7 +66,6 @@ private:
 
 	re::RE re;
 	re::RSP rr;
-	tx::Animation anim{ 3 };
 
 private:
 	bool init() {
@@ -96,11 +95,6 @@ private:
 		}
 		tx::u32 length = width * height * 4;
 
-		for (int i = 0; i < data.size(); i++) {
-			anim.addFrame(
-			    re.addTexture({ width, height }, std::bitSpan(data[i], length)));
-			if (data[i]) stbi_image_free(data[i]);
-		}
 
 		return 1;
 	}
@@ -138,7 +132,7 @@ private:
 		tickCounter++;
 	}
 	void render() {
-		rr.drawSprite(tx::Origin, anim.next(), tx::vec2{ 1.0f, 1.0f }, 0, colorEngine.getNextColor().compress());
+		//rr.drawSprite(tx::Origin, anim.next(), tx::vec2{ 1.0f, 1.0f }, 0, colorEngine.getNextColor().compress());
 		re.draw();
 	}
 };
