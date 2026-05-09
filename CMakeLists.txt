@@ -17,7 +17,9 @@ if(TARGET TXLib)
 	return()
 endif()
 
-add_library(TXLib INTERFACE)
+add_library(TXLib INTERFACE
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/txlib.h"
+)
 target_link_libraries(TXLib INTERFACE
 	TXMath
 	TXMap
@@ -27,4 +29,7 @@ target_link_libraries(TXLib INTERFACE
 	TXData
 	TXGraphics
 	TXUtility
-)							
+)
+target_include_directories(TXLib INTERFACE
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+)
