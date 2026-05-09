@@ -11,3 +11,20 @@ add_subdirectory("TXResource")
 add_subdirectory("TXData")
 add_subdirectory("TXGraphics")
 add_subdirectory("TXUtility")
+
+# Umbrella target for everything
+if(TARGET TXLib)
+	return()
+endif()
+
+add_library(TXLib INTERFACE)
+target_link_libraries(TXLib INTERFACE
+	TXMath
+	TXMap
+	TXJson
+	TXGrid
+	TXResource
+	TXData
+	TXGraphics
+	TXUtility
+)							
