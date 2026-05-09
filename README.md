@@ -4,13 +4,13 @@
 ## Installation
 Download `add_txlib.cmake`:
 
-[TXLib: add_txlib.cmake](https://raw.githubusercontent.com/TXWD1234/TXLib/add_txlib.cmake)
+[TXLib: add_txlib.cmake](https://raw.githubusercontent.com/TXWD1234/TXLib/main/add_txlib.cmake)
 
 or
 
 ```bash
 cd "<your_project_directory>"
-curl -O https://raw.githubusercontent.com/TXWD1234/TXLib/add_txlib.cmake
+curl -O https://raw.githubusercontent.com/TXWD1234/TXLib/main/add_txlib.cmake
 ```
 
 Place it in your project directory, then include it in your project CMakeLists.txt, before `add_executable()`:
