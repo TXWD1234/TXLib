@@ -19,19 +19,25 @@ function(tx_add_txlib)
 	endif()
 
 	# prepare source
+	set(REQUIRE_REMOTE_DOWNLOAD TRUE)
+
 	if(ARG_LOCAL_DIR) # use local dir
 		message(STATUS "TXLib: Using local TXLib")
+		set(REQUIRE_REMOTE_DOWNLOAD FALSE)
 		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}/CMakeLists.txt") # look for in project dir first (relative path)
 			set(TX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
 		elseif(EXISTS "${ARG_LOCAL_DIR}/CMakeLists.txt")
 			set(TX_SOURCE_DIR "${ARG_LOCAL_DIR}")
 		else()
-			message(SEND_ERROR "TXLib: LOCAL_DIR path not found!")
+			# intented fallback to remote download
+			message(STATUS "TXLib: LOCAL_DIR path not found! downloading TXLib.")
+			set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 			return()
 		endif()
 		set(TX_BINARY_DIR "${TX_BINARY_DIR}/libs/TXLib")
+	endif()
 
-	else() # fetch from remote
+	if(REQUIRE_REMOTE_DOWNLOAD) # fetch from remote
 		message(STATUS "TXLib: Fetching TXLib from GitHub")		
 	
 		# resolve version
