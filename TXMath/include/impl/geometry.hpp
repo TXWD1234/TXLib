@@ -4,6 +4,7 @@
 #pragma once
 #include <cmath>
 #include <iostream>
+#include "basic_utils.hpp"
 
 namespace tx {
 
@@ -14,7 +15,6 @@ constexpr float epsilon = 1e-6f;
 // 2 direction vector
 class vec2;
 class Coord;
-constexpr inline float dot(const vec2& in1, const vec2& in2);
 class vec2 {
 public:
 	float x, y;
@@ -64,7 +64,7 @@ public:
 	constexpr inline bool operator>(const vec2& other) const { return this->x * this->x + this->y * this->y > other.x * other.x + other.y * other.y; }
 
 	inline float length() const {
-		return std::sqrtf(dot(*this, *this));
+		return std::sqrtf(sq(x) + sq(y));
 	}
 
 	constexpr inline vec2 offset(float x, float y) const { return this->operator+(vec2(x, y)); }

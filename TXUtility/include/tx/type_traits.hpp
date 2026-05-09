@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include "impl/geometry.hpp"
 #include <type_traits>
 
 namespace tx {

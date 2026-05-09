@@ -3,17 +3,25 @@ function(tx_add_txlib)
 	message(STATUS "TXLib: Adding TXLib")
 
 	set(options "")
-    set(oneValueArgs LOCAL_DIR VERSION)
+    set(oneValueArgs LOCAL_DIR BIN_DIR VERSION)
     set(multiValueArgs COMPONENTS)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
 	set(TX_SOURCE_DIR "")
-	set(TX_BINARY_DIR "")
+	set(TX_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+
+	# resolve BIN_DIR
+	if(ARG_BIN_DIR)
+		message(STATUS "TXLib: Using specialized bin dir")
+		set(TX_BINARY_DIR "${ARG_BIN_DIR}")
+	else()
+		message(STATUS "TXLib: Using default bin dir: \${CMAKE_CURRENT_BINARY_DIR}: ${CMAKE_CURRENT_BINARY_DIR}")
+	endif()
 
 	# prepare source
 	if(ARG_LOCAL_DIR) # use local dir
-		message(STATUS "TXLib Using local TXLib")
-		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}/CMakeLists.txt") # look for in project dir first
+		message(STATUS "TXLib: Using local TXLib")
+		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}/CMakeLists.txt") # look for in project dir first (relative path)
 			set(TX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
 		elseif(EXISTS "${ARG_LOCAL_DIR}/CMakeLists.txt")
 			set(TX_SOURCE_DIR "${ARG_LOCAL_DIR}")
@@ -21,10 +29,10 @@ function(tx_add_txlib)
 			message(SEND_ERROR "TXLib: LOCAL_DIR path not found!")
 			return()
 		endif()
-		set(TX_BINARY_DIR "${CMAKE_BINARY_DIR}/libs/TXLib")
+		set(TX_BINARY_DIR "${TX_BINARY_DIR}/libs/TXLib")
 
 	else() # fetch from remote
-		message(STATUS "Fetching TXLib from GitHub")		
+		message(STATUS "TXLib: Fetching TXLib from GitHub")		
 	
 		# resolve version
 		if(ARG_VERSION)
