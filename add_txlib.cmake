@@ -74,5 +74,5 @@ function(tx_add_txlib)
 		add_subdirectory("${TX_SOURCE_DIR}" "${TX_BINARY_DIR}")
 	endif()
 	
-	set(TXLib "${TX_SOURCE_DIR}" PARENT_SCOPE)
+	set(TXLib_SOURCE_DIR "${TX_SOURCE_DIR}" PARENT_SCOPE)
 endfunction()
