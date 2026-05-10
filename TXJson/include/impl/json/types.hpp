@@ -245,4 +245,13 @@ inline JsonMapHandle JsonObject::insertMulti(const std::string& key, const JsonV
 inline JsonMapHandle JsonObject::insert(const std::string& key, const JsonValue& value) {
 	return members.insertSingle(key, value);
 }
+
+inline void JsonObjectValidateRecursive(JsonObject& obj) {
+	obj.validate();
+	for (auto& i : obj) {
+		if (i.v().is<JsonObject>()) {
+			i.v().get<JsonObject>().validate();
+		}
+	}
+}
 } // namespace tx
