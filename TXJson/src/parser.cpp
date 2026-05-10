@@ -1,7 +1,7 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXJson
 
-#include "impl/json_parser.hpp"
+#include "impl/json/parser.hpp"
 
 namespace tx {
 

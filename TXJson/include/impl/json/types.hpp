@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 #include <string_view>
+#include <fstream>
+#include <filesystem>
 
 namespace tx {
 class JsonParser;
@@ -68,6 +70,23 @@ public:
 	inline iterator end() { return members.end(); }
 	inline const_iterator end() const { return members.end(); }
 
+	// editors
+
+	template <class K>
+	inline JsonMapHandle set(const K& key, const JsonValue& value) { return members.set(key, value); }
+
+	template <class K>
+	inline void remove(const K& key) { members.remove(key); }
+
+	inline void reserve(int count) { members.reserve(count); }
+
+	template <JsonConflictResolveFunc ResolveFunc = JsonMergeReplace>
+	inline JsonMapHandle insertSingle(const std::string& key, const JsonValue& value, ResolveFunc&& f = JsonMergeReplace{});
+
+	template <JsonConflictResolveFunc ResolveFunc = JsonMergeReplace>
+	inline JsonMapHandle insertMulti(const std::string& key, const JsonValue& value, ResolveFunc&& f = JsonMergeReplace{});
+	inline JsonMapHandle insert(const std::string& key, const JsonValue& value);
+
 	// utilities
 
 	template <JsonConflictResolveFunc Func = JsonMergeReplace>
@@ -79,19 +98,30 @@ public:
 		members.merge(std::move(other.members), std::forward<Func>(resolve));
 	}
 
-private:
-	JsonMap members;
+	void write(std::ostream& out);
+	inline void write(const std::filesystem::path& filePath) {
+		std::ofstream ofs(filePath);
+		write(ofs);
+		ofs.close();
+	}
+	inline void write(std::ofstream& ofs) { write(ofs); }
+	inline void write(std::string& str) {
+		std::ostringstream oss;
+		write(oss);
+		str = std::move(oss).str();
+	}
 
 	void validate() {
 		members.validate();
 		/*for (KVPair<std::string, JsonValue>& i : members) {
-				if (i.v().is<JsonObject>()) {
-					i.v().get<JsonObject>().validate();
-				}
-			}*/
+			if (i.v().is<JsonObject>()) {
+				i.v().get<JsonObject>().validate();
+			}
+		}*/
 	}
 
-
+private:
+	JsonMap members;
 	//JsonObject* parent = nullptr;
 };
 class JsonValue {
@@ -111,24 +141,25 @@ public:
 	template <class T>
 	inline bool is() const { return std::holds_alternative<T>(this->m_var); }
 	inline JsonType type() const {
-		return std::visit([](auto&& v) -> JsonType {
-			using T = std::decay_t<decltype(v)>;
-			if constexpr (std::is_same_v<T, bool>)
-				return JsonType::Boolean;
-			else if constexpr (std::is_same_v<T, int>)
-				return JsonType::Int;
-			else if constexpr (std::is_same_v<T, float>)
-				return JsonType::Float;
-			else if constexpr (std::is_same_v<T, std::string>)
-				return JsonType::String;
-			else if constexpr (std::is_same_v<T, JsonArray>)
-				return JsonType::Array;
-			else if constexpr (std::is_same_v<T, JsonObject>)
-				return JsonType::JsonObject;
-			else
-				static_assert(sizeof(T) == 0, "Unhandled JsonValue type");
-		},
-		                  m_var);
+		return std::visit(
+		    [](auto&& v) -> JsonType {
+			    using T = std::decay_t<decltype(v)>;
+			    if constexpr (std::is_same_v<T, bool>)
+				    return JsonType::Boolean;
+			    else if constexpr (std::is_same_v<T, int>)
+				    return JsonType::Int;
+			    else if constexpr (std::is_same_v<T, float>)
+				    return JsonType::Float;
+			    else if constexpr (std::is_same_v<T, std::string>)
+				    return JsonType::String;
+			    else if constexpr (std::is_same_v<T, JsonArray>)
+				    return JsonType::Array;
+			    else if constexpr (std::is_same_v<T, JsonObject>)
+				    return JsonType::JsonObject;
+			    else
+				    static_assert(sizeof(T) == 0, "Unhandled JsonValue type");
+		    },
+		    m_var);
 	}
 	template <class T>
 	inline T& get() { return std::get<T>(this->m_var); }
@@ -199,5 +230,19 @@ inline T JsonObject::getOr(std::string_view key, const T& fallback) const {
 	const auto* valptr = get<T>(key);
 	if (valptr) return *valptr;
 	return fallback;
+}
+
+template <JsonConflictResolveFunc ResolveFunc>
+inline JsonMapHandle JsonObject::insertSingle(const std::string& key, const JsonValue& value, ResolveFunc&& f) {
+	return members.insertSingle(key, value, std::forward<ResolveFunc>(f));
+}
+
+template <JsonConflictResolveFunc ResolveFunc>
+inline JsonMapHandle JsonObject::insertMulti(const std::string& key, const JsonValue& value, ResolveFunc&& f) {
+	return members.insertMulti(key, value, std::forward<ResolveFunc>(f));
+}
+
+inline JsonMapHandle JsonObject::insert(const std::string& key, const JsonValue& value) {
+	return members.insertSingle(key, value);
 }
 } // namespace tx

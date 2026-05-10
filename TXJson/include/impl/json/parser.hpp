@@ -6,7 +6,7 @@
 #include <charconv>
 #include <stdexcept>
 
-#include "json_types.hpp"
+#include "impl/json/types.hpp"
 
 namespace tx {
 
@@ -56,12 +56,4 @@ inline JsonObject parseJson(const std::string& str) {
 	parser.parse(str, root);
 	return root;
 }
-
-
-// things to add:
-// operator<< for JosnValue / .str() function
-// comments
-// escaped character decodeing
-// better error messages
-//
 } // namespace tx
