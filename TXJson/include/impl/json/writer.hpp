@@ -97,7 +97,7 @@ private:
 	}
 };
 
-void JsonObject::write(std::ostream& out) {
+inline void JsonObject::write(std::ostream& out) {
 	JsonWriter::write(*this, out);
 }
 } // namespace tx
