@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 function(tx_add_release_ops in_target)
 	set_property(TARGET ${in_target} PROPERTY INTERPROCEDURAL_OPTIMIZATION $<CONFIG:Release>)
 

@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 function(tx_link_dir_to_bin in_target in_dirPath)
     get_filename_component(folderName "${in_dirPath}" NAME)
     set(dst_dir "$<TARGET_FILE_DIR:${in_target}>/${folderName}")
