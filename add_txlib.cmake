@@ -70,7 +70,7 @@ function(tx_add_txlib)
 	
 	# <-------------------------------------------------
 	# Sources are ready; TXLib is locally exist;
-	# call TXLib_SOURCE_DIR/TXCMakeUtilis/impl/install.cmake or something like that
+	# call TXLib_SOURCE_DIR/TXCMake/installation/link_txlib.cmake or something like that
 
 	# everything below should be in that install.cmake 
 
