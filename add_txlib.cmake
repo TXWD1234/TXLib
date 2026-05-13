@@ -1,4 +1,8 @@
-# if using `LOCAL_DIR`, the parameter `VERSION` will be ignored
+include_guard(GLOBAL)
+#[[
+if using LOCAL_DIR, the parameter VERSION will be ignored
+if not using LOCAL_DIR, the parameter BIN_DIR will be ignored
+]]
 function(tx_add_txlib)
 	message(STATUS "TXLib: Adding TXLib")
 
@@ -24,15 +28,14 @@ function(tx_add_txlib)
 	if(ARG_LOCAL_DIR) # use local dir
 		message(STATUS "TXLib: Using local TXLib")
 		set(REQUIRE_REMOTE_DOWNLOAD FALSE)
-		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}/CMakeLists.txt") # look for in project dir first (relative path)
+		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}") # look for in project dir first (relative path)
 			set(TXLib_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
-		elseif(EXISTS "${ARG_LOCAL_DIR}/CMakeLists.txt")
+		elseif(EXISTS "${ARG_LOCAL_DIR}")
 			set(TXLib_SOURCE_DIR "${ARG_LOCAL_DIR}")
 		else()
 			# intented fallback to remote download
 			message(STATUS "TXLib: LOCAL_DIR path not found! downloading TXLib.")
 			set(REQUIRE_REMOTE_DOWNLOAD TRUE)
-			return()
 		endif()
 		set(TXLib_BINARY_DIR "${TXLib_BINARY_DIR}/TXLib")
 	endif()
@@ -65,6 +68,22 @@ function(tx_add_txlib)
 		set(TXLib_BINARY_DIR "${txlib_BINARY_DIR}")
 	endif()
 	
+	# <-------------------------------------------------
+	# Sources are ready; TXLib is locally exist;
+	# call TXLib_SOURCE_DIR/TXCMakeUtilis/impl/install.cmake or something like that
+
+	# everything below should be in that install.cmake 
+
+
+
+	# TXLib settings variables
+	set(TXLib_CXX_VERSION "cxx_std_20")
+
+	# load TXLib module registry
+	# <------------------------------
+
+	# include TXLib cmake utilities
+
 	# resolve components
 	if(ARG_COMPONENTS) # if given components
 		foreach(comp IN LISTS ARG_COMPONENTS)
