@@ -32,7 +32,6 @@ function(tx_add_txlib)
 			# intented fallback to remote download
 			message(STATUS "TXLib: LOCAL_DIR path not found! downloading TXLib.")
 			set(REQUIRE_REMOTE_DOWNLOAD TRUE)
-			return()
 		endif()
 		set(TX_BINARY_DIR "${TX_BINARY_DIR}/libs/TXLib")
 	endif()
