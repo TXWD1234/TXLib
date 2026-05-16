@@ -20,6 +20,16 @@
 				"CMAKE_BUILD_TYPE": "Release",
 				"CMAKE_INSTALL_PREFIX": "dist"
 			}
+		},
+		{
+			"name": "config_profile",
+			"displayName": "config_profile",
+			"generator": "Ninja",
+			"binaryDir": "build",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "RelWithDebInfo",
+				"CMAKE_INSTALL_PREFIX": "dist"
+			}
 		}
 	],
 	"buildPresets": [
@@ -30,6 +40,10 @@
 		{
 			"name": "build_release",
 			"configurePreset": "config_release"
+		},
+		{
+			"name": "build_profile",
+			"configurePreset": "config_profile"
 		}
 	]
 }
