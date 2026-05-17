@@ -19,6 +19,7 @@ add_library(TXData STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/parted_arr.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/sorted_arr.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/data_utils.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/circular_queue.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/parted_arr.cpp"
 )
 tx_add_release_ops(TXData)
