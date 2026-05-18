@@ -2,7 +2,7 @@
 // Module: TXUtility
 
 #pragma once
-#include "impl/basic_utils.hpp"
+#include "tx/basic_types.hpp"
 
 namespace tx {
 // be aware of the dangling reference of the deleted handles

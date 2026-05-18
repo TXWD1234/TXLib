@@ -4,6 +4,8 @@
 tx_txlib_module(
 	LIB_TYPE INTERFACE
 	PUBLIC_HEADERS
+		"foundation.h"
+
 		"type_traits.hpp"
 		"algorithm.hpp"
 		"basic_types.hpp"
