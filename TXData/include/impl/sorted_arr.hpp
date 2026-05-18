@@ -2,10 +2,10 @@
 // Module: TXData
 
 #pragma once
-#include "impl/basic_utils.hpp"
-#include "impl/data_utils.hpp"
+#include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include "tx/algorithm.hpp"
+#include "impl/data_utils.hpp"
 #include <algorithm>
 #include <initializer_list>
 #include <span>

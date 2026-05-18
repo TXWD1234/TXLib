@@ -2,7 +2,7 @@
 // Module: TXData
 
 #pragma once
-#include "impl/basic_utils.hpp"
+#include "tx/basic_types.hpp"
 #include <span>
 #include <concepts>
 

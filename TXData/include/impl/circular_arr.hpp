@@ -1,9 +1,8 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXData
 
-
 #pragma once
-#include "impl/basic_utils.hpp"
+#include "tx/basic_types.hpp"
 
 namespace tx {
 
