@@ -1,0 +1,1 @@
+set(TXLib_CXX_VERSION "cxx_std_20")
