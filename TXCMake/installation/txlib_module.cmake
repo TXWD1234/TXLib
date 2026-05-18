@@ -1,14 +1,10 @@
 include_guard(GLOBAL)
 
-include("${CMAKE_CURRENT_LIST_DIR}/log.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/../optimization.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/make_module_available.cmake")
+include("${TXLib_INSTALLATION_DIR}/log.cmake")
+include("${TXLib_INSTALLATION_DIR}/../set_compile_flags.cmake")
+include("${TXLib_INSTALLATION_DIR}/make_module_available.cmake")
 
 #[[
-MODULE_NAME
-(Mandatory)
-The name of the module. It will be used as the cmake target name. Example: TXMath
-
 MODULE_DIR
 The path of the module.
 Modules are not strictly defined by CMakeLists.txt within the module dir anymore.
@@ -44,68 +40,57 @@ List the files in `${Module}/src/`. These files will be relative to `${Module}/s
 (The path `${Module}/src/` will be added before the path provided)
 The file listed here should only contain `.cpp` files.
 
-DEPENDENCIES
-The dependency of this module within TXLib.
-Attension! This does not account for external dependencies. You have to link them yourself.
-Write the name of the dependency module.
-
+Note:
+The name of the module is already setted by the registry
 ]]
 function(tx_txlib_module)
 
 	set(options "")
-    set(oneValueArgs MODULE_NAME MODULE_DIR LIB_TYPE)
-    set(multiValueArgs DEPENDENCIES PUBLIC_HEADERS IMPL_HEADERS SOURCES)
+    set(oneValueArgs LIB_TYPE)
+    set(multiValueArgs PUBLIC_HEADERS IMPL_HEADERS SOURCES)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+	
+	if(NOT TXLib_INSTALLATION_MODULE_NAME)
+		tx_error_log("Variable TXLib_INSTALLATION_MODULE_NAME does not exist."
+		             "  Hint: Not added by `add_txlib.cmake` nor `setup.cmake`.")
+	endif()
+	set(TXLib_MODULE_NAME "${TXLib_INSTALLATION_MODULE_NAME}")
 
 	# parameter integrity check
-	if(NOT ARG_MODULE_NAME)
-		tx_error_log("UNKNOWN" "Failed to declare module. Module Name not provided.")
-	endif()
 	if(NOT ARG_LIB_TYPE)
-		tx_error_log("${ARG_MODULE_NAME}" "Failed to declare module. Missing mandatory parameter: LIB_TYPE.")
+		tx_error_log("${TXLib_MODULE_NAME}" "Failed to declare module. Missing mandatory parameter: LIB_TYPE.")
 	endif()
 	if(NOT ARG_PUBLIC_HEADERS)
-		tx_error_log("${ARG_MODULE_NAME}" "Failed to declare module. Missing mandatory parameter: PUBLIC_HEADERS.")
+		tx_error_log("${TXLib_MODULE_NAME}" "Failed to declare module. Missing mandatory parameter: PUBLIC_HEADERS.")
 	endif()
 
-	# to defence being included multiple times
-	if(TARGET ${ARG_MODULE_NAME})
+	# to defend against being included multiple times
+	if(TARGET ${TXLib_MODULE_NAME})
 		return()
 	endif()
-	# to defence the invalid add_subdirectories call that's not from add_txlib.cmake
+	# to defend against invalid add_subdirectories calls not from add_txlib.cmake
 	if(NOT TXLib_SOURCE_DIR OR NOT TXLib_BINARY_DIR)
-		tx_error_log( "${ARG_MODULE_NAME}" "Variable TXLib_SOURCE_DIR or TXLib_BINARY_DIR does not exist." "Hint: Not added by `add_txlib.cmake`.")
+		tx_error_log("${TXLib_MODULE_NAME}" "Variable TXLib_SOURCE_DIR or TXLib_BINARY_DIR does not exist."
+		                                    "  Hint: Not added by `add_txlib.cmake`.")
 	endif()
-
-	# resolving module dir
-	if(ARG_MODULE_DIR)
-		set(TXLib_MODULE_DIR ${ARG_MODULE_DIR})
-		if(NOT EXISTS ${TXLib_MODULE_DIR})
-			tx_error_log("${ARG_MODULE_NAME}" "Cannot find MODULE_DIR path:" "  ${TXLib_MODULE_DIR}")
-		endif()
-	else()
-		set(TXLib_MODULE_DIR "${TXLib_SOURCE_DIR}/${ARG_MODULE_NAME}")
-		if(NOT EXISTS ${TXLib_MODULE_DIR})
-			tx_error_log("${ARG_MODULE_NAME}" "MODULE_DIR not set, and cannot find default path:" "  ${TXLib_MODULE_DIR}")
-		endif()
-	endif()
-
+	
 	# start target configuration
 
-	set(TXLib_MODULE_NAME "${ARG_MODULE_NAME}")
+	set(TXLib_MODULE_DIR ${TXLib_${TXLib_MODULE_NAME}_SOURCE_DIR})
 	
 	if(ARG_LIB_TYPE STREQUAL "STATIC")
 		# static library
 		if(NOT ARG_SOURCES)
-			tx_error_log("${TXLib_MODULE_NAME}" "Missing SOURCES entry." "When LIB_TYPE is STATIC, at least one SOURCES entry have to be provided.")
+			tx_error_log("${TXLib_MODULE_NAME}" "Missing SOURCES entry."
+			                                    "  When LIB_TYPE is STATIC, at least one SOURCES entry have to be provided.")
 		endif()
 		add_library("${TXLib_MODULE_NAME}" STATIC)
-		tx_add_release_ops("${TXLib_MODULE_NAME}")
+		tx_set_compile_flags("${TXLib_MODULE_NAME}" PUBLIC)
 
 		set(SCOPE_PUBLIC "PUBLIC")
 		set(SCOPE_PRIVATE "PRIVATE")
 
-		foreach(FILE IN LISTS ARG_SOURCES) # SOURCES
+		foreach(FILE IN LISTS ARG_SOURCES) # SOURCES - moved up to here because interface does not need sources
 			set(FILE "${TXLib_MODULE_DIR}/src/${FILE}")
 			if(NOT EXISTS ${FILE})
 				tx_error_log("${TXLib_MODULE_NAME}" "Cannot find source file (SOURCES):" "  ${FILE}")
@@ -115,12 +100,12 @@ function(tx_txlib_module)
 	elseif(ARG_LIB_TYPE STREQUAL "INTERFACE")
 		# interface library
 		add_library("${TXLib_MODULE_NAME}" INTERFACE)
-		tx_add_release_ops_interface("${TXLib_MODULE_NAME}")
+		tx_set_compile_flags("${TXLib_MODULE_NAME}" INTERFACE)
 		
 		set(SCOPE_PUBLIC "INTERFACE")
 		set(SCOPE_PRIVATE "INTERFACE")
 	else()
-		tx_error_log("${TXLib_MODULE_NAME}" "Unsupported LIB_TYPE: ${ARG_LIB_TYPE}.")
+		tx_error_log("${TXLib_MODULE_NAME}" "Unsupported LIB_TYPE:" "  ${ARG_LIB_TYPE}.")
 	endif()
 
 	# add source files
@@ -142,9 +127,8 @@ function(tx_txlib_module)
 
 	# resolve dependencies
 	foreach(DEP_MODULE IN LISTS ARG_DEPENDENCIES)
-		tx_make_module_available("${DEP_MODULE}")
 		target_link_libraries("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} ${DEP_MODULE})		
-	endforeach()	
+	endforeach()
 	
 	# target properties
 
