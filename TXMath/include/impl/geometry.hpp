@@ -2,9 +2,10 @@
 // Module: TXMath
 
 #pragma once
+#include "tx/basic_types.hpp"
+#include "impl/numeric_utils.hpp"
 #include <cmath>
 #include <iostream>
-#include "basic_utils.hpp"
 
 namespace tx {
 

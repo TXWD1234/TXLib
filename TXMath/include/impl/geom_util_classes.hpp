@@ -2,7 +2,7 @@
 // Module: TXMath
 
 #pragma once
-#include "impl/basic_utils.hpp"
+#include "tx/basic_types.hpp"
 #include "impl/geometry.hpp"
 #include <concepts>
 
