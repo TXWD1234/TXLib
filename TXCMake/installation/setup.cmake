@@ -7,6 +7,8 @@ include("${TXLib_INSTALLATION_DIR}/preprocess_module.cmake")
 include("${TXLib_INSTALLATION_DIR}/add_module.cmake")
 include("${TXLib_SOURCE_DIR}/module_registry.cmake")
 
+include("${TXLib_INSTALLATION_DIR}/txlib_module.cmake") # for the CMakeLists.txt of the modules
+
 # include static parameters
 include("${TXLib_INSTALLATION_DIR}/txlib_cxx_version.cmake")
 

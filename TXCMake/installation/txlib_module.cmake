@@ -5,14 +5,6 @@ include("${TXLib_INSTALLATION_DIR}/../set_compile_flags.cmake")
 include("${TXLib_INSTALLATION_DIR}/make_module_available.cmake")
 
 #[[
-MODULE_DIR
-The path of the module.
-Modules are not strictly defined by CMakeLists.txt within the module dir anymore.
-The path of the module only have to contain the source of the module.
-The CMake definition (the calling of this funciton) can be anywhere.
-Default to `${TXLib_SOURCE_DIR}/${MODULE_NAME}`.
-Note: This parameter exist for flexibility, but the best practice is still keep the module name identical with the dir name
-
 LIB_TYPE
 (Mandatory)
 Library type of the module, either STATIC or INTERFACE
