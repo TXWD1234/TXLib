@@ -7,7 +7,7 @@ function(tx_preprocess_module MODULES OUT_DEPS ARG_BOOL_INCOMING_DEPENDENCIES)
 	foreach(MODULE IN LISTS ${MODULES})
 		# module presence check
 		if(NOT EXISTS TXLib_${MODULE}_SOURCE_DIR)
-			tx_error_log(
+			tx_error_log(FALSE
 				"Cannot find SOURCE_DIR of requested module: ${MODULE}"
 				"  SOURCE_DIR: \"${TXLib_${MODULE}_SOURCE_DIR}\""
 			)

@@ -19,11 +19,11 @@ if(TXLib_INSTALLATION_MODULES) # if given requested modules
 
 	set(TXLib_INSTALLATION_DEPS "")
 
+	set(BOOL_INCOMING_DEPENDENCIES "")
 	# first pass - resolve dependencies of requested modules
-	tx_preprocess_module(TXLib_INSTALLATION_MODULES TXLib_INSTALLATION_DEPS)
+	tx_preprocess_module(TXLib_INSTALLATION_MODULES TXLib_INSTALLATION_DEPS BOOL_INCOMING_DEPENDENCIES)
 
 	# further passes - resolve dependencies of the dependencies
-	set(BOOL_INCOMING_DEPENDENCIES TRUE)
 	set(TXLib_INSTALLATION_DEPS_CUR ${TXLib_INSTALLATION_DEPS})
 		
 	while(BOOL_INCOMING_DEPENDENCIES)
@@ -60,7 +60,7 @@ else() # add the whole library
 		tx_log("  ${MODULE}")
 	endforeach()
 
-	foreach(MODULE IN LISTS TXLib_INSTALLATION_MODULES)
+	foreach(MODULE IN LISTS TXLib_MODULES)
 		tx_add_module("${MODULE}")
 	endforeach()
 endif()

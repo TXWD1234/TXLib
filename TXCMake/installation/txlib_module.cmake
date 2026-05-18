@@ -51,8 +51,9 @@ function(tx_txlib_module)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 	
 	if(NOT TXLib_INSTALLATION_MODULE_NAME)
-		tx_error_log("Variable TXLib_INSTALLATION_MODULE_NAME does not exist."
-		             "  Hint: Not added by `add_txlib.cmake` nor `setup.cmake`.")
+		tx_error_log(FALSE
+			"Variable TXLib_INSTALLATION_MODULE_NAME does not exist."
+		    "  Hint: Not added by `add_txlib.cmake` nor `setup.cmake`.")
 	endif()
 	set(TXLib_MODULE_NAME "${TXLib_INSTALLATION_MODULE_NAME}")
 
@@ -126,7 +127,7 @@ function(tx_txlib_module)
 	endforeach()
 
 	# resolve dependencies
-	foreach(DEP_MODULE IN LISTS ARG_DEPENDENCIES)
+	foreach(DEP_MODULE IN LISTS TXLib_${TXLib_MODULE_NAME}_DEPENDENCIES)
 		target_link_libraries("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} ${DEP_MODULE})		
 	endforeach()
 	
