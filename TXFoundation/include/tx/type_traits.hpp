@@ -28,6 +28,10 @@ struct is_instantiation_of<Template<Args...>, Template> : std::true_type {};
 template <typename T, template <typename...> class Template>
 concept instantiation_of = is_instantiation_of<T, Template>::value;
 
+// any_of
+template <class T, class... Ts>
+concept any_of = (std::same_as<T, Ts> || ...);
+
 // numeric
 template <class T>
 concept numeric = (std::integral<T> || std::floating_point<T>) && !std::same_as<T, bool>;

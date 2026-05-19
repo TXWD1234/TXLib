@@ -7,10 +7,11 @@
 #include "impl/gl_core/fence.hpp"
 #include <tuple>
 #include <deque>
+#include <concepts>
 
 namespace tx::RenderEngine {
 
-template <class... FuncTypes>
+template <std::invocable<>... FuncTypes>
 class FenceManagerBase {
 public:
 	FenceManagerBase() {
@@ -40,7 +41,7 @@ public:
 		resolveFences_impl();
 	}
 
-	template <class T>
+	template <tx::any_of<FuncTypes...> T>
 	void addOperation(T&& operation) {
 		std::get<std::vector<std::decay_t<T>>>(operationQueue.back()).push_back(std::forward<T>(operation));
 	}
@@ -75,7 +76,7 @@ private:
 
 /// @brief A helper callable that forwards a deleter operation to a FenceManager.
 /// Used to pass a fence manager to functions that expect a deleter-submitting functor.
-template <InstantiationOf<FenceManagerBase> FMT>
+template <instantiation_of<FenceManagerBase> FMT>
 struct FMAddOperation {
 	FMAddOperation(FMT& in_fm) : fm(in_fm) {}
 	FMT& fm;
@@ -89,8 +90,8 @@ struct FMAddOperation {
 template <typename FMT>
 FMAddOperation(FMT&) -> FMAddOperation<FMT>;
 
-template <InstantiationOf<FenceManagerBase> FMT>
-using FMSubmiter = FMAddOperation<FMT>;
+template <instantiation_of<FenceManagerBase> FMT>
+using FMSubmiter = FMAddOperation<FMT>; // this is just a alias of FMAddOperation
 
 using FenceManager = FenceManagerBase<
     RingBufferObjectDeleter,
