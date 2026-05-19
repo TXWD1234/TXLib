@@ -1,44 +1,48 @@
 # Copyright (c) 2025 TXLib. Licensed under the MIT License.
 # Module: TXGraphics
 
-cmake_minimum_required(VERSION 4.2)
-
-# to defence being included multiple times
-if(TARGET TXGraphics)
-	return()
-endif()
-
-set(TXLib "..")
-set(CMakeUtils "${TXLib}/TXCMakeUtils")
-
-include("${CMakeUtils}/optimization.cmake")
-
-# dependencies
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/dependency/glad")
-
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 
-# Automatically collect all nested headers and source files
-file(GLOB_RECURSE TX_GRAPHICS_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
-file(GLOB_RECURSE TX_GRAPHICS_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+tx_txlib_module(
+	LIB_TYPE STATIC
+	PUBLIC_HEADERS
+		graphics.h
+	IMPL_HEADERS
+		"gl_core/basic_gl_utils.hpp"
+		"gl_core/buffer.hpp"
+		"gl_core/draw_call_manager.hpp"
+		"gl_core/fence_manager.hpp"
+		"gl_core/fence.hpp"
+		"gl_core/shader_manager.hpp"
+		"gl_core/shader.hpp"
+		"gl_core/texture.hpp"
+		"gl_core/utility.hpp"
+		"gl_core/vertex_attribute_manager.hpp"
 
-add_library(TXGraphics STATIC ${TX_GRAPHICS_HEADERS} ${TX_GRAPHICS_SOURCES})
+		"render_engine/log.hpp"
+		"render_engine/render_engine.hpp"
+		"render_engine/renderer_framework.hpp"
+		"render_engine/renderer.hpp"
+		"render_engine/texture_manager.hpp"
 
-tx_add_release_ops(TXGraphics)
-target_compile_features(TXGraphics PUBLIC cxx_std_20)
+		"utility/rgb.hpp"
+
+		"framework/framework.hpp"
+	SOURCES
+		"gl_core/shader.cpp"
+		"gl_core/texture.cpp"
+
+		"render_engine/render_engine.cpp"
+		"render_engine/renderer_framework.cpp"
+		"render_engine/renderer.cpp"
+
+		"framework/framework.cpp"	
+)
+
 target_link_libraries(TXGraphics PUBLIC 
 	glfw
 	glad
 	OpenGL::GL
-	TXMath
-	TXUtility
-	TXData
-)
-
-
-target_include_directories(TXGraphics PUBLIC
-	"${CMAKE_CURRENT_SOURCE_DIR}/include"
-	PRIVATE
-	"${CMAKE_CURRENT_SOURCE_DIR}/src"
 )

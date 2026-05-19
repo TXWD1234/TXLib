@@ -4,6 +4,7 @@
 #pragma once
 #include <cmath>
 #include <vector>
+#include "tx/basic_types.hpp"
 #include "tx/math.h"
 
 namespace tx {
@@ -29,15 +30,15 @@ public:
 	inline bool operator!=(const tx::RGB& other) const { return !this->operator==(other); }
 
 	inline void normalize() {
-		m_r *= oneOf255;
-		m_g *= oneOf255;
-		m_b *= oneOf255;
+		m_r *= ONE_OF_255;
+		m_g *= ONE_OF_255;
+		m_b *= ONE_OF_255;
 	}
 	inline RGB normalized() const {
 		return RGB{
-			m_r * oneOf255,
-			m_g * oneOf255,
-			m_b * oneOf255
+			m_r * ONE_OF_255,
+			m_g * ONE_OF_255,
+			m_b * ONE_OF_255
 		};
 	}
 	inline bool isNormalized() const {
@@ -108,17 +109,17 @@ public:
 	inline bool operator!=(const tx::RGBA& other) const { return !this->operator==(other); }
 
 	inline void normalize() {
-		m_r *= oneOf255;
-		m_g *= oneOf255;
-		m_b *= oneOf255;
-		m_a *= oneOf255;
+		m_r *= ONE_OF_255;
+		m_g *= ONE_OF_255;
+		m_b *= ONE_OF_255;
+		m_a *= ONE_OF_255;
 	}
 	inline RGBA normalized() const {
 		return RGBA{
-			m_r * oneOf255,
-			m_g * oneOf255,
-			m_b * oneOf255,
-			m_a * oneOf255
+			m_r * ONE_OF_255,
+			m_g * ONE_OF_255,
+			m_b * ONE_OF_255,
+			m_a * ONE_OF_255
 		};
 	}
 	inline bool isNormalized() const {

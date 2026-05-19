@@ -2,6 +2,7 @@
 // Module: TXGraphics
 
 #pragma once
+#include "tx/basic_types.hpp"
 #include "tx/math.h"
 #include "tx/type_traits.hpp"
 #include "impl/gl_core/basic_gl_utils.hpp"
