@@ -8,6 +8,7 @@
 #include "impl/data_utils.hpp"
 #include "impl/value_group.hpp"
 #include "impl/circular_queue.hpp"
+#include "impl/avl_tree.hpp"
 
 /**
  * Terminology:

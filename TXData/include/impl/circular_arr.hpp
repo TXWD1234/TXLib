@@ -4,6 +4,7 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include <stdexcept>
 
 namespace tx {
 

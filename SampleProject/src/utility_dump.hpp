@@ -6,6 +6,7 @@
 #include "tx/json.h"
 #include "tx/resource.h"
 #include "tx/data.h"
+#include "tx/utility.h"
 #include <bits/stdc++.h>
 
 using std::cin;
