@@ -7,6 +7,9 @@
 #include <vector>
 #include <array>
 #include <concepts>
+#include <utility>
+
+#include <cassert>
 
 namespace tx {
 
@@ -49,87 +52,42 @@ public:
 
 
 
-	// AVL Tree Test Suite
-	// Tests for tx::AVLTree
-	// Since AVLTree doesn't yet have a public search() or traversal,
-	// this file assumes you've added the following test hooks to the class
-	// (shown below as a guide — paste into AVLTree's public section):
-	// ============================================================
-	// --- TEST HOOKS (can be removed for release builds) ---
-	// Returns pointer to value if found, nullptr otherwise.
-	const T* search(const T& val) const {
-		if (m_nodes.empty()) return nullptr;
-		u32 curIndex = m_meta.root;
-		while (true) {
-			const Node_impl& cur = m_nodes[curIndex];
-			if (m_cmp(val, m_data[cur.data]))
-				curIndex = cur.children[Left];
-			else if (m_cmp(m_data[cur.data], val))
-				curIndex = cur.children[Right];
-			else
-				return &m_data[cur.data];
-			if (isNull(curIndex)) return nullptr;
-		}
-	}
-	struct ValidationResult {
-		bool valid = true;
-		std::string error;
-	};
-	// Walks the whole tree and checks:
-	//   1. BF stored == BF recomputed from subtree heights
-	//   2. |BF| <= 1 everywhere
-	//   3. BST ordering property holds
-	//   4. Parent links are consistent
-	ValidationResult validate() const {
-		if (isNull(m_meta.root)) return {};
-		ValidationResult res;
-		validate_impl(m_meta.root, res);
-		return res;
+	FindResult search(const T& val) {
+		FindResult result;
+		u32 nodeIndex = search_impl(val, result.found);
+		if (result) result.value = &m_data[nodeIndex];
+		return result;
 	}
 
-private:
-	// Returns height of subtree rooted at index, or -1 for null.
-	int validate_impl(u32 index, ValidationResult& res) const {
-		if (isNull(index)) return -1;
-		const Node_impl& node = m_nodes[index];
-		// check parent link
-		if (!isNull(node.parent)) {
-			const Node_impl& par = m_nodes[node.parent];
-			if (par.children[0] != index && par.children[1] != index) {
-				res.valid = false;
-				res.error = "Parent link broken at node " + std::to_string(index);
-			}
-		}
-		int lh = validate_impl(node.children[Left], res);
-		int rh = validate_impl(node.children[Right], res);
-		// check BST order
-		if (!isNull(node.children[Left])) {
-			if (!m_cmp(m_data[m_nodes[node.children[Left]].data], m_data[node.data])) {
-				res.valid = false;
-				res.error = "BST violation: left child >= parent at node " + std::to_string(index);
-			}
-		}
-		if (!isNull(node.children[Right])) {
-			if (!m_cmp(m_data[node.data], m_data[m_nodes[node.children[Right]].data])) {
-				res.valid = false;
-				res.error = "BST violation: parent >= right child at node " + std::to_string(index);
-			}
-		}
-		// check BF
-		i8 computedBf = static_cast<i8>(lh - rh); // adjust sign to match your convention
-		i8 storedBf = m_nodemeta[index].bf;
-		if (computedBf != storedBf) {
-			res.valid = false;
-			res.error = "BF mismatch at node " + std::to_string(index) + ": stored=" + std::to_string(storedBf) + " computed=" + std::to_string(computedBf);
-		}
-		if (std::abs(storedBf) > 1) {
-			res.valid = false;
-			res.error = "Balance violation at node " + std::to_string(index) + ": bf=" + std::to_string(storedBf);
-		}
-		return 1 + std::max(lh, rh);
-	}
-	// == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
-public:
+	// void insert(const T& val) {
+	// 	bool found = false;
+	// 	u32 parentIndex = search_impl(val, found);
+	// 	if (found) {
+	// 		// DevNote: Replace / Ignore / Error
+	// 		return; // currently it's ignore semantic
+	// 	}
+	// 	m_data.push_back(val);
+	// 	u32 nodeIndex = makeNewNode_impl();
+
+	// 	if (isNull(parentIndex)) {
+	// 		m_meta.root = nodeIndex;
+	// 		return;
+	// 	}
+
+	// 	// add node
+	// 	m_nodes[nodeIndex].parent = parentIndex;
+	// 	Node_impl& parent = m_nodes[parentIndex];
+	// 	Direction bin = static_cast<Direction>(cmp(parentIndex, val));
+	// 	parent.children[bin] = nodeIndex;
+	// 	// resolve insersion
+	// 	if (isNull(parent.child(other(bin)))) // if the other child is null
+	// 		propagate_impl(parentIndex, binAtParent(nodeIndex, parentIndex), 1); // which means that the height increased
+	// 	else { // as height of parent don't change, only updating bf of parent
+	// 		assert(std::abs(m_nodemeta[parentIndex].bf) != 0);
+	// 		m_nodemeta[parentIndex].bf += binToBf(bin);
+	// 	}
+	// }
+
 	void insert(const T& val) {
 		bool found = false;
 		u32 parentIndex = search_impl(val, found);
@@ -137,26 +95,102 @@ public:
 			// DevNote: Replace / Ignore / Error
 			return; // currently it's ignore semantic
 		}
+		std::cout << "parent is " << parentIndex << '\n';
 		m_data.push_back(val);
 		u32 nodeIndex = makeNewNode_impl();
-
 		if (isNull(parentIndex)) {
 			m_meta.root = nodeIndex;
 			return;
 		}
-
 		// add node
 		m_nodes[nodeIndex].parent = parentIndex;
 		Node_impl& parent = m_nodes[parentIndex];
-		Direction bin = static_cast<Direction>(cmp(parent, val));
+		Direction bin = static_cast<Direction>(cmp(parentIndex, val));
 		parent.children[bin] = nodeIndex;
 		// resolve insersion
-		if (isNull(parent.child(other(bin)))) // if the other child is null
-			insert_impl(nodeIndex); // which means that the height increased
-		else { // as height of parent don't change, only updating bf of parent
+		if (isNull(parent.child(other(bin)))) { // if the other child is null
+			std::cout << "parent was leaf, height changed, propagation begin.\n";
+			propagate_impl(parentIndex, binAtParent(nodeIndex, parentIndex), 1); // which means that the height increased
+		} else { // as height of parent don't change, only updating bf of parent
+			std::cout << "parent have child, no height change, only updating bf of parent.\n";
+			assert(std::abs(m_nodemeta[parentIndex].bf) <= 2);
+			assert(std::abs(m_nodemeta[parentIndex].bf) != 0);
 			m_nodemeta[parentIndex].bf += binToBf(bin);
+			// DevNote: Debug
+			//std::cout << "******************* insert bf: " << (int)m_nodemeta[parentIndex].bf << '\n';
+			assert(std::abs(m_nodemeta[parentIndex].bf) <= 2);
 		}
 	}
+
+
+	void remove(const T& val) {
+		bool found = false;
+		u32 nodeIndex = search_impl(val, found);
+		if (!found) return; // DevNote: maybe throw?
+		delete_impl(nodeIndex);
+	}
+
+
+
+
+
+	// debug
+
+	struct indent_t {
+		u32 val;
+	};
+	static indent_t indent(u32 indent) {
+		return indent_t{ indent };
+	}
+	friend std::ostream& operator<<(std::ostream& os, indent_t indent) {
+		for (u32 i = 0; i < indent.val; i++) {
+			os << ' ';
+		}
+		return os;
+	}
+
+
+
+	void printNode(u32 nodeIndex, std::ostream& os = std::cout, u32 in_indent = 0) {
+		os << indent(in_indent) << "-------------------------- node [" << nodeIndex << "] status \n";
+		if (m_nodes.size() <= nodeIndex) {
+			os << indent(in_indent) << "Not yet created.\n";
+			return;
+		}
+		Node_impl node = m_nodes[nodeIndex];
+		os << indent(in_indent) << "Parent: " << node.parent << '\n'
+		   << indent(in_indent) << "LeftChild: " << node.child(Direction::Left)
+		   << "(Height: " << getHeight(node.child(Direction::Left)) << ")\n"
+		   << indent(in_indent) << "RightChild: " << node.child(Direction::Right)
+		   << "(Height: " << getHeight(node.child(Direction::Right)) << ")\n"
+		   << indent(in_indent) << "bf: " << (int)m_nodemeta[nodeIndex].bf << '\n';
+	}
+	void printTree(u32 nodeIndex, std::ostream& os = std::cout, u32 in_indent = 0) {
+		printNode(nodeIndex, os, in_indent);
+		if (!isNull(m_nodes[nodeIndex].child(Direction::Left)))
+			printNode(m_nodes[nodeIndex].child(Direction::Left), os, in_indent + 4);
+		if (!isNull(m_nodes[nodeIndex].child(Direction::Right)))
+			printNode(m_nodes[nodeIndex].child(Direction::Right), os, in_indent + 4);
+	}
+	void printTreeRecursive(u32 nodeIndex, std::ostream& os = std::cout, u32 in_indent = 0) {
+		printNode(nodeIndex, os, in_indent);
+		if (!isNull(m_nodes[nodeIndex].child(Direction::Left)))
+			printTreeRecursive(m_nodes[nodeIndex].child(Direction::Left), os, in_indent + 4);
+		if (!isNull(m_nodes[nodeIndex].child(Direction::Right)))
+			printTreeRecursive(m_nodes[nodeIndex].child(Direction::Right), os, in_indent + 4);
+	}
+	void printAll(std::ostream& os = std::cout) {
+		printTreeRecursive(m_meta.root, os);
+	}
+
+	u32 getHeight(u32 nodeIndex) {
+		if (isNull(nodeIndex)) return 0;
+		u32 leftHeight = getHeight(m_nodes[nodeIndex].child(Direction::Left));
+		u32 rightHeight = getHeight(m_nodes[nodeIndex].child(Direction::Right));
+
+		return std::max(leftHeight, rightHeight) + 1;
+	}
+
 
 private:
 	// just treat this as boolean / bin (binary) in general
@@ -170,20 +204,18 @@ private:
 	};
 
 	struct Node_impl {
-		Node_impl() = default;
-		Node_impl(u32 in_data) : data(in_data), parent(null), children({ null, null }) {}
-		u32 data, parent; // data have to not be null at all time
+		Node_impl() : parent(null), children({ null, null }) {}
+		u32 parent; // data have to not be null at all time
 		std::array<u32, 2> children; // first one is left, second is right
 
 		u32& child(Direction dir) { return children[dir]; }
 		u32 child(Direction dir) const { return children[dir]; }
 
 		/**
-		 * There way node (parent + 2 children)
-		 * Plus data ptr
+		 * Three way node (parent + 2 children)
 		 */
 	};
-	// Balance Factors (SoA to save memory so Node_impl don't become 20 bytes)
+	// Balance Factors (SoA to save memory so Node_impl don't become 16 bytes)
 	struct NodeMeta_impl {
 		i8 bf;
 	};
@@ -211,8 +243,14 @@ private:
 		u32 parentIndex = node.parent;
 		Node_impl& parent = m_nodes[parentIndex];
 
+		std::cout << "Rotation: Node: " << nodeIndex << '\n';
+		std::cout << "Rotation: Parent: " << parentIndex << '\n';
+
 		i8 oldNodeBf = m_nodemeta[nodeIndex].bf;
 		i8 oldParentBf = m_nodemeta[parentIndex].bf;
+
+		assert(std::abs(m_nodemeta[nodeIndex].bf) <= 3);
+		assert(std::abs(m_nodemeta[parentIndex].bf) <= 3);
 
 		if (dir == Left) {
 			m_nodemeta[parentIndex].bf = oldParentBf - 1 - std::max(i8{ 0 }, oldNodeBf);
@@ -221,6 +259,7 @@ private:
 			m_nodemeta[parentIndex].bf = oldParentBf + 1 - std::min(i8{ 0 }, oldNodeBf);
 			m_nodemeta[nodeIndex].bf = oldNodeBf + 1 + std::max(i8{ 0 }, m_nodemeta[parentIndex].bf);
 		}
+
 		/**
 		 * using example for right rotation `parent`:
 		 * `m_nodemeta[parentIndex].bf = oldParentBf + 1 - std::min(i8{ 0 }, oldNodeBf);`
@@ -246,6 +285,7 @@ private:
 
 		// connect child to parent
 		u32 childIndex = node.child(other(dir));
+		std::cout << "Rotation: child: " << childIndex << '\n';
 		if (!isNull(childIndex)) {
 			Node_impl& child = m_nodes[childIndex];
 			parent.child(dir) = childIndex;
@@ -256,9 +296,10 @@ private:
 
 		// connect node to grand
 		u32 grandIndex = parent.parent;
+		std::cout << "Rotation: grand: " << grandIndex << '\n';
 		if (!isNull(grandIndex)) {
 			Node_impl& grand = m_nodes[grandIndex];
-			u32 grandChildIndex = binAtParent(parentIndex);
+			Direction grandChildIndex = binAtParent(parentIndex);
 			grand.child(static_cast<Direction>(grandChildIndex)) = nodeIndex;
 			node.parent = grandIndex;
 		} else { // parent orginally is root - change note to root
@@ -274,8 +315,9 @@ private:
 
 	/**
 	 * call on the node that is imbalance
+	 * @return the index of the node that replaces the position of param `index`
 	 */
-	void balance_impl(u32 index) {
+	u32 balance_impl(u32 index) {
 		u32 nodeIndex = index;
 		Node_impl node = m_nodes[nodeIndex];
 		i8 nodeBf = m_nodemeta[nodeIndex].bf;
@@ -285,19 +327,31 @@ private:
 		Node_impl child = m_nodes[childIndex];
 		i8 childBf = m_nodemeta[childIndex].bf;
 
+		assert(std::abs(nodeBf) <= 3);
+		assert(std::abs(childBf) <= 2);
+
 		// target is the nodeIndex of the node that will be the root after the
 		// rotations.
 		if (different(nodeBf, childBf)) { // double rotation
+			std::cout << "Balance: Double Rotation\n";
 			u32 target = child.child(other(direction));
 			// opposite direction rotation
 			rotate_impl(other(direction), target);
 			// direction rotation
 			rotate_impl(direction, target);
 
+			assert(std::abs(m_nodemeta[target].bf) <= 2);
+
+			return target;
 		} else { // single rotation
+			std::cout << "Balance: Single Rotation\n";
 			u32 target = childIndex;
 			// direction rotate for the target child of node
 			rotate_impl(direction, target);
+
+			assert(std::abs(m_nodemeta[target].bf) <= 2);
+
+			return target;
 		}
 	}
 
@@ -313,9 +367,9 @@ private:
 		while (true) {
 			const Node_impl& cur = m_nodes[curIndex];
 			u32 nxt;
-			if (cmp(val, cur)) { // left
+			if (pmc(curIndex, val)) { // left
 				nxt = cur.child(Direction::Left);
-			} else if (cmp(cur, val)) { // right
+			} else if (cmp(curIndex, val)) { // right
 				nxt = cur.child(Direction::Right);
 			} else { // equal
 				nxt = null;
@@ -328,68 +382,319 @@ private:
 				curIndex = nxt;
 		}
 	}
-	/**
-	 * Technically it's `resolveInsertion` / `rebalance`,
-	 * but named `insert_impl` just for naming alignment.
-	 * Should be ran after insertion, where the last element of m_nodes is
-	 * the newly inserted node.
+	/** 
+	 * Backward propagation
 	 * 
 	 * This function is responsible of updating the bf, and
 	 * perform potensial rotations
 	 * 
-	 * The purpose of this separation is to isolate the value from the AVL logic
+	 * Note: don't require the object of nodeIndex still alive, but require the
+	 * object of parentIndex still alive
 	 * 
-	 * @param index the index of the node that just got inserted
+	 * @param parentIndex the node that is affected by the operation, the 
+	 * parent of the node that just changed (inserted or deleted)
+	 * @param nodePosition the bin of `node` in `parent`
+	 * @param bfDiff the indicater of propagation type:
+	 * 1 is insertion, -1 is deletion
 	 */
-	void insert_impl(u32 index) {
-		u32 prevIndex = index;
-		u32 curIndex = m_nodes[index].parent;
+	void propagate_impl(u32 parentIndex, Direction nodePosition, i8 bfDiff) {
+		// cur is the parent
+		u32 curIndex = parentIndex;
+		Direction prevBin = nodePosition;
 
 		while (true) {
 			// update bf
 			i8& curBf = m_nodemeta[curIndex].bf;
-			curBf += binToBf(binAtParent(prevIndex));
+			assert(std::abs(curBf) <= 2);
+			curBf += bfDiff * binToBf(prevBin);
 
-			// if perfect balance
-			// early return, because that means the newly inserted node had
-			// filled up a slot in the tree
-			if (curBf == 0) return;
+			std::cout << "Propagation: accessing " << curIndex << '\n';
+
+			// update indices for next iteration
+			u32 prevIndex = curIndex;
+
+			// early return for deletion:
+			// when bf is -1 or 1, there is no height change, because the
+			// deletion is already consumed. (it deletes one of cur's child,
+			// who has 2 children or in another word, decreased one of cur's
+			// child's height leaving a non-perfect (!= 0) bf)
+			if (bfDiff == -1 && isBalanced(curBf) && curBf != 0) {
+				return;
+			};
+
+			// early return for insertion:
+			// when curBf is 0 it is perfect balance, and means the newly
+			// inserted node had filled up a slot in the tree
+			//if (bfDiff == 1 && curBf == 0) return;
 
 			// if imbalance
 			// trigger rebalance
 			if (!isBalanced(curBf)) {
-				balance_impl(curIndex); // rebalance
-				return;
+				std::cout << "Propagation: imbalance node: " << curIndex << "; Balancing...\n";
+
+				u32 root = balance_impl(curIndex); // rebalance
+
+				assert(std::abs(m_nodemeta[root].bf) <= 2);
+
+				// early return for insertion:
 				// return immediately after rebalance, because rebalance will
 				// reduce the increased height, pull the height back to what it
 				// started with.
+				//
+				// But for deletion, since rebalance will garantee to decrease
+				// the height by 1, the propagation have to continue to the root
+				if (bfDiff == 1)
+					return;
+				else {
+					// early return for deletion (same as before)
+					if (m_nodemeta[root].bf != 0) return;
+					// update the prevIndex to adapt the rotated structure
+					if (root == m_meta.root) return;
+					prevIndex = root;
+					curIndex = m_nodes[root].parent;
+					prevBin = binAtParent(prevIndex, curIndex);
+					continue;
+					// the deletion propagation continues
+				}
 			}
 
 			// update indices for next iteration
 			if (curIndex == m_meta.root) return;
-			prevIndex = curIndex;
 			curIndex = m_nodes[curIndex].parent;
+			prevBin = binAtParent(prevIndex, curIndex);
+		}
+	}
+
+	/**
+	 * for deletion - find the node to swap up to become the new root
+	 * should only be called for node that have children, therefore the impl
+	 * assumes children exist
+	 * 
+	 * convension: minimum bigger node / maximum smaller node (low priority)
+	 *                                   <- this one is only used when `node`
+	 *                                      have no right child
+	 * 
+	 * logic: go one node in direction, then go inv direction until can go no
+	 * more
+	 * 
+	 * @return the index of the closest node from target
+	 */
+	u32 findClosest_impl(u32 nodeIndex) const {
+		const Node_impl& node = m_nodes[nodeIndex];
+		if (isNull(node.child(Direction::Right))) {
+			// fallback (when there's no right child)
+			// return left directly, since left cannot have any child (or it
+			// would be imbalance)
+			return node.child(Direction::Left);
+		} else {
+			// normal search
+			u32 curIndex = node.child(Direction::Right);
+			u32 nxtIndex = m_nodes[curIndex].child(Direction::Left);
+			while (!isNull(nxtIndex)) {
+				curIndex = nxtIndex;
+				nxtIndex = m_nodes[curIndex].child(Direction::Left);
+			}
+			return curIndex;
+		}
+	}
+
+	/**
+	 * AVL delete
+	 * The pipeline:
+	 * 1. if target node is leaf, just delete it and start the propagation
+	 * 2. else: there is child to this node. find the node in it's child nodes
+	 * to swap with (to replace the removing node)
+	 * 3. connect all reference of target node to found swapping node
+	 * 4. delete (in memory) the target node
+	 * 5. resolve child of swaping node (connect to swaping node's parent)
+	 * 
+	 * There are 4 cases in deletion:
+	 * 1. target is leaf - easy leaf delete
+	 * 2. target is tree, and swapper have a parent that's not target
+	 * 3. target is tree, and swapper is the left child of target
+	 * 4. traget is tree, and swapper is the right child of target
+	 */
+	void delete_impl(u32 nodeIndex) {
+		const Node_impl& node = m_nodes[nodeIndex]; // target
+		std::cout << "*********************** Deletion: deleting node " << nodeIndex << '\n';
+
+		// case 1: target is leaf
+		if (isNull(node.children[0]) &&
+		    isNull(node.children[1])) {
+			// DevNote: Debug
+			std::cout << "*********************** Deletion: Case 1\n";
+
+			u32 parentIndex = node.parent;
+			if (isNull(parentIndex)) {
+				m_meta.root = null;
+			} else {
+				// unlink
+				Direction nodeBin = binAtParent(nodeIndex, parentIndex);
+				m_nodes[parentIndex].child(nodeBin) = null;
+
+				propagate_impl(parentIndex, nodeBin, -1);
+			}
+			deleteNode_impl(nodeIndex);
+			return;
+		}
+
+		u32 swapperIndex = findClosest_impl(nodeIndex);
+		Node_impl& swapper = m_nodes[swapperIndex];
+		u32 swapperParentIndex = swapper.parent;
+
+		u32 nodeParentIndex = node.parent;
+
+		if (swapperParentIndex != nodeIndex) {
+			// case 2: target is tree, and swapper have a parent that's not target
+			// In this case, swapper have at most one right child:
+			// Since there is no left child (findClosest reached the end) of
+			// swapper, to be balance the maximum number of height swapper can have
+			// on right it 1.
+
+			// DevNote: Debug
+			std::cout << "*********************** Deletion: Case 2\n";
+
+			Direction swapperBin = binAtParent(swapperIndex, swapperParentIndex);
+
+			// resolve swapper's child - it will replace swapper's place
+			u32 swapperChildIndex = swapper.child(Direction::Right);
+			// if swapperChildIndex is null then swapper is leaf, no child,
+			// swapperParent point to null. Otherwise swapperParent points to
+			// swapperChild
+			m_nodes[swapperParentIndex].child(swapperBin) = swapperChildIndex;
+			if (!isNull(swapperChildIndex)) {
+				m_nodes[swapperChildIndex].parent = swapperParentIndex;
+			}
+
+			moveNode(nodeIndex, swapperIndex);
+			// invalidating Node_impl& swapper.
+			// -- comment requested by Claude
+
+			propagate_impl(swapperParentIndex, swapperBin, -1);
+			deleteNode_impl(nodeIndex);
+			return;
+		}
+
+		if (binAtParent(swapperIndex, nodeIndex) == Direction::Left) {
+			// case 3: target is tree, and swapper is the left child of target
+			// In this case, swapper have to be a leaf:
+			// Since there is no right child in node, if swapper have child, it
+			// will be an imbalance
+
+			// DevNote: Debug
+			std::cout << "*********************** Deletion: Case 3\n";
+
+			if (isNull(nodeParentIndex)) { // node is root
+				swapper.parent = null;
+				m_meta.root = swapperIndex;
+			} else {
+				Direction nodeBin = binAtParent(nodeIndex, nodeParentIndex);
+
+				swapper.parent = nodeParentIndex;
+				m_nodes[nodeParentIndex].child(nodeBin) = swapperIndex;
+
+				propagate_impl(nodeParentIndex, nodeBin, -1);
+			}
+
+			deleteNode_impl(nodeIndex);
+		} else {
+			// case 4: traget is tree, and swapper is the right child of target
+			// In this case, swapper have at most one right child:
+			// Since there is no left child in swapper, the max height of swapper is
+			// 2.
+			// And the other branch could have a maximum height of 3.
+
+			// DevNote: Debug
+			std::cout << "*********************** Deletion: Case 4\n";
+
+			// update swapper (new root)'s bf
+			// + 1 for the decrease on right child
+			i8& bf = m_nodemeta[swapperIndex].bf;
+			assert(std::abs(bf) <= 2);
+			bf = m_nodemeta[nodeIndex].bf + 1;
+
+			// connect potential left child of node to swapper
+			u32 nodeChildIndex = node.child(Direction::Left);
+			if (!isNull(nodeChildIndex)) {
+				Node_impl& nodeChild = m_nodes[nodeChildIndex];
+				nodeChild.parent = swapperIndex;
+				swapper.child(Direction::Left) = nodeChildIndex;
+			}
+
+			// at this point: the individual tree is ready, but potential
+			// imbalance exists - solve potential imbalance
+			u32 rootIndex = swapperIndex;
+			if (!isBalanced(bf)) {
+				rootIndex = balance_impl(swapperIndex);
+			}
+			Node_impl& root = m_nodes[rootIndex];
+
+			// replace swapper to node (connect to node's parent)
+			if (isNull(nodeParentIndex)) { // node is root
+				root.parent = null;
+				m_meta.root = rootIndex;
+			} else {
+				Direction nodeBin = binAtParent(nodeIndex, nodeParentIndex);
+
+				root.parent = nodeParentIndex;
+				m_nodes[nodeParentIndex].child(nodeBin) = rootIndex;
+
+				// Propagation is not certain here. Wether height will change
+				// depends on what bf of the node is.
+				// if original is left heavy (1), decrease right height will
+				// balance it (become 0);
+				// if original is right heavy (-1), decrease right height will
+				// create imbalance, which then the balance_impl() will decrease
+				// the height - since by definition balance_impl() decrease
+				// height by 1.
+				// If it was balanced, decrease right height will just make it
+				// into 1 without height change, since the other child's branch
+				// remains the same height, keeping the overall height the same
+				if (m_nodemeta[nodeIndex].bf != 0)
+					propagate_impl(nodeParentIndex, nodeBin, -1);
+			}
+
+			deleteNode_impl(nodeIndex);
 		}
 	}
 
 
-
+	// memory oriented helpers
 
 	// called immediately after pushing a new element in m_data
 	u32 makeNewNode_impl() {
-		m_nodes.push_back(Node_impl(m_data.size() - 1));
+		m_nodes.push_back(Node_impl{});
 		m_nodemeta.push_back(NodeMeta_impl{ 0 });
 		return m_nodes.size() - 1;
+	}
+
+	/**
+	 * uses swap-to-back trick
+	 * this is just memory operations and handling the index mismatch caused
+	 * by the swap
+	 * The old references of nodeIndex is not accounted
+	 */
+	void deleteNode_impl(u32 nodeIndex) {
+		u32 src = m_nodes.size() - 1;
+		// perform actual deletion
+		if (nodeIndex < src) { // not already at back
+			// move but not swap to save potential move assignemnt overhead
+			// since the moving to back data is already deprecated
+			m_data[nodeIndex] = std::move(m_data.back());
+			moveNode(src, nodeIndex);
+		}
+		m_data.pop_back();
+		m_nodes.pop_back();
+		m_nodemeta.pop_back();
 	}
 
 
 	// helper functions
 
 	static bool isNull(u32 index) { return index == null; }
-	bool cmp(const Node_impl& node, const T& val) const { return m_cmp(m_data[node.data], val); }
-	bool cmp(const T& val, const Node_impl& node) const { return m_cmp(val, m_data[node.data]); }
+	bool cmp(u32 nodeIndex, const T& val) const { return m_cmp(m_data[nodeIndex], val); }
+	bool pmc(u32 nodeIndex, const T& val) const { return m_cmp(val, m_data[nodeIndex]); } // reverse of cmp
 	bool isSame(const T& a, const T& b) const { return !m_cmp(a, b) && !m_cmp(b, a); }
-	bool isSame(const Node_impl& node, const T& val) const { return isSame(m_data[node.data], val); }
 
 	static bool isBalanced(i8 bf) { return std::abs(bf) <= 1; }
 	static Direction bfToBin(i8 bf) { return bf < 0 ? Direction::Right : Direction::Left; }
@@ -402,8 +707,42 @@ private:
 		//return m_nodes[m_nodes[nodeIndex].parent].children[1] == nodeIndex ? Direction::Right : Direction::Left;
 		return static_cast<Direction>(m_nodes[m_nodes[nodeIndex].parent].children[1] == nodeIndex);
 	}
+	Direction binAtParent(u32 nodeIndex, u32 parentIndex) const { // provided parentIndex to avoid access of nodeIndex
+		return static_cast<Direction>(m_nodes[parentIndex].children[1] == nodeIndex);
+	}
 	static Direction other(Direction val) { return val == Direction::Right ? Direction::Left : Direction::Right; }
+	void moveNode_meta(u32 src, u32 dest) {
+		m_nodes[dest] = m_nodes[src];
+		m_nodemeta[dest] = m_nodemeta[src];
+	}
+	void moveNode_ref(u32 src, u32 dest) {
+		const Node_impl& node = m_nodes[src];
+
+		u32 parentIndex = node.parent;
+		u32 child0Index = node.children[0];
+		u32 child1Index = node.children[1];
+		if (!isNull(parentIndex))
+			m_nodes[parentIndex].child(
+			    binAtParent(src, parentIndex)) = dest;
+		else
+			m_meta.root = dest;
+		if (!isNull(child0Index))
+			m_nodes[child0Index].parent = dest;
+		if (!isNull(child1Index))
+			m_nodes[child1Index].parent = dest;
+	}
+	void moveNode(u32 src, u32 dest) {
+		moveNode_ref(src, dest);
+		moveNode_meta(src, dest);
+	}
 };
-
-
 } // namespace tx
+
+/**
+ * TODO:
+ * - separate insert core logic out from insert to insert_impl
+ *   - T&& insert support
+ * - merge support
+ * - foreach support
+ * - conflict action traits
+ */
