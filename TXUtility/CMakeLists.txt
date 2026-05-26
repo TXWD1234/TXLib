@@ -27,7 +27,7 @@ target_compile_features(TXUtility INTERFACE cxx_std_20)
 
 target_link_libraries(TXUtility INTERFACE
 	TXMath
-	TXData	
+	TXData
 )
 
 target_include_directories(TXUtility INTERFACE

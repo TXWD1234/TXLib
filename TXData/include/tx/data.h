@@ -9,6 +9,7 @@
 #include "impl/value_group.hpp"
 #include "impl/circular_queue.hpp"
 #include "impl/avl_tree.hpp"
+#include "impl/static_grow_arr.hpp"
 
 /**
  * Terminology:
