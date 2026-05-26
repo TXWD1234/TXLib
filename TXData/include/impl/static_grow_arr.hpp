@@ -40,9 +40,13 @@ public:
 	                   static_cast<T*>(::operator new(
 	                       capacity * sizeof(T), std::align_val_t{ alignof(T) }))),
 	      m_size(0), m_capacity(capacity), m_ownsMemory(ptr == nullptr) {}
-	StaticGrowArr(ConstIt_t begin, ConstIt_t end)
-	    : m_data(std::to_address(begin)),
-	      m_size(0), m_capacity(std::distance(begin, end)), m_ownsMemory(false) {}
+	/**
+	 * @param buffer the provided storage memory buffer
+	 * Note that this constructorcan only result a non-owning object
+	 */
+	StaticGrowArr(std::span<T> buffer)
+	    : m_data(buffer.data()),
+	      m_size(0), m_capacity(buffer.size()), m_ownsMemory(false) {}
 	~StaticGrowArr() {
 		this->free_impl();
 	}
@@ -70,6 +74,9 @@ public:
 	u32 size() const { return m_size; }
 	u32 capacity() const { return m_capacity; }
 	bool empty() const { return m_size == 0; }
+
+	T* data() { return m_data; }
+	const T* data() const { return m_data; }
 
 	void resize(u32 newSize) {
 		assert_impl([&]() { return newSize <= m_capacity; }, "requested newSize overflows capacity.");
