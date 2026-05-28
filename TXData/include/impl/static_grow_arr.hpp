@@ -3,27 +3,46 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include "impl/data_utils.hpp"
 #include "tx/type_traits.hpp"
 #include <span>
 #include <stdexcept>
 #include <memory>
+#include <type_traits>
 
 namespace tx {
 
 // this is scheduled to move to TXFoundation immediately after TXLib structural refactor
 #ifdef NDEBUG
-inline constexpr const bool debug = false;
+inline constexpr const bool enabled_debug = false;
 #else
-inline constexpr const bool debug = true;
+inline constexpr const bool enabled_debug = true;
 #endif
+
+#ifdef __cpp_exceptions
+inline constexpr const bool enabled_exception = true;
+#else
+inline constexpr const bool enabled_exception = false;
+#endif
+
+template <tx::invocable_r<bool> Expr>
+inline static void assert_impl(Expr&& expr, const char* message) {
+	if constexpr (enabled_debug && enabled_exception) {
+		if (!expr()) [[unlikely]]
+			throw std::runtime_error(message);
+	}
+}
+
+
 
 // std::vector but fixed capacity
 // copy is disabled, this class is move-only
 template <class T>
 class StaticGrowArr {
 private:
-	using It_t = std::conditional_t<debug, typename std::span<T>::iterator, T*>;
-	using ConstIt_t = std::conditional_t<debug, typename std::span<T>::const_iterator, const T*>;
+	// using std::span's iterator for debug build bound check assertion
+	using It_t = typename std::span<T>::iterator;
+	using ConstIt_t = typename std::span<T>::const_iterator;
 
 public:
 	using iterator = It_t;
@@ -87,6 +106,45 @@ public:
 		}
 		m_size = newSize;
 	}
+	// resize but don't zero init PODs
+	// exist only for performance
+	void resize_no_zero_init(u32 newSize) {
+		assert_impl([&]() { return newSize <= m_capacity; }, "requested newSize overflows capacity.");
+		if (newSize < m_size) {
+			std::destroy(m_data + newSize, m_data + m_size);
+		} else {
+			std::uninitialized_default_construct(m_data + m_size, m_data + newSize);
+		}
+		m_size = newSize;
+	}
+
+	It_t erase(ConstIt_t it) {
+		u32 index = findIteratorIndex(this->cbegin(), it);
+		assert_impl([&]() { return index < m_size; }, "StaticGrowArr::erase() subscript out of range.");
+		It_t mit = this->begin() + index; // mutable it
+		m_size--;
+		if (index != m_size)
+			std::move(mit + 1, this->end(), mit);
+		std::destroy_at(m_data + m_size);
+		return mit;
+	}
+	It_t erase(ConstIt_t begin, ConstIt_t end) {
+		u32 indexBegin = findIteratorIndex(this->cbegin(), begin);
+		u32 indexEnd = findIteratorIndex(this->cbegin(), end);
+		assert_impl([&]() { return indexBegin < m_size && indexEnd <= m_size; }, "StaticGrowArr::erase() subscript out of range.");
+		assert_impl([&]() { return indexBegin < indexEnd; }, "StaticGrowArr::erase() begin is greater then end.");
+		It_t mbegin = this->begin() + indexBegin; // mutable begin
+		It_t mend = this->begin() + indexEnd; // mutable end
+		u32 eraseSize = static_cast<u32>(std::distance(begin, end));
+		if (indexEnd == m_size)
+			std::destroy(mbegin, mend);
+		else {
+			std::move(mend, this->end(), mbegin);
+			std::destroy(m_data + m_size - eraseSize, m_data + m_size);
+		}
+		m_size -= eraseSize;
+		return mbegin;
+	}
 
 	void clear() {
 		std::destroy(m_data, m_data + m_size);
@@ -141,24 +199,27 @@ public:
 		return *(m_data + m_size - 1);
 	}
 
-	It_t begin() { return It_t{ m_data }; }
-	ConstIt_t begin() const { return ConstIt_t{ m_data }; }
-	It_t end() { return It_t{ m_data + m_size }; }
-	ConstIt_t end() const { return ConstIt_t{ m_data + m_size }; }
+
+	std::span<T> span() { return std::span<T>(m_data, m_size); }
+	std::span<const T> span() const { return std::span<const T>(m_data, m_size); }
+
+	It_t begin() { return span().begin(); }
+	ConstIt_t begin() const { return std::span<T>(m_data, m_size).cbegin(); }
+	It_t end() { return span().end(); }
+	ConstIt_t end() const { return std::span<T>(m_data, m_size).cend(); }
+	ConstIt_t cbegin() const { return std::span<T>(m_data, m_size).cbegin(); }
+	ConstIt_t cend() const { return std::span<T>(m_data, m_size).cend(); }
+
+	// have to inline the `span()` function for `ConstIt_t begin() const` and
+	// `ConstIt_t begin() const` because they cannot call normal `span()`,
+	// meanwhile `span() const` should return `std::span<const T>`, which is a
+	// different type then `std::span<T>`
 
 private:
 	T* m_data;
 	u32 m_size,
 	    m_capacity;
 	bool m_ownsMemory;
-
-	template <tx::invocable_r<bool> Expr>
-	inline static void assert_impl(Expr&& expr, const char* message) {
-		if constexpr (debug) {
-			if (!expr()) [[unlikely]]
-				throw std::runtime_error(message);
-		}
-	}
 
 	void null_impl() {
 		m_data = nullptr;

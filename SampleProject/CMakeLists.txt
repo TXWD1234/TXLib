@@ -32,7 +32,7 @@ target_include_directories(TXProject PRIVATE
 )
 
 # project settings
-target_compile_features(TXProject PUBLIC cxx_std_20)
+target_compile_features(TXProject PUBLIC cxx_std_23)
 
 # dependencies
 target_link_libraries(TXProject PRIVATE 
