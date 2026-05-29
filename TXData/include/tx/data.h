@@ -10,6 +10,7 @@
 #include "impl/circular_queue.hpp"
 #include "impl/avl_tree.hpp"
 #include "impl/static_grow_arr.hpp"
+#include "impl/basic_storage.hpp"
 
 /**
  * Terminology:
