@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include "impl/data_utils.hpp" // include for the exception
 #include <span>
 #include <concepts>
 
@@ -74,13 +75,57 @@ public:
 		            m_size - m_begin + m_end :
 		            m_end - m_begin);
 	}
+	u32 capacity() const { return m_size; }
 
-protected:
+	// data getters
+
+	T& front() { return *(m_data + m_begin); }
+	const T& front() const { return *(m_data + m_begin); }
+	T& back() { return *(m_data + m_end); }
+	const T& back() const { return *(m_data + m_end); }
+
+private:
 	T* m_data;
 	u32 m_size;
 	u32 m_begin = 0, m_end = 0;
 	bool m_wrap = false;
 
+	T& at_impl(u32 index) {
+		return *(m_data + index);
+	}
+
+	void push_impl() {
+		m_end++;
+		if (m_end == m_size) {
+			m_end = 0; // wrapping logic
+			m_wrap = true;
+		}
+	}
+	void pop_impl() {
+		m_begin++;
+		if (m_begin == m_size) {
+			m_begin = 0; // wrapping logic
+			m_wrap = false;
+		}
+	}
+
+	template <std::invocable<T&> Func>
+	void foreach_impl(Func&& f) {
+		if (m_wrap) {
+			for (u32 i = m_begin; i < m_size; i++) {
+				f(at_impl(i));
+			}
+			for (u32 i = 0; i < m_end; i++) {
+				f(at_impl(i));
+			}
+		} else {
+			for (u32 i = m_begin; i < m_end; i++) {
+				f(at_impl(i));
+			}
+		}
+	}
+
+protected:
 	void null_impl() {
 		m_data = nullptr;
 		m_size = 0;
@@ -126,42 +171,6 @@ protected:
 	void destruct_impl() {
 		clear();
 	}
-
-private:
-	T& at_impl(u32 index) {
-		return *(m_data + index);
-	}
-
-	void push_impl() {
-		m_end++;
-		if (m_end == m_size) {
-			m_end = 0; // wrapping logic
-			m_wrap = true;
-		}
-	}
-	void pop_impl() {
-		m_begin++;
-		if (m_begin == m_size) {
-			m_begin = 0; // wrapping logic
-			m_wrap = false;
-		}
-	}
-
-	template <std::invocable<T&> Func>
-	void foreach_impl(Func&& f) {
-		if (m_wrap) {
-			for (u32 i = m_begin; i < m_size; i++) {
-				f(at_impl(i));
-			}
-			for (u32 i = 0; i < m_end; i++) {
-				f(at_impl(i));
-			}
-		} else {
-			for (u32 i = m_begin; i < m_end; i++) {
-				f(at_impl(i));
-			}
-		}
-	}
 };
 
 template <class T>
@@ -179,7 +188,7 @@ public:
 
 	CircularQueue(const CircularQueue<T>& other)
 	    : CircularQueueOverlay<T>(
-	          allocate<T>(other.m_size), other.m_size) {
+	          allocate<T>(other.capacity()), other.capacity()) {
 		copy_impl(other);
 	}
 	CircularQueue(CircularQueue<T>&& other) : CircularQueueOverlay<T>(other) {
