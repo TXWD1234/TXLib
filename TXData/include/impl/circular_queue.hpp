@@ -41,25 +41,43 @@ public:
 	// basic operations
 
 	void push(const T& val) {
-		at_impl(m_end) = val;
+		assert_impl([&]() { return !full(); },
+		            "tx::CircularQueueOverlay::push(): called on full buffer");
+		std::construct_at(m_data + m_end, val);
 		push_impl();
 	}
 	void push(T&& val) {
-		at_impl(m_end) = std::move(val);
+		assert_impl([&]() { return !full(); },
+		            "tx::CircularQueueOverlay::push(): called on full buffer");
+		std::construct_at(m_data + m_end, std::move(val));
+		push_impl();
+	}
+	template <class... Args>
+	void emplace(Args&&... args) {
+		assert_impl([&]() { return !full(); },
+		            "tx::CircularQueueOverlay::emplace(): called on full buffer");
+		std::construct_at(m_data + m_end, std::forward<Args>(args)...);
 		push_impl();
 	}
 
 	void pop() {
-		if constexpr (!std::is_trivial_v<T>) {
-			at_impl(m_begin) = T{};
-		}
+		std::destroy_at(m_data + m_begin);
 		pop_impl();
 	}
 
 	void clear() {
-		foreach_impl([&](T& val) {
-			val = T{};
-		});
+		if (m_wrap) {
+			std::destroy(
+			    m_data + m_begin,
+			    m_data + m_size);
+			std::destroy(
+			    m_data,
+			    m_data + m_end);
+		} else {
+			std::destroy(
+			    m_data + m_begin,
+			    m_data + m_end);
+		}
 
 		m_begin = 0;
 		m_end = 0;
@@ -77,12 +95,31 @@ public:
 	}
 	u32 capacity() const { return m_size; }
 
+	T* data() { return m_data; }
+	const T* data() const { return m_data; }
+
 	// data getters
 
-	T& front() { return *(m_data + m_begin); }
-	const T& front() const { return *(m_data + m_begin); }
-	T& back() { return *(m_data + m_end); }
-	const T& back() const { return *(m_data + m_end); }
+	T& front() {
+		assert_impl([&]() { return !empty(); },
+		            "tx::CircularQueueOverlay::front(): called on empty buffer");
+		return *(m_data + m_begin);
+	}
+	const T& front() const {
+		assert_impl([&]() { return !empty(); },
+		            "tx::CircularQueueOverlay::front(): called on empty buffer");
+		return *(m_data + m_begin);
+	}
+	T& back() {
+		assert_impl([&]() { return !empty(); },
+		            "tx::CircularQueueOverlay::back(): called on empty buffer");
+		return *(m_data + m_end - 1);
+	}
+	const T& back() const {
+		assert_impl([&]() { return !empty(); },
+		            "tx::CircularQueueOverlay::back(): called on empty buffer");
+		return *(m_data + m_end - 1);
+	}
 
 private:
 	T* m_data;
