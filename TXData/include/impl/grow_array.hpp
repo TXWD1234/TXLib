@@ -120,26 +120,26 @@ public:
 
 	void push_back(const T& val) {
 		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::push_back(): called on full StaticGrowArr.");
+		            "tx::GrowArrayOverlay::push_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, val);
 		m_size++;
 	}
 	void push_back(T&& val) {
 		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::push_back(): called on full StaticGrowArr.");
+		            "tx::GrowArrayOverlay::push_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, std::move(val));
 		m_size++;
 	}
 	template <class... Args>
 	void emplace_back(Args&&... args) {
 		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::emplace_back(): called on full StaticGrowArr.");
+		            "tx::GrowArrayOverlay::emplace_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, std::forward<Args>(args)...);
 		m_size++;
 	}
 	void pop_back() {
 		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::pop_back(): called on empty StaticGrowArr.");
+		            "tx::GrowArrayOverlay::pop_back(): called on empty buffer.");
 		m_size--;
 		std::destroy_at(m_data + m_size);
 	}
@@ -157,22 +157,22 @@ public:
 
 	T& front() {
 		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::front(): called on empty StaticGrowArr.");
+		            "tx::GrowArrayOverlay::front(): called on empty buffer.");
 		return *m_data;
 	}
 	const T& front() const {
 		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::front(): called on empty StaticGrowArr.");
+		            "tx::GrowArrayOverlay::front(): called on empty buffer.");
 		return *m_data;
 	}
 	T& back() {
 		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::back(): called on empty StaticGrowArr.");
+		            "tx::GrowArrayOverlay::back(): called on empty buffer.");
 		return *(m_data + m_size - 1);
 	}
 	const T& back() const {
 		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::back(): called on empty StaticGrowArr.");
+		            "tx::GrowArrayOverlay::back(): called on empty buffer.");
 		return *(m_data + m_size - 1);
 	}
 
@@ -206,6 +206,21 @@ protected:
 		std::swap(m_size, other.m_size);
 		std::swap(m_capacity, other.m_capacity);
 	}
+	// copy the data and state of another object after construction
+	// to fully sync with the other object
+	void copy_impl(const GrowArrayOverlay<T>& other) {
+		std::uninitialized_copy(other.begin(), other.end(), m_data);
+		m_size = other.m_size;
+	}
+	// query if object is valid
+	// used for defend moved-from object
+	bool isNull_impl() const {
+		return !m_data;
+	}
+	// called at destruction to clean up data
+	void destruct_impl() {
+		clear();
+	}
 };
 
 template <class T>
@@ -213,11 +228,10 @@ class GrowArray : public GrowArrayOverlay<T> {
 public:
 	GrowArray(u32 capacity)
 	    : GrowArrayOverlay<T>(
-	          allocate<T>(capacity),
-	          capacity) {}
+	          allocate<T>(capacity), capacity) {}
 	~GrowArray() {
-		if (m_data) {
-			this->clear(); // destroy live elements before freeing
+		if (!this->isNull_impl()) {
+			this->destruct_impl(); // destroy live elements before freeing
 			free(this->data());
 		}
 	}
@@ -225,8 +239,7 @@ public:
 	GrowArray(const GrowArray<T>& other)
 	    : GrowArrayOverlay<T>(
 	          allocate<T>(other.m_capacity), other.m_capacity) {
-		this->m_size = other.m_size;
-		std::uninitialized_copy(other.begin(), other.end(), this->begin());
+		copy_impl(other);
 	}
 	GrowArray(GrowArray<T>&& other) : GrowArrayOverlay<T>(other) {
 		// just use the copy constructor of GrowArrayOverlay - shallow copy
