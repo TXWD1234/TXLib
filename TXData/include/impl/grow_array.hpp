@@ -29,18 +29,18 @@ public:
 	using iterator = It_t;
 	using const_iterator = ConstIt_t;
 
+	using value_type = T;
+
 public:
 	/**
-	 * @param capacity the capacity of this container object. It cannot resize.
 	 * @param ptr the data pointer to a piece of memory that have at least size of `capacity`.
-	 * set to nullptr to let the object manage the memory
+	 * @param capacity the capacity of this container object. It cannot resize.
 	 */
 	GrowArrayOverlay(T* ptr, u32 capacity)
 	    : m_data(ptr), m_size(0),
 	      m_capacity(capacity) {}
 	/**
 	 * @param buffer the provided storage memory buffer
-	 * Note that this constructorcan only result a non-owning object
 	 */
 	GrowArrayOverlay(std::span<T> buffer)
 	    : m_data(buffer.data()), m_size(0),
@@ -85,7 +85,7 @@ public:
 	It_t erase(ConstIt_t it) {
 		u32 index = findIteratorIndex(this->cbegin(), it);
 		assert_impl([&]() { return index < m_size; },
-		            "tx::GrowArrayOverlay::::erase(): subscript out of range.");
+		            "tx::GrowArrayOverlay::erase(): subscript out of range.");
 		It_t mit = this->begin() + index; // mutable it
 		m_size--;
 		if (index != m_size)
@@ -195,6 +195,17 @@ protected:
 	T* m_data;
 	u32 m_size,
 	    m_capacity;
+
+	void null_impl() {
+		m_data = nullptr;
+		m_size = 0;
+		m_capacity = 0;
+	}
+	void swap_impl(GrowArrayOverlay<T>& other) {
+		std::swap(m_data, other.m_data);
+		std::swap(m_size, other.m_size);
+		std::swap(m_capacity, other.m_capacity);
+	}
 };
 
 template <class T>
@@ -202,59 +213,38 @@ class GrowArray : public GrowArrayOverlay<T> {
 public:
 	GrowArray(u32 capacity)
 	    : GrowArrayOverlay<T>(
-	          static_cast<T*>(::operator new(
-	              capacity * sizeof(T), std::align_val_t{ alignof(T) })),
+	          allocate<T>(capacity),
 	          capacity) {}
 	~GrowArray() {
-		free_impl();
+		if (m_data) {
+			this->clear(); // destroy live elements before freeing
+			free(this->data());
+		}
 	}
 
 	GrowArray(const GrowArray<T>& other)
 	    : GrowArrayOverlay<T>(
-	          static_cast<T*>(::operator new(
-	              other.m_capacity * sizeof(T), std::align_val_t{ alignof(T) })),
-	          other.m_capacity) {
+	          allocate<T>(other.m_capacity), other.m_capacity) {
 		this->m_size = other.m_size;
 		std::uninitialized_copy(other.begin(), other.end(), this->begin());
-	}
-	GrowArray& operator=(const GrowArray<T>& other) {
-		if (this == &other) return *this;
-		free_impl();
-		this->m_data = static_cast<T*>(::operator new(
-		    other.m_capacity * sizeof(T), std::align_val_t{ alignof(T) }));
-		this->m_capacity = other.m_capacity;
-		this->m_size = other.m_size;
-		std::uninitialized_copy(other.begin(), other.end(), this->begin());
-		return *this;
 	}
 	GrowArray(GrowArray<T>&& other) : GrowArrayOverlay<T>(other) {
 		// just use the copy constructor of GrowArrayOverlay - shallow copy
-		other.m_data = nullptr;
-		other.m_capacity = 0;
-		other.m_size = 0;
+		other.null_impl();
 	}
-	GrowArray& operator=(GrowArray<T>&& other) {
-		if (this == &other) return *this;
-		free_impl();
-		this->m_data = other.m_data;
-		this->m_capacity = other.m_capacity;
-		this->m_size = other.m_size;
-		other.m_data = nullptr;
-		other.m_capacity = 0;
-		other.m_size = 0;
+	GrowArray& operator=(GrowArray<T> other) {
+		this->swap_impl(other);
 		return *this;
 	}
 
 private:
-	void free_impl() {
-		this->clear(); // destroy live elements before freeing
-		::operator delete(this->data(), std::align_val_t{ alignof(T) });
+	// cannot be swap_impl because ambiguity with base's swap_impl
+	// this function exists for potential future expansion
+	void swap(GrowArray<T>& other) {
+		swap_impl(other);
 	}
 };
 
 template <class T>
 using static_vector = GrowArray<T>;
-
-
-
 } // namespace tx
