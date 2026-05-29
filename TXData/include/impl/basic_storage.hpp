@@ -30,14 +30,15 @@ public:
 	using iterator = It_t;
 	using const_iterator = ConstIt_t;
 
+	using value_type = T;
+
 public:
 	BasicStorage(u32 size)
-	    : m_data(static_cast<T*>(::operator new(
-	          size * sizeof(T), std::align_val_t{ alignof(T) }))),
+	    : m_data(allocate<T>(size)),
 	      m_size(size) {}
 	~BasicStorage() {
 		if (m_data)
-			free_impl();
+			free(m_data);
 	}
 
 	// regular APIs
@@ -148,9 +149,5 @@ public:
 private:
 	T* m_data;
 	u32 m_size;
-
-	void free_impl() {
-		::operator delete(m_data, std::align_val_t{ alignof(T) });
-	}
 };
 } // namespace tx

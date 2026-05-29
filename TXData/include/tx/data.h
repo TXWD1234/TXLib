@@ -17,10 +17,15 @@
  * 
  * - Overlay:
  *   A data structure that don't own the data, but manipulates the data.
+ *   Overlay contains the logic, all it's member should be `protected`. To
+ *   create a full data structure from an overlay, just inherit the overlay
+ *   class and overwrite the constructor and destructor
  * 
  * - View:
- *   A data structure that don't own the data, and don't manipulate the data either.
- *   Read only, anyone use the data structure will not be able to manipulate the data
+ *   A data structure that don't own the data, and don't manipulate the data
+ *   either.
+ *   Read only, anyone use the data structure will not be able to manipulate
+ *   the data
  * 
  * - Span:
  *   A data structure that don't own the data, and don't manipulate the data by itself.
