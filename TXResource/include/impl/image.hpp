@@ -55,12 +55,12 @@ public:
 	bool valid() const { return m_valid; }
 
 	u32 size() const { return m_dimension.x * m_dimension.y * 4; } // Forced 4 channels
-	std::span<u8> getSpan() const { return std::span<u8>(m_data, size()); }
+	std::span<u8> span() const { return std::span<u8>(m_data, size()); }
 
 private:
 	u8* m_data = nullptr;
 	Coord m_dimension{};
 	int m_channelCount = 0;
-	bool m_loaded = 0, m_valid = 0;
+	bool m_loaded = false, m_valid = false;
 };
 } // namespace tx

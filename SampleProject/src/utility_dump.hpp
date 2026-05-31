@@ -15,9 +15,6 @@ using std::endl;
 using std::string;
 using std::vector;
 
-namespace std {
-using bitSpan = span<tx::u8>;
-}
 
 namespace tx {
 

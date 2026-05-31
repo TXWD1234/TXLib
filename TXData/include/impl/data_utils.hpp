@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/basic_utils.hpp"
+#include "tx/type_traits.hpp"
 
 namespace tx {
 // this is scheduled to move to TXFoundation immediately after TXLib structural refactor

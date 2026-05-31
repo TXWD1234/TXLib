@@ -238,7 +238,7 @@ public:
 
 	GrowArray(const GrowArray<T>& other)
 	    : GrowArrayOverlay<T>(
-	          allocate<T>(other.m_capacity), other.m_capacity) {
+	          allocate<T>(other.capacity()), other.capacity()) {
 		copy_impl(other);
 	}
 	GrowArray(GrowArray<T>&& other) : GrowArrayOverlay<T>(other) {
