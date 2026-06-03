@@ -23,6 +23,7 @@ add_library(TXData STATIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/avl_tree.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/grow_array.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/basic_storage.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/include/impl/ring_buffer.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/parted_arr.cpp"
 )
 tx_add_release_ops(TXData)

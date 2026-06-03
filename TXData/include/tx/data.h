@@ -11,6 +11,7 @@
 #include "impl/avl_tree.hpp"
 #include "impl/grow_array.hpp"
 #include "impl/basic_storage.hpp"
+#include "impl/ring_buffer.hpp"
 
 /**
  * Terminology:
