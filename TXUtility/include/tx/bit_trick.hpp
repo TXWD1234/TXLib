@@ -56,23 +56,22 @@ template <bit_eligible T>
 void erase(T& target, T val) { target = erase_copy(target, val); }
 
 // set_true / set_false
+
+template <bit_eligible T>
+T setFalse_copy(T target, T val) { return erase_copy(target, val); }
 template <bool boolean, bit_eligible T>
-T set_copy(T target, T val) {
-	if constexpr (boolean) {
-		return combined(target, val); // set true
-	} else {
-		return erase_copy(target, val); // set false
-	}
-}
-// set_true / set_false
+void setFalse(T& target, T val) { erase(target, val); }
+
+template <bit_eligible T>
+T setTrue_copy(T target, T val) { return combine_copy(target, val); }
 template <bool boolean, bit_eligible T>
-void set(T& target, T val) { target = set_copy<boolean>(target, val); }
+void setTrue(T& target, T val) { combine(target, val); }
 
 // set_true / set_false
 template <bit_eligible T>
 T set_copy(T target, T val, bool boolean) {
 	if (boolean) {
-		return combined(target, val); // set true
+		return combine_copy(target, val); // set true
 	} else {
 		return erase_copy(target, val); // set false
 	}
