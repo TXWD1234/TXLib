@@ -74,6 +74,7 @@ if(TXLib_INSTALLATION_MODULES) # if given requested modules
 	foreach(MODULE IN LISTS TXLib_INSTALLATION_MODULES)
 		tx_add_module("${MODULE}")
 	endforeach()
+
 else() # add the whole library
 	tx_log("Modules:")
 	foreach(MODULE IN LISTS TXLib_MODULES)

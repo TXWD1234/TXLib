@@ -3,12 +3,6 @@ cmake_minimum_required(VERSION 4.2)
 set(libs "${CMAKE_SOURCE_DIR}/libs")
 set(src "${CMAKE_SOURCE_DIR}/src")
 
-set(TXLib "../")
-set(CMakeUtils "${TXLib}/TXCMakeUtils")
-
-include("${CMakeUtils}/optimization.cmake")
-include("${CMakeUtils}/link_dir_to_bin.cmake")
-
 project(TXProject)
 
 # install
@@ -16,10 +10,24 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.local" CACHE PATH "Install prefix to ~/.local" FORCE)
 endif()
 
-# dependencies
+# TXLib
+include("../add_txlib.cmake")
 
-add_subdirectory("${TXLib}" "${CMAKE_BINARY_DIR}/libs/TXLib")
-add_subdirectory("${CMAKE_SOURCE_DIR}/libs/stb_image" "${CMAKE_BINARY_DIR}/libs/stb_image")
+tx_add_txlib(
+	LOCAL_DIR
+		"../"
+	BIN_DIR
+		"./build/TXLib"
+	MODULES
+		TXMath
+		TXMap
+		TXJson
+		TXGrid
+		TXResource
+		TXData
+		TXGraphics
+		TXUtility
+)
 
 add_executable(TXProject 
 	"${src}/main.cpp"
@@ -32,7 +40,7 @@ target_include_directories(TXProject PRIVATE
 )
 
 # project settings
-target_compile_features(TXProject PUBLIC cxx_std_20)
+target_compile_features(TXProject PUBLIC cxx_std_23)
 
 # dependencies
 target_link_libraries(TXProject PRIVATE 
@@ -47,13 +55,17 @@ target_link_libraries(TXProject PRIVATE
 )
 
 # optimization
-tx_add_release_ops(TXProject)
+include("../TXCMake/set_compile_flags.cmake")
+tx_set_compile_flags(TXProject PRIVATE)
 
 # build
 set_target_properties(TXProject PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_BINARY_DIR}/bin"
 	RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
 )
+
+# executable environment
+include("../TXCMake/link_dir_to_bin.cmake")
 tx_link_dir_to_bin(TXProject "${CMAKE_SOURCE_DIR}/assets")
 
 install(TARGETS TXProject

@@ -1,1 +1,1 @@
-set(TXLib_CXX_VERSION "cxx_std_20")
+set(TXLib_CXX_VERSION "cxx_std_23")

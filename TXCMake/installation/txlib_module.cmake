@@ -2,7 +2,6 @@ include_guard(GLOBAL)
 
 include("${TXLib_INSTALLATION_DIR}/log.cmake")
 include("${TXLib_INSTALLATION_DIR}/../set_compile_flags.cmake")
-include("${TXLib_INSTALLATION_DIR}/make_module_available.cmake")
 
 #[[
 LIB_TYPE

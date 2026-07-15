@@ -16,7 +16,7 @@ function(tx_add_txlib)
 
 	# resolve BIN_DIR
 	if(ARG_BIN_DIR)
-		message(STATUS "add_txlib.cmake: Using specialized bin dir")
+		message(STATUS "add_txlib.cmake: Using specialized bin dir: ${ARG_BIN_DIR}")
 		set(TXLib_BINARY_DIR "${ARG_BIN_DIR}")
 	else()
 		message(STATUS "add_txlib.cmake: Using default bin dir: \${CMAKE_CURRENT_BINARY_DIR}: ${CMAKE_CURRENT_BINARY_DIR}")
@@ -26,7 +26,7 @@ function(tx_add_txlib)
 	set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 
 	if(ARG_LOCAL_DIR) # use local dir
-		message(STATUS "add_txlib.cmake: Using local TXLib")
+		message(STATUS "add_txlib.cmake: Using local TXLib: ${ARG_LOCAL_DIR}")
 		set(REQUIRE_REMOTE_DOWNLOAD FALSE)
 		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}") # look for in project dir first (relative path)
 			set(TXLib_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
