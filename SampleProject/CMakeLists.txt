@@ -19,14 +19,14 @@ tx_add_txlib(
 	BIN_DIR
 		"./build/TXLib"
 	MODULES
+		TXFoundation
 		TXMath
-		TXMap
+		TXData
+		TXUtility
 		TXJson
 		TXGrid
 		TXResource
-		TXData
 		TXGraphics
-		TXUtility
 )
 
 add_executable(TXProject 
@@ -44,18 +44,18 @@ target_compile_features(TXProject PUBLIC cxx_std_23)
 
 # dependencies
 target_link_libraries(TXProject PRIVATE 
+	TXFoundation
 	TXMath
-	TXMap
+	TXData
+	TXUtility
 	TXJson
 	TXGrid
 	TXResource
 	TXGraphics
-	TXData
-	stb_image
 )
 
 # optimization
-include("../TXCMake/set_compile_flags.cmake")
+include("../cmake/set_compile_flags.cmake")
 tx_set_compile_flags(TXProject PRIVATE)
 
 # build
@@ -65,7 +65,7 @@ set_target_properties(TXProject PROPERTIES
 )
 
 # executable environment
-include("../TXCMake/link_dir_to_bin.cmake")
+include("../cmake/link_dir_to_bin.cmake")
 tx_link_dir_to_bin(TXProject "${CMAKE_SOURCE_DIR}/assets")
 
 install(TARGETS TXProject

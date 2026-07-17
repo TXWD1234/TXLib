@@ -1,5 +1,5 @@
 # setting the INSTALLATION scope global variables
-set(TXLib_INSTALLATION_DIR "${TXLib_SOURCE_DIR}/TXCMake/installation")
+set(TXLib_INSTALLATION_DIR "${TXLib_SOURCE_DIR}/cmake/installation")
 
 # include installation script and resources
 include("${TXLib_INSTALLATION_DIR}/log.cmake")
@@ -41,12 +41,14 @@ if(TXLib_INSTALLATION_MODULES) # if given requested modules
 	endwhile()
 
 	# end of stage 2 - module list are ready
-	tx_log("Modules:")
+	tx_log_verbose("Modules:")
 	foreach(MODULE IN LISTS TXLib_INSTALLATION_MODULES)
-		tx_log("  ${MODULE}")
+		tx_log_verbose("  ${MODULE}")
 	endforeach()
 	foreach(MODULE IN LISTS TXLib_INSTALLATION_DEPS)
-		tx_log("  ${MODULE} (Dependency)")
+		if(NOT TXLib_${MODULE}_INCLUDED)
+			tx_log_verbose("  ${MODULE} (Dependency)")
+		endif()
 	endforeach()
 
 	# adding modules
@@ -76,9 +78,9 @@ if(TXLib_INSTALLATION_MODULES) # if given requested modules
 	endforeach()
 
 else() # add the whole library
-	tx_log("Modules:")
+	tx_log_verbose("Modules:")
 	foreach(MODULE IN LISTS TXLib_MODULES)
-		tx_log("  ${MODULE}")
+		tx_log_verbose("  ${MODULE}")
 	endforeach()
 
 	# note: because TXLib_MODULES list is already topologically sorted, therefore no sorting required.

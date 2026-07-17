@@ -112,7 +112,7 @@ function(tx_txlib_module)
 	foreach(FILE IN LISTS ARG_IMPL_HEADERS) # IMPL_HEADERS
 		set(FILE "${TXLib_MODULE_DIR}/include/impl/${FILE}")
 		if(NOT EXISTS ${FILE})
-			tx_error_log("${TXLib_MODULE_NAME}" "Cannot find source file (IMPL_HEADERS):" "  ${FILE}")
+			tx_log_error("${TXLib_MODULE_NAME}" "Cannot find source file (IMPL_HEADERS):" "  ${FILE}")
 		endif()
 		target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} "${FILE}")
 	endforeach()

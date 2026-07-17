@@ -16,17 +16,17 @@ function(tx_add_txlib)
 
 	# resolve BIN_DIR
 	if(ARG_BIN_DIR)
-		message(STATUS "add_txlib.cmake: Using specialized bin dir: ${ARG_BIN_DIR}")
+		message(VERBOSE "add_txlib.cmake: Using specialized bin dir: ${ARG_BIN_DIR}")
 		set(TXLib_BINARY_DIR "${ARG_BIN_DIR}")
 	else()
-		message(STATUS "add_txlib.cmake: Using default bin dir: \${CMAKE_CURRENT_BINARY_DIR}: ${CMAKE_CURRENT_BINARY_DIR}")
+		message(VERBOSE "add_txlib.cmake: Using default bin dir: \${CMAKE_CURRENT_BINARY_DIR}: ${CMAKE_CURRENT_BINARY_DIR}")
 	endif()
 
 	# prepare source
 	set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 
 	if(ARG_LOCAL_DIR) # use local dir
-		message(STATUS "add_txlib.cmake: Using local TXLib: ${ARG_LOCAL_DIR}")
+		message(VERBOSE "add_txlib.cmake: Using local TXLib: ${ARG_LOCAL_DIR}")
 		set(REQUIRE_REMOTE_DOWNLOAD FALSE)
 		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}") # look for in project dir first (relative path)
 			set(TXLib_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
@@ -34,14 +34,14 @@ function(tx_add_txlib)
 			set(TXLib_SOURCE_DIR "${ARG_LOCAL_DIR}")
 		else()
 			# intented fallback to remote download
-			message(STATUS "add_txlib.cmake: LOCAL_DIR path not found! downloading TXLib.")
+			message(VERBOSE "add_txlib.cmake: LOCAL_DIR path not found! downloading TXLib.")
 			set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 		endif()
 		set(TXLib_BINARY_DIR "${TXLib_BINARY_DIR}/TXLib")
 	endif()
 
 	if(REQUIRE_REMOTE_DOWNLOAD) # fetch from remote
-		message(STATUS "add_txlib.cmake: Fetching TXLib from GitHub")		
+		message(VERBOSE "add_txlib.cmake: Fetching TXLib from GitHub")		
 	
 		# resolve version
 		if(ARG_VERSION)
@@ -57,7 +57,7 @@ function(tx_add_txlib)
 			txlib
 			GIT_REPOSITORY "https://github.com/TXWD1234/TXLib.git"
 			GIT_TAG "${GIT_TAG_VAL}"
-			SOURCE_SUBDIR "TXCMake"
+			SOURCE_SUBDIR "cmake"
 		)
 		# use `SOURCE_SUBDIR` to work around the MakeAvailable's auto `add_subdirectory`
 
@@ -69,7 +69,7 @@ function(tx_add_txlib)
 	endif()
 	
 	# <-------------------------------------------------
-	# TXLib/TXCMake/installation is locally exist,
+	# TXLib/cmake/installation is locally exist,
 	# TXLib_SOURCE_DIR and TXLib_BINARY_DIR exist,
 	# installation shall began:
 	message(STATUS "add_txlib.cmake: Sources are ready.")
@@ -78,8 +78,8 @@ function(tx_add_txlib)
 	# they are the parameters of setup.cmake
 	set(TXLib_INSTALLATION_MODULES "${ARG_MODULES}")
 
-	# call ${TXLib_SOURCE_DIR}/TXCMake/installation/setup.cmake
+	# call ${TXLib_SOURCE_DIR}/cmake/installation/setup.cmake
 	# setup begins
-	include("${TXLib_SOURCE_DIR}/TXCMake/installation/setup.cmake")
+	include("${TXLib_SOURCE_DIR}/cmake/installation/setup.cmake")
 	
 endfunction()

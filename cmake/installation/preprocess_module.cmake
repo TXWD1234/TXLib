@@ -6,10 +6,10 @@ function(tx_preprocess_module MODULES OUT_DEPS ARG_BOOL_INCOMING_DEPENDENCIES)
 	# module presence, register requests
 	foreach(MODULE IN LISTS ${MODULES})
 		# module presence check
-		if(NOT EXISTS "${TXLib_SOURCE_DIR}/modules/${TXLib_${MODULE}_SOURCE_DIR}")
-			tx_error_log(FALSE
+		if(NOT EXISTS "${TXLib_${MODULE}_SOURCE_DIR}")
+			tx_log_error(FALSE
 				"Cannot find SOURCE_DIR of requested module: ${MODULE}"
-				"SOURCE_DIR: \"${TXLib_SOURCE_DIR}/modules/${TXLib_${MODULE}_SOURCE_DIR}\""
+				"SOURCE_DIR: \"${TXLib_${MODULE}_SOURCE_DIR}\""
 			)
 		endif()
 
@@ -23,7 +23,7 @@ function(tx_preprocess_module MODULES OUT_DEPS ARG_BOOL_INCOMING_DEPENDENCIES)
 	foreach(MODULE IN LISTS ${MODULES})
 		foreach(DEP IN LISTS TXLib_${MODULE}_DEPENDENCIES)
 			if(NOT TXLib_${DEP}_INCLUDED)
-				tx_log("Found module [${DEP}] as dependency of requested module [${MODULE}]"
+				tx_log_debug("Found module [${DEP}] as dependency of requested module [${MODULE}]"
 				       "  Adding [${DEP}] to module list.")
 				list(APPEND LOCAL_NEW_DEPS "${DEP}")
 				set(TXLib_${DEP}_INCLUDED TRUE PARENT_SCOPE)

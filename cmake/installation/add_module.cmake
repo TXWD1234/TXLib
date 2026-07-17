@@ -4,6 +4,6 @@ include_guard(GLOBAL)
 function(tx_add_module MODULE)
 	set(TXLib_INSTALLATION_MODULE_NAME ${MODULE})
 	add_subdirectory(
-		"${TXLib_SOURCE_DIR}/modules/${TXLib_${MODULE}_SOURCE_DIR}"
+		"${TXLib_${MODULE}_SOURCE_DIR}"
 		"${TXLib_BINARY_DIR}/${MODULE}")
 endfunction()
