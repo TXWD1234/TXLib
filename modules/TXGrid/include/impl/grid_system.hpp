@@ -2,7 +2,7 @@
 // Module: TXGrid
 
 #pragma once
-#include "impl/basic_utils.hpp"
+#include "tx/basic_types.hpp"
 #include "impl/coord_map.hpp"
 #include "impl/geometry.hpp"
 #include <type_traits>

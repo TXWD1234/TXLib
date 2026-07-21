@@ -2,11 +2,11 @@
 // Module: TXMath
 
 #pragma once
-#include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include <type_traits>
 #include <concepts>
 #include <algorithm>
+#include <cmath>
 
 namespace tx {
 

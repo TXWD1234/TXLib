@@ -5,6 +5,7 @@
 #include "tx/basic_types.hpp"
 #include <type_traits>
 #include <concepts>
+#include <iterator>
 
 namespace tx {
 
@@ -102,14 +103,6 @@ template <>
 struct type_enum<u32> {
 	static constexpr TypeEnum value = TypeEnum::U32;
 };
-template <>
-struct type_enum<tx::vec2> {
-	static constexpr TypeEnum value = TypeEnum::Vec2;
-};
-template <>
-struct type_enum<tx::Coord> {
-	static constexpr TypeEnum value = TypeEnum::Coord;
-};
 
 template <class T>
 inline constexpr TypeEnum type_enum_v = type_enum<T>::value;
@@ -133,14 +126,6 @@ struct enum_type<TypeEnum::U8> {
 template <>
 struct enum_type<TypeEnum::U32> {
 	using type = u32;
-};
-template <>
-struct enum_type<TypeEnum::Vec2> {
-	using type = tx::vec2;
-};
-template <>
-struct enum_type<TypeEnum::Coord> {
-	using type = tx::Coord;
 };
 
 template <TypeEnum T>

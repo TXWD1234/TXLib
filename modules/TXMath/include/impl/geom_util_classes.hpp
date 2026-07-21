@@ -81,8 +81,8 @@ public:
 	// inclusive-inclusive
 	DiscreteRect(const Coord& start, const Coord& end)
 	    : m_bottomLeft(Coord{
-	          min(start.x, end.x),
-	          min(start.y, end.y) }),
+	          std::min(start.x, end.x),
+	          std::min(start.y, end.y) }),
 	      m_width(std::abs(start.x - end.x + 1)), m_height(std::abs(start.y - end.y + 1)) {}
 
 	Coord topRight() const { return Coord{ m_bottomLeft.x + m_width - 1, m_bottomLeft.y + m_height - 1 }; }

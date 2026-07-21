@@ -2,8 +2,7 @@
 // Module: TXUtility
 
 #pragma once
-#include "impl/basic_utils.hpp"
-#include <type_traits>
+#include "tx/basic_types.hpp"
 #include <iterator>
 #include <concepts>
 

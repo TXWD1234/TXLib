@@ -158,10 +158,10 @@ private:
 	MathLine m_line;
 	vec2 m_start, m_end;
 
-	static inline float _startX(const vec2& start, const vec2& end) { return min(start.x, end.x); }
-	static inline float _startY(const vec2& start, const vec2& end) { return min(start.y, end.y); }
-	static inline float _endX(const vec2& start, const vec2& end) { return max(start.x, end.x); }
-	static inline float _endY(const vec2& start, const vec2& end) { return max(start.y, end.y); }
+	static inline float _startX(const vec2& start, const vec2& end) { return std::min(start.x, end.x); }
+	static inline float _startY(const vec2& start, const vec2& end) { return std::min(start.y, end.y); }
+	static inline float _endX(const vec2& start, const vec2& end) { return std::max(start.x, end.x); }
+	static inline float _endY(const vec2& start, const vec2& end) { return std::max(start.y, end.y); }
 };
 
 inline vec2 findIntersection(const MathLine& l, const LineSegment& ls) {

@@ -20,7 +20,7 @@ struct TextureId {
 	bool valid() const { return dimensionId != InvalidU32 && index != InvalidU32; }
 };
 
-template <InstantiationOf<FenceManagerBase> fmT>
+template <instantiation_of<FenceManagerBase> fmT>
 class TextureManagerBase {
 public:
 	TextureId addTexture(Coord dimension, std::span<u8> data) {

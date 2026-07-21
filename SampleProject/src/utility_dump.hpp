@@ -2,8 +2,8 @@
 #include "tx/math.h"
 #include "tx/grid.h"
 #include "tx/graphics.h"
-#include "tx/map.h"
-#include "tx/json.h"
+//#include "tx/map.h"
+//#include "tx/json.h"
 #include "tx/resource.h"
 #include "tx/data.h"
 #include <bits/stdc++.h>

@@ -3,6 +3,7 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
+#include <vector>
 #include <cstring>
 #include <algorithm>
 #include <span>
@@ -222,7 +223,7 @@ private:
 
 	void reservePart_impl(u32 partIndex, u32 newsize) {
 		PartAttrib_impl& attrib = partAttribs[partIndex];
-		int expandPartCount = max(static_cast<int>((newsize + PartLen - 1) / PartLen) - static_cast<int>(attrib.partCount), 0);
+		int expandPartCount = std::max(static_cast<int>((newsize + PartLen - 1) / PartLen) - static_cast<int>(attrib.partCount), 0);
 		attrib.partCount += expandPartCount;
 		// memory
 		if (attrib.memoryIndex >= partOrder.size() - 1) { // at the end

@@ -2,7 +2,6 @@
 // Module: TXMath
 
 #pragma once
-#include "tx/basic_types.hpp"
 #include "impl/numeric_utils.hpp"
 #include <cmath>
 #include <iostream>
@@ -11,7 +10,7 @@ namespace tx {
 
 constexpr float epsilon = 1e-6f;
 
-// vec2 ***********************************************************************************************************************
+// // ################ Vec2 ################
 
 // 2 direction vector
 class vec2;
@@ -146,7 +145,7 @@ inline std::ostream& operator<<(std::ostream& in_cout, const Coord& in_coord) {
 	return in_cout;
 }
 
-// constants **************************************************************************************************************
+// ################ Constants ################
 // clang-format off
 
 constexpr const vec2 IHat(1.0f, 0.0f);
@@ -192,19 +191,14 @@ constexpr int _2wayIncrement[] = {
 constexpr Coord CoordOrigin{ 0, 0 };
 // clang-format on
 
-
-
-
-
-
-
-
+// ################ Related Utilities ################
 
 
 
 
 
 } // namespace tx
+
 
 #include <functional>
 // std::hash specialization so tx::Coord can be used in std::unordered_map
@@ -219,3 +213,24 @@ struct hash<tx::Coord> {
 	}
 };
 } // namespace std
+
+#include "tx/type_traits.hpp"
+namespace tx {
+template <>
+struct type_enum<vec2> {
+	static constexpr TypeEnum value = TypeEnum::Vec2;
+};
+template <>
+struct type_enum<Coord> {
+	static constexpr TypeEnum value = TypeEnum::Coord;
+};
+
+template <>
+struct enum_type<TypeEnum::Vec2> {
+	using type = vec2;
+};
+template <>
+struct enum_type<TypeEnum::Coord> {
+	using type = Coord;
+};
+}
