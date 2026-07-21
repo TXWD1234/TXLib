@@ -18,6 +18,9 @@ enumval(T in) noexcept {
 template <class>
 inline constexpr bool false_v = false;
 
+// Conditional Presence
+class Nothing {};
+
 // Concepts
 
 // is instantiatin of

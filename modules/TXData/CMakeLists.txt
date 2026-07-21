@@ -11,6 +11,7 @@ tx_txlib_module(
 		"sorted_arr.hpp"
 		"data_utils.hpp"
 		"circular_queue.hpp"
+		"binary_set_view.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )

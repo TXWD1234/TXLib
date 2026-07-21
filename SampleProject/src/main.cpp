@@ -1,6 +1,5 @@
 #include "Project.hpp"
 #include "stb_image.hpp"
-#include <concepts>
 
 class Application {
 private:

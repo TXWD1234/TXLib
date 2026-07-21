@@ -39,9 +39,9 @@ tx_module_registry_register(
 	TXData
 	TXUtility
 )
-tx_module_registry_register(
-	TXJson "TXJson"
-	TXMath
-	TXData
-	TXUtility
-)
+# tx_module_registry_register(
+# 	TXJson "TXJson"
+# 	TXMath
+# 	TXData
+# 	TXUtility
+# )

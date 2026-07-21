@@ -9,6 +9,6 @@ tx_txlib_module(
 		"geometry.hpp"
 		"math_line.hpp"
 		"geom_utils.hpp"
-		"basic_utils.hpp"
+		"numeric_utils.hpp"
 		"geom_util_classes.hpp"
 )

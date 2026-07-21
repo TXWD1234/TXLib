@@ -23,7 +23,7 @@ tx_add_txlib(
 		TXMath
 		TXData
 		TXUtility
-		TXJson
+		
 		TXGrid
 		TXResource
 		TXGraphics
@@ -48,7 +48,7 @@ target_link_libraries(TXProject PRIVATE
 	TXMath
 	TXData
 	TXUtility
-	TXJson
+	
 	TXGrid
 	TXResource
 	TXGraphics
