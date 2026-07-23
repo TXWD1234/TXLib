@@ -8,6 +8,7 @@
 #include "impl/data_utils.hpp"
 #include "impl/value_group.hpp"
 #include "impl/circular_queue.hpp"
+#include "impl/binary_set_view.hpp"
 
 /**
  * Terminology:

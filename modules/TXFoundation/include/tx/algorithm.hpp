@@ -5,6 +5,8 @@
 #include "tx/basic_types.hpp"
 #include <iterator>
 #include <concepts>
+#include <vector>
+#include <algorithm>
 
 namespace tx {
 
@@ -58,8 +60,13 @@ void sort_multi(it_t begin, it_t end, multi_it_t const&... byProducts) {
 }
 
 /**
- * @brief remove a set of values in a range. the set of value to be removed and the range are both sorted
+ * @brief remove a set of values in a range. the set of value to be removed and
+ * the range are both sorted
  * @return the first element of the removed range
+ * 
+ * This function will remove elements from the given range [begin, end) which
+ * satisfied the condition of: is same in comparison with any element in given
+ * target range [remove_begin, remove_end) 
  */
 template <std::forward_iterator it_t, std::forward_iterator rem_it_t, class Cmp = std::less<>>
     requires std::invocable<Cmp, std::iter_value_t<it_t>, std::iter_value_t<rem_it_t>>
