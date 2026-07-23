@@ -138,8 +138,8 @@ private:
 
 int main() {
 
-	tx::BinarySetView<int, true, true> aaa{ std::span<int>{} };
-	aaa.size();
+	//tx::BinarySetView<int, true, true> aaa{ std::span<int>{} };
+	//aaa.size();
 
 
 	return 0;

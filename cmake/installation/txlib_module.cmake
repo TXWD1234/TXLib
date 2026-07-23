@@ -82,13 +82,13 @@ function(tx_txlib_module)
 		set(SCOPE_PUBLIC "PUBLIC")
 		set(SCOPE_PRIVATE "PRIVATE")
 
+		list(TRANSFORM ARG_SOURCES PREPEND "${TXLib_MODULE_DIR}/src/")
 		foreach(FILE IN LISTS ARG_SOURCES) # SOURCES - moved up to here because interface does not need sources
-			set(FILE "${TXLib_MODULE_DIR}/src/${FILE}")
 			if(NOT EXISTS ${FILE})
 				tx_error_log("${TXLib_MODULE_NAME}" "Cannot find source file (SOURCES):" "  ${FILE}")
 			endif()
-			target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PRIVATE} "${FILE}")
 		endforeach()
+		target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PRIVATE} "${ARG_SOURCES}")
 	elseif(ARG_LIB_TYPE STREQUAL "INTERFACE")
 		# interface library
 		add_library("${TXLib_MODULE_NAME}" INTERFACE)
@@ -101,21 +101,23 @@ function(tx_txlib_module)
 	endif()
 
 	# add source files
+	list(TRANSFORM ARG_PUBLIC_HEADERS PREPEND "${TXLib_MODULE_DIR}/include/tx/")
+	list(TRANSFORM ARG_IMPL_HEADERS   PREPEND "${TXLib_MODULE_DIR}/include/impl/")
 	foreach(FILE IN LISTS ARG_PUBLIC_HEADERS) # PUBLIC_HEADERS
-		set(FILE "${TXLib_MODULE_DIR}/include/tx/${FILE}")
 		if(NOT EXISTS ${FILE})
 			tx_error_log("${TXLib_MODULE_NAME}" "Cannot find source file (PUBLIC_HEADERS):" "  ${FILE}")
 		endif()
-		target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} "${FILE}")
 	endforeach()
-	
 	foreach(FILE IN LISTS ARG_IMPL_HEADERS) # IMPL_HEADERS
-		set(FILE "${TXLib_MODULE_DIR}/include/impl/${FILE}")
 		if(NOT EXISTS ${FILE})
 			tx_log_error("${TXLib_MODULE_NAME}" "Cannot find source file (IMPL_HEADERS):" "  ${FILE}")
 		endif()
-		target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} "${FILE}")
 	endforeach()
+	target_sources("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC}
+		FILE_SET HEADERS
+		BASE_DIRS "${TXLib_MODULE_DIR}/include"
+		FILES ${ARG_IMPL_HEADERS}
+	)
 
 	# resolve dependencies
 	foreach(DEP_MODULE IN LISTS TXLib_${TXLib_MODULE_NAME}_DEPENDENCIES)
@@ -126,9 +128,4 @@ function(tx_txlib_module)
 
 	# cxx version
 	target_compile_features("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC} ${TXLib_CXX_VERSION})
-
-	# include dir
-	target_include_directories("${TXLib_MODULE_NAME}" ${SCOPE_PUBLIC}
-		"${TXLib_MODULE_DIR}/include"
-	)
 endfunction()
