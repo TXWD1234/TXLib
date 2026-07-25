@@ -1,0 +1,123 @@
+# BasedOnStyle: Microsoft
+# IndentWidth: 4
+# TabWidth: 8
+# UseTab: ForIndentation
+# BreakBeforeBraces: Attach
+# AllowShortIfStatementsOnASingleLine: never
+# AllowShortLoopsOnASingleLine:        never
+# AllowShortFunctionsOnASingleLine:    never
+# AllowShortBlocksOnASingleLine:       never
+# BreakBeforeTernaryOperators:         never
+# ColumnLimit: 0
+# PointerAlignment: Left
+# ReferenceAlignment: Left
+# SpacesBeforeTrailingComments: 1
+
+# SpaceAfterControlStatementKeyword: true
+# SpaceBeforeParens: true
+# SpacesInParentheses: false
+# SpacesInSquareBrackets: false
+# SpaceBeforeAssignmentOperators: true
+# SpacesInAngles: false
+# SpacesInContainerLiterals: true
+
+# BreakStringLiterals: true
+
+# EmptyLineBeforeBrace: true
+# MaxEmptyLinesToKeep: 5
+# KeepEmptyLinesAtTheEndOfBlocks: true
+# KeepEmptyLinesAtTheStartOfBlocks: true
+# AlignAfterOpenBracket: DontAlign
+
+# AlignConsecutiveAssignments: false
+
+
+# IndentCaseLabel: false
+
+
+# | Option                         | Values                | Effect                                 |
+# | ------------------------------ | --------------------- | -------------------------------------- |
+# | `AlignConsecutiveAssignments`  | `true` / `false`      | Align `a = 1; b = 2;` vertically       |
+# | `AlignConsecutiveDeclarations` | `true` / `false`      | Align variable declarations            |
+# | `AlignAfterOpenBracket`        | `Align` / `DontAlign` | Alignment of multi-line function calls |
+# | `AlignOperands`                | `true` / `false`      | Align operators over multiple lines    |
+# | `AlignTrailingComments`        | `true` / `false`      | Align `// comments` vertically         |
+
+# === BASE STYLE ===
+BasedOnStyle: LLVM        # Start from a predefined style (LLVM, Google, Chromium, Mozilla, Microsoft, WebKit)
+
+# === INDENTATION ===
+IndentWidth: 4            # Spaces per indentation level
+TabWidth: 4               # Visual width of a tab
+UseTab: ForIndentation    # Never / ForIndentation / Always
+ContinuationIndentWidth: 4  # Indent width for wrapped lines
+# IndentCaseLabels: false   # Indent 'case' under switch
+# IndentCaseBlocks: true    # Indent the block inside case
+IndentPPDirectives: None  # None / AfterHash / BeforeHash
+
+# === BRACES ===
+BreakBeforeBraces: Attach   # Attach, Allman, Linux, Mozilla, Stroustrup, etc.
+BraceWrapping:              # Fine control if BreakBeforeBraces: Custom
+  AfterFunction: false
+  AfterClass: false
+  AfterControlStatement: false
+Cpp11BracedListStyle: false # make brace move to the next line for things like lambda and initializer_list 
+
+# === SHORT STATEMENTS ===
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All  # None / Inline / Empty / All
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+
+# === SPACING ===
+SpaceBeforeParens: ControlStatements   # Never / ControlStatements / Always
+SpaceAfterControlStatementKeyword: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInAngles: false
+SpaceBeforeAssignmentOperators: true
+SpacesBeforeTrailingComments: 1
+
+# === LINE LENGTH ===
+ColumnLimit: 0         # 0 disables line wrapping
+
+# === POINTERS & REFERENCES ===
+PointerAlignment: Left   # Left (int* a), Right (int *a), Middle (int * a)
+ReferenceAlignment: Left
+
+# === EMPTY LINES ===
+MaxEmptyLinesToKeep: 9999
+KeepEmptyLinesAtTheStartOfBlocks: true
+# KeepEmptyLinesAtTheEndOfBlocks: true
+
+# === ALIGNMENT ===
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignAfterOpenBracket: Align  # Align / DontAlign / AlwaysBreak
+
+# === SWITCH / CASE ===
+IndentCaseLabels: false
+IndentCaseBlocks: false
+
+# === INCLUDE SORTING ===
+SortIncludes: false
+IncludeBlocks: Preserve   # Preserve / Merge / Regroup
+
+# === COMMENTS ===
+ReflowComments: false      # Re-wrap long comments
+AlignTrailingComments: false
+CommentPragmas: '^/\*\*'
+
+# === TERNARY OPERATOR ===
+BreakBeforeTernaryOperators: false
+
+# === STRINGS ===
+BreakStringLiterals: true
+
+# === NAMESPACE ===
+NamespaceIndentation: None  # None / Inner / All
+
+# === ACCESS MODIFIERS ===
+AccessModifierOffset: -4
+IndentAccessModifiers: false
