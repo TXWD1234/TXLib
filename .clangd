@@ -1,0 +1,18 @@
+CompileFlags:
+  Remove:
+    - -fmodules-ts
+    - -fmodule-mapper=*
+    - -fdeps-format=*
+  Add:
+    - -std=c++23
+    - -Wall
+    - -Wextra
+    - -xc++-header
+    - -I../../../TXFoundation/include
+    - -I../../../TXMath/include
+    - -I../../../TXData/include
+    - -I../../../TXUtility/include
+    - -I../../../TXJson/include
+    - -I../../../TXGrid/include
+    - -I../../../TXResource/include
+    - -I../../../TXGraphics/include
