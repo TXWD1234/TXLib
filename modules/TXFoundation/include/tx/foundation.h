@@ -5,3 +5,5 @@
 #include "tx/type_traits.hpp"
 #include "tx/algorithm.hpp"
 #include "tx/basic_types.hpp"
+#include "tx/build_config.hpp"
+#include "tx/exception.hpp"

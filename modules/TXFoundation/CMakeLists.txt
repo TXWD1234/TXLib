@@ -9,4 +9,6 @@ tx_txlib_module(
 		"type_traits.hpp"
 		"algorithm.hpp"
 		"basic_types.hpp"
+		"build_config.hpp"
+		"exception.hpp"
 )

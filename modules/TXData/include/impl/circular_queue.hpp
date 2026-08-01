@@ -6,6 +6,7 @@
 #include "impl/data_utils.hpp" // include for the exception
 #include <span>
 #include <concepts>
+#include <memory>
 
 namespace tx {
 /**
