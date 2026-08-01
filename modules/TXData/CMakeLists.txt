@@ -6,9 +6,9 @@ tx_txlib_module(
 	PUBLIC_HEADERS
 		"data.h"
 	IMPL_HEADERS
-		"circular_arr.hpp"
-		"parted_arr.hpp"
-		"sorted_arr.hpp"
+		"circular_array.hpp"
+		"parted_array.hpp"
+		"sorted_array.hpp"
 		"data_utils.hpp"
 		"circular_queue.hpp"
 		"binary_set_view.hpp"

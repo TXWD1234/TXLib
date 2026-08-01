@@ -12,7 +12,7 @@ namespace tx {
 // note: slightly slower then PartedArr but more memory efficient
 // order is not garenteed. any pointer is not garenteed to be valid after push_back
 template <class T>
-class CircularArr {
+class CircularArray {
 	// terminology:
 	// part = partition
 public:
@@ -57,7 +57,7 @@ public:
 	using ConstIt_t = typename std::vector<T>::const_iterator;
 
 public:
-	CircularArr(u32 partCount, u32 partLen)
+	CircularArray(u32 partCount, u32 partLen)
 	    : data(std::vector<T>(partCount * partLen)),
 	      partAttribs(std::vector<u32>(partCount)),
 	      PartLen(partLen) {
@@ -75,7 +75,7 @@ public:
 	};
 	class Partition_impl {
 	public:
-		Partition_impl(CircularArr* in_parent, u32 in_index)
+		Partition_impl(CircularArray* in_parent, u32 in_index)
 		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]), partIndex(in_index) {}
 
 		T& operator[](u32 index) { return parent->data[parent->clampIndex(attrib.offset + index)]; }
@@ -90,13 +90,13 @@ public:
 		It_t end() { return parent->begin() + attrib.offset + attrib.len; }
 
 	private:
-		CircularArr<T>* parent;
+		CircularArray<T>* parent;
 		PartAttrib_impl attrib;
 		u32 partIndex;
 	};
 	class ConstPartition_impl {
 	public:
-		ConstPartition_impl(const CircularArr* in_parent, u32 in_index)
+		ConstPartition_impl(const CircularArray* in_parent, u32 in_index)
 		    : parent(in_parent), attrib(in_parent->partAttribs[in_index]) {}
 
 		const T& operator[](u32 index) const { return parent->data[parent->clampIndex(attrib.offset + index)]; }
@@ -106,7 +106,7 @@ public:
 		ConstIt_t end() const { return parent->begin() + attrib.offset + attrib.len; }
 
 	private:
-		const CircularArr<T>* parent;
+		const CircularArray<T>* parent;
 		PartAttrib_impl attrib;
 	};
 
@@ -140,7 +140,7 @@ private:
 	// circular shift
 	void push_back_impl(u32 partIndex, const T& val) {
 		if (m_totalSize >= data.size()) {
-			throw std::runtime_error("tx::CircularArr: capacity exceeded.");
+			throw std::runtime_error("tx::CircularArray: capacity exceeded.");
 		}
 		PartAttrib_impl& attrib = partAttribs[partIndex];
 		if (partAttribs[partIndex].len >= PartLen) {

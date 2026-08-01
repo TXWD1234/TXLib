@@ -3,7 +3,7 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
-#include "impl/sorted_arr.hpp"
+#include "impl/sorted_array.hpp"
 #include <concepts>
 #include <random>
 
@@ -15,9 +15,9 @@ public:
 
 	RandDistBlacklist(T min, T max)
 	    : m_dist(min, max), m_range{ min, max } {}
-	RandDistBlacklist(T min, T max, SortedArr<T>& blacklist)
+	RandDistBlacklist(T min, T max, SortedArray<T>& blacklist)
 	    : m_blacklist(blacklist), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
-	RandDistBlacklist(T min, T max, SortedArr<T>&& blacklist)
+	RandDistBlacklist(T min, T max, SortedArray<T>&& blacklist)
 	    : m_blacklist(std::move(blacklist)), m_dist(min, max - m_blacklist.size()), m_range{ min, max } {}
 	template <tx::input_iterator_value_type<T> It>
 	RandDistBlacklist(T min, T max, It begin, It end)
@@ -91,7 +91,7 @@ public:
 	}
 
 private:
-	SortedArr<T> m_blacklist;
+	SortedArray<T> m_blacklist;
 	std::uniform_int_distribution<T> m_dist;
 	struct Range_impl {
 		T min = 0, max = 0;

@@ -14,7 +14,7 @@
 namespace tx {
 
 template <class T, tx::invocable_r<bool, T, T> CmpFunc = std::less<T>>
-class SortedArr {
+class SortedArray {
 	class Sort_impl;
 	struct Placeholder_impl;
 
@@ -24,30 +24,30 @@ public:
 	using It_t = typename std::vector<T>::iterator;
 	using ConstIt_t = typename std::vector<T>::const_iterator;
 
-	SortedArr(CmpFunc&& cmp = CmpFunc{})
+	SortedArray(CmpFunc&& cmp = CmpFunc{})
 	    : cmp(std::move(cmp)) {}
-	SortedArr(size_t size, CmpFunc&& cmp = CmpFunc{})
+	SortedArray(size_t size, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(size), cmp(std::move(cmp)) { sort_impl(); }
-	SortedArr(size_t size, const T& value, CmpFunc&& cmp = CmpFunc{})
+	SortedArray(size_t size, const T& value, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(size, value), cmp(std::move(cmp)) { sort_impl(); }
 	template <tx::input_iterator_value_type<T> It>
-	SortedArr(It begin, It end, CmpFunc&& cmp = CmpFunc{})
+	SortedArray(It begin, It end, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(begin, end), cmp(std::move(cmp)) {
 		sort_impl();
 	}
-	SortedArr(std::span<const T> data, CmpFunc&& cmp = CmpFunc{})
+	SortedArray(std::span<const T> data, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(data.begin(), data.end()), cmp(std::move(cmp)) {
 		sort_impl();
 	}
-	SortedArr(std::initializer_list<T> ilist, CmpFunc&& cmp = CmpFunc{})
+	SortedArray(std::initializer_list<T> ilist, CmpFunc&& cmp = CmpFunc{})
 	    : m_data(ilist), cmp(std::move(cmp)) {
 		sort_impl();
 	}
 
-	SortedArr(const SortedArr&) = default;
-	SortedArr(SortedArr&&) noexcept = default;
-	SortedArr& operator=(const SortedArr&) = default;
-	SortedArr& operator=(SortedArr&&) noexcept = default;
+	SortedArray(const SortedArray&) = default;
+	SortedArray(SortedArray&&) noexcept = default;
+	SortedArray& operator=(const SortedArray&) = default;
+	SortedArray& operator=(SortedArray&&) noexcept = default;
 
 	const T& operator[](size_t index) const { return m_data[index]; }
 
@@ -161,7 +161,7 @@ public:
 	size_t erase(std::initializer_list<T> values) {
 		return erase(std::span<const T>(values.begin(), values.size()));
 	}
-	size_t erase(const SortedArr& other) {
+	size_t erase(const SortedArray& other) {
 		size_t old_size = m_data.size();
 		m_data.erase(
 		    tx::remove_multi_sorted(
@@ -173,10 +173,10 @@ public:
 	}
 
 
-	void merge(const SortedArr& other) {
+	void merge(const SortedArray& other) {
 		merge_impl(other, Placeholder_impl{});
 	}
-	void merge(SortedArr&& other) {
+	void merge(SortedArray&& other) {
 		merge_impl(std::move(other), Placeholder_impl{});
 	}
 	void merge(std::span<const T> other) {
@@ -188,12 +188,12 @@ public:
 
 	// @note predicate don't affect original data, only for incoming merging data
 	template <tx::invocable_r<bool, const T&> Pred>
-	void merge_if(const SortedArr& other, Pred&& pred) {
+	void merge_if(const SortedArray& other, Pred&& pred) {
 		merge_impl(other, std::forward<Pred>(pred));
 	}
 	// @note predicate don't affect original data, only for incoming merging data
 	template <tx::invocable_r<bool, const T&> Pred>
-	void merge_if(SortedArr&& other, Pred&& pred) {
+	void merge_if(SortedArray&& other, Pred&& pred) {
 		merge_impl(std::move(other), std::forward<Pred>(pred));
 	}
 	// @note predicate don't affect original data, only for incoming merging data
@@ -208,8 +208,8 @@ public:
 	}
 
 	struct Inserter {
-		SortedArr<T>* m_parent;
-		Inserter(SortedArr<T>* parent) : m_parent(parent) {}
+		SortedArray<T>* m_parent;
+		Inserter(SortedArray<T>* parent) : m_parent(parent) {}
 		void insert(const T& val) { m_parent->m_data.push_back(val); }
 		void insert(T&& val) { m_parent->m_data.push_back(std::move(val)); }
 	};
@@ -281,12 +281,12 @@ private:
 	}
 
 	template <tx::invocable_r<bool, const T&> Func>
-	void merge_impl(const SortedArr& other, Func&& f) {
+	void merge_impl(const SortedArray& other, Func&& f) {
 		size_t original_size = insert_if_impl(other.begin(), other.end(), std::forward<Func>(f));
 		std::inplace_merge(m_data.begin(), m_data.begin() + original_size, m_data.end(), cmp);
 	}
 	template <tx::invocable_r<bool, const T&> Func>
-	void merge_impl(SortedArr&& other, Func&& f) {
+	void merge_impl(SortedArray&& other, Func&& f) {
 		// Choose the vector with the larger capacity to minimize memory allocations
 		if (other.m_data.capacity() > m_data.capacity()) {
 			if constexpr (!std::is_same_v<std::remove_cvref_t<Func>, Placeholder_impl>) { // if use condition
@@ -318,7 +318,7 @@ private:
 	}
 };
 template <class T>
-using SortedArrInserter = SortedArr<T>::Inserter;
+using SortedArrInserter = SortedArray<T>::Inserter;
 
 
 } // namespace tx

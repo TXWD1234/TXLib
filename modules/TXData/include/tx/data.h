@@ -2,9 +2,9 @@
 // Module: TXData
 
 #pragma once
-#include "impl/parted_arr.hpp"
-#include "impl/circular_arr.hpp"
-#include "impl/sorted_arr.hpp"
+#include "impl/parted_array.hpp"
+#include "impl/circular_array.hpp"
+#include "impl/sorted_array.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/value_group.hpp"
 #include "impl/circular_queue.hpp"

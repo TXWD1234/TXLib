@@ -14,7 +14,7 @@ namespace tx {
 // note: slightly memory wasting comparing to CircularArr but faster
 // order is not garenteed. any pointer is not garenteed to be valid after push_back
 template <class T>
-class PartedArr {
+class PartedArray {
 	// terminology:
 	// part = partition
 public:
@@ -22,8 +22,8 @@ public:
 	using ConstIt_t = typename std::vector<T>::const_iterator;
 
 public:
-	PartedArr(u32 partLen = 64) : PartLen(partLen) {}
-	PartedArr(u32 partCount, u32 partLen)
+	PartedArray(u32 partLen = 64) : PartLen(partLen) {}
+	PartedArray(u32 partCount, u32 partLen)
 	    : m_data(std::vector<T>(partCount * partLen)),
 	      partAttribs(std::vector<PartAttrib_impl>(partCount)),
 	      PartLen(partLen) {
@@ -33,10 +33,10 @@ public:
 		}
 	}
 
-	PartedArr(const PartedArr&) = default;
-	PartedArr(PartedArr&&) noexcept = default;
-	PartedArr& operator=(const PartedArr&) = default;
-	PartedArr& operator=(PartedArr&&) noexcept = default;
+	PartedArray(const PartedArray&) = default;
+	PartedArray(PartedArray&&) noexcept = default;
+	PartedArray& operator=(const PartedArray&) = default;
+	PartedArray& operator=(PartedArray&&) noexcept = default;
 
 	class PartAttrib_impl {
 	public:
@@ -47,7 +47,7 @@ public:
 	};
 	class Partition_impl {
 	public:
-		Partition_impl(PartedArr* in_parent, u32 in_index)
+		Partition_impl(PartedArray* in_parent, u32 in_index)
 		    : parent(in_parent), partIndex(in_index) {}
 
 		T& operator[](u32 index) { return parent->m_data[attrib().offset + index]; }
@@ -82,14 +82,14 @@ public:
 		std::span<T> span() { return std::span<T>{ begin(), end() }; }
 
 	private:
-		PartedArr<T>* parent;
+		PartedArray<T>* parent;
 		u32 partIndex;
 
 		PartAttrib_impl& attrib() const { return parent->partAttribs[partIndex]; }
 	};
 	class ConstPartition_impl {
 	public:
-		ConstPartition_impl(const PartedArr* in_parent, u32 in_index)
+		ConstPartition_impl(const PartedArray* in_parent, u32 in_index)
 		    : parent(in_parent), partIndex(in_index) {}
 
 		const T& operator[](u32 index) const { return parent->m_data[attrib().offset + index]; }
@@ -102,7 +102,7 @@ public:
 		std::span<const T> span() const { return std::span<const T>{ begin(), end() }; }
 
 	private:
-		const PartedArr<T>* parent;
+		const PartedArray<T>* parent;
 		u32 partIndex;
 
 		const PartAttrib_impl& attrib() const { return parent->partAttribs[partIndex]; }
@@ -257,14 +257,14 @@ private:
 // add deletion
 
 template <class T>
-using PartedArr_Partition = typename PartedArr<T>::Partition_impl;
+using PartedArr_Partition = typename PartedArray<T>::Partition_impl;
 template <class T>
-using PartedArr_ConstPartition = typename PartedArr<T>::ConstPartition_impl;
+using PartedArr_ConstPartition = typename PartedArray<T>::ConstPartition_impl;
 
 template <class T, class AttribT>
 class PartedArrAttrib {
 public:
-	PartedArr<T> arr;
+	PartedArray<T> arr;
 	std::vector<AttribT> attrib;
 };
 } // namespace tx

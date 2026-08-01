@@ -8,8 +8,7 @@
 #include "impl/gl_core/vertex_attribute_manager.hpp"
 #include "impl/gl_core/shader.hpp"
 #include "impl/gl_core/utility.hpp"
-#include "impl/render_engine/texture_manager.hpp"
-#include "impl/parted_arr.hpp"
+#include "impl/parted_array.hpp"
 
 #include <variant>
 
@@ -160,7 +159,7 @@ public:
 private:
 	template <class T>
 	struct DBuffer_impl {
-		PartedArr<T> stage;
+		PartedArray<T> stage;
 		BufferHandle<RingBufferObject<T>> buffer;
 	};
 

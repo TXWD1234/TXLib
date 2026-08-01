@@ -13,7 +13,7 @@ namespace tx {
 /**
  * A helper class wrapping a look up table, to perform fast O(1) exist check
  * Only work best for range that's smaller then 1000.
- * If larger than that, you should consider std::unordered_map or tx::KVMap
+ * If larger than that, you should consider std::unordered_map or tx::BinarySetView / tx::AVLTree
  * If memory is major concern, use ValueGroupBitSet instead for 8x smaller memory usage
  * 
  * Usage Syntax:
