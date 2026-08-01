@@ -12,6 +12,10 @@ tx_txlib_module(
 		"data_utils.hpp"
 		"circular_queue.hpp"
 		"binary_set_view.hpp"
+		"avl_tree.hpp"
+		"grow_array.hpp"
+		"basic_storage.hpp"
+		"ring_buffer.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )

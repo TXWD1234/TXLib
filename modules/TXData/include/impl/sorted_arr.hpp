@@ -230,7 +230,7 @@ public:
 	}
 
 
-	u32 index(ConstIt_t it) const { return tx::index(m_data.begin(), it); }
+	u32 index(ConstIt_t it) const { return findIteratorIndex(m_data.begin(), it); }
 
 	void sort() { sort_impl(); }
 

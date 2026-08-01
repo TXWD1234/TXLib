@@ -93,16 +93,28 @@ public:
 	}
 	constexpr Coord(const Coord&) = default;
 
-	constexpr inline Coord operator+(const Coord& other) const { return Coord(this->x + other.x, this->y + other.y); }
-	constexpr inline Coord operator-(const Coord& other) const { return Coord(this->x - other.x, this->y - other.y); }
-	constexpr inline Coord operator+=(const Coord& other) {
+	friend constexpr inline Coord operator+(Coord a, const Coord& other) { return a += other; }
+	friend constexpr inline Coord operator-(Coord a, const Coord& other) { return a -= other; }
+	friend constexpr inline Coord operator*(Coord a, const Coord& other) { return a *= other; }
+	friend constexpr inline Coord operator/(Coord a, const Coord& other) { return a /= other; }
+	constexpr inline Coord& operator+=(const Coord& other) {
 		this->x += other.x;
 		this->y += other.y;
 		return *this;
 	}
-	constexpr inline Coord operator-=(const Coord& other) {
+	constexpr inline Coord& operator-=(const Coord& other) {
 		this->x -= other.x;
 		this->y -= other.y;
+		return *this;
+	}
+	constexpr inline Coord& operator*=(const Coord& other) {
+		this->x *= other.x;
+		this->y *= other.y;
+		return *this;
+	}
+	constexpr inline Coord& operator/=(const Coord& other) {
+		this->x /= other.x;
+		this->y /= other.y;
 		return *this;
 	}
 

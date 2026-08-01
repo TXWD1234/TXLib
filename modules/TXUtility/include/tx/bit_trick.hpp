@@ -34,7 +34,7 @@ using underlying_t = typename underlying<T>::type;
 // **************** setters ****************
 
 template <bit_eligible T>
-T combined(T target, T val) {
+T combine_copy(T target, T val) {
 	using U = underlying_t<T>;
 	const U vtarget = static_cast<U>(target);
 	const U vval = static_cast<U>(val);
@@ -42,10 +42,10 @@ T combined(T target, T val) {
 	    vtarget | vval);
 }
 template <bit_eligible T>
-void combine(T& target, T val) { target = combined(target, val); }
+void combine(T& target, T val) { target = combine_copy(target, val); }
 
 template <bit_eligible T>
-T erased(T target, T val) {
+T erase_copy(T target, T val) {
 	using U = underlying_t<T>;
 	const U vtarget = static_cast<U>(target);
 	const U vval = static_cast<U>(val);
@@ -53,37 +53,36 @@ T erased(T target, T val) {
 	    vtarget & (~vval));
 }
 template <bit_eligible T>
-void erase(T& target, T val) { target = erased(target, val); }
+void erase(T& target, T val) { target = erase_copy(target, val); }
 
 // set_true / set_false
+
+template <bit_eligible T>
+T setFalse_copy(T target, T val) { return erase_copy(target, val); }
 template <bool boolean, bit_eligible T>
-T setted(T target, T val) {
-	if constexpr (boolean) {
-		return combined(target, val); // set true
-	} else {
-		return erased(target, val); // set false
-	}
-}
-// set_true / set_false
+void setFalse(T& target, T val) { erase(target, val); }
+
+template <bit_eligible T>
+T setTrue_copy(T target, T val) { return combine_copy(target, val); }
 template <bool boolean, bit_eligible T>
-void set(T& target, T val) { target = setted<boolean>(target, val); }
+void setTrue(T& target, T val) { combine(target, val); }
 
 // set_true / set_false
 template <bit_eligible T>
-T setted(T target, T val, bool boolean) {
+T set_copy(T target, T val, bool boolean) {
 	if (boolean) {
-		return combined(target, val); // set true
+		return combine_copy(target, val); // set true
 	} else {
-		return erased(target, val); // set false
+		return erase_copy(target, val); // set false
 	}
 }
 // set_true / set_false
 template <bit_eligible T>
-void set(T& target, T val, bool boolean) { target = setted(target, val, boolean); }
+void set(T& target, T val, bool boolean) { target = set_copy(target, val, boolean); }
 
 // set bit mask
 template <bit_eligible T>
-T setted(T target, T val, T mask) {
+T set_copy(T target, T val, T mask) {
 	using U = underlying_t<T>;
 	const U vtarget = static_cast<U>(target);
 	const U vval = static_cast<U>(val);
@@ -93,11 +92,25 @@ T setted(T target, T val, T mask) {
 }
 // set bit mask
 template <bit_eligible T>
-void set(T& target, T val, T mask) { target = setted(target, val, mask); }
+void set(T& target, T val, T mask) { target = set_copy(target, val, mask); }
+
+// set index
+// @param index maxinum value is 63
+template <bit_eligible T>
+T setIndex_copy(T target, u8 index, bool val) {
+	using U = underlying_t<T>;
+	const U vtarget = static_cast<U>(target);
+	return static_cast<T>(
+	    vtarget | (val << (7 - index)));
+}
+// set index
+// @param index maxinum value is 63
+template <bit_eligible T>
+void setIndex(T& target, u8 index, bool val) { target = setIndex_copy(target, index, val); }
 
 // flip each bit
 template <bit_eligible T>
-T flipped(T target) {
+T flip_copy(T target) {
 	using U = underlying_t<T>;
 	const U vtarget = static_cast<U>(target);
 	return static_cast<T>(
@@ -105,7 +118,7 @@ T flipped(T target) {
 }
 // flip each bit
 template <bit_eligible T>
-void flip(T& target) { target = flipped(target); }
+void flip(T& target) { target = flip_copy(target); }
 
 /**
  * @param target the data variable
@@ -113,7 +126,7 @@ void flip(T& target) { target = flipped(target); }
  * @note for every `1` bit in mask, the same bit at `target` will be flipped
  */
 template <bit_eligible T>
-T flipped(T target, T mask) {
+T flip_copy(T target, T mask) {
 	using U = underlying_t<T>;
 	const U vtarget = static_cast<U>(target);
 	const U vmask = static_cast<U>(mask);
@@ -126,7 +139,7 @@ T flipped(T target, T mask) {
  * @note for every `1` bit in mask, the same bit at `target` will be flipped
  */
 template <bit_eligible T>
-void flip(T& target, T mask) { target = flipped(target, mask); }
+void flip(T& target, T mask) { target = flip_copy(target, mask); }
 
 // **************** getters ****************
 
@@ -163,7 +176,7 @@ bool contains_none(T target, T val) { return excludes(target, val); }
 /**
  * Note for whoever wants to commit:
  * Please change API nameing:
- * - fix the `setted` English error. Suggestion: use `*_copy` for every of them. remember to keep consistency.
+ * - fix the `set_copy` English error. Suggestion: use `*_copy` for every of them. remember to keep consistency.
  * - delete the `includes`, `overlaps`, `excludes` API alias, and just use `contains_*`
  * I cannot do this myself because TX_Jerry is stopping me to do so.
  * Thank you very much!

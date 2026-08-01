@@ -3,6 +3,8 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
+#include <stdexcept>
+#include <vector>
 
 namespace tx {
 

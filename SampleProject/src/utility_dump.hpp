@@ -5,7 +5,8 @@
 //#include "tx/map.h"
 //#include "tx/json.h"
 #include "tx/resource.h"
-#include "tx/data.h" 
+#include "tx/data.h"
+#include "tx/utility.h"
 #include <bits/stdc++.h>
 
 using std::cin;
@@ -14,9 +15,6 @@ using std::endl;
 using std::string;
 using std::vector;
 
-namespace std {
-using bitSpan = span<tx::u8>;
-}
 
 namespace tx {
 
@@ -24,7 +22,7 @@ namespace RenderEngine {
 
 const fs::path shaderPath = tx::getExeDir() / "assets/shaders";
 
-std::string readShaderSource(const std::string& filename) {
+inline std::string readShaderSource(const std::string& filename) {
 	return readWholeFileText(shaderPath / filename);
 }
 
