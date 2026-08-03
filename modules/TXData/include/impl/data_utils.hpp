@@ -23,4 +23,12 @@ inline void free(T* ptr) {
 	if (!ptr) return;
 	::operator delete(ptr, std::align_val_t{ alignof(T) });
 }
+struct IndexRange {
+	u32 offset = 0;
+	u32 size = 0;
+
+	[[nodiscard]] constexpr u32 begin() const noexcept { return offset; }
+	[[nodiscard]] constexpr u32 end() const noexcept { return offset + size; }
+	[[nodiscard]] constexpr bool empty() const noexcept { return size == 0; }
+};
 } // namespace tx
