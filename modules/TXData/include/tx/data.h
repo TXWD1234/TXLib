@@ -13,6 +13,7 @@
 #include "impl/grow_array.hpp"
 #include "impl/basic_storage.hpp"
 #include "impl/ring_buffer.hpp"
+#include "impl/packed_parted_array.hpp"
 
 /**
  * Terminology:
@@ -32,6 +33,20 @@
  *   by itself.
  *   But the user of the data structure can manipulate the data by calling
  *   methods of the data structure or geting the reference to the raw data.
+ * 
+ * - Buffer
+ *   A contiguous chunck of raw memory, without any algorithm above it or
+ *   operating it.
+ * 
+ * - Array:
+ *   A buffer that has an algorithm above it or operating it, making it perform
+ *   certain behavior. An Array have to be encapsulated in a class.
+ * 
+ * - Vector:
+ *   An array with the ability to self reallocate / self resize. Also known as
+ *   a DynamicArray.
+ * 
+ * 
  *   
  * 
  */
