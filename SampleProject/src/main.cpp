@@ -1,4 +1,5 @@
 #include "Project.hpp"
+#include "impl/binary_set_view.hpp"
 // #include "stb_image.hpp"
 // #include <concepts>
 
@@ -475,6 +476,17 @@ void test_custom_comparator() {
 // ---- Main ----
 
 int main() {
+	auto cmp = [](int, int) -> bool {
+		return true;
+	};
+	tx::InplaceBinarySetView<int, decltype(cmp)> aaa = tx::InplaceBinarySetView(std::span<int>{}, cmp);
+
+	auto bbb = tx::InplaceBinarySetView(std::span<int>{}, [](int, int) -> bool {
+		return true;
+	});
+
+
+
 	std::cout << "AVLTree Test Suite\n";
 	std::cout << "==================\n";
 

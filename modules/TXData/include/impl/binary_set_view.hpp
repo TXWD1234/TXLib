@@ -179,12 +179,33 @@ private:
 	bool validIt_impl(It_t it) const { return it != m_data.end(); }
 };
 
-template <class T>
-using InplaceBinarySetView = BinarySetView<T, false, false>;
-template <class T>
-using IndexedInplaceBinarySetView = BinarySetView<T, false, true>;
-template <class T>
-using DetachedBinarySetView = BinarySetView<T, true, false>;
-template <class T>
-using MappedBinarySetView = BinarySetView<T, true, true>;
+// keepOriginalData=false → non-owning span<T>
+template <class T, class CompareFunc>
+BinarySetView(std::span<T>, CompareFunc) -> BinarySetView<T, false, false, CompareFunc>;
+
+template <class T, class CompareFunc>
+BinarySetView(std::span<T>, CompareFunc) -> BinarySetView<T, false, true, CompareFunc>;
+
+// keepOriginalData=true → owning copy, span<const T>
+template <class T, class CompareFunc>
+BinarySetView(std::span<const T>, CompareFunc) -> BinarySetView<T, true, false, CompareFunc>;
+
+template <class T, class CompareFunc>
+BinarySetView(std::span<const T>, CompareFunc) -> BinarySetView<T, true, true, CompareFunc>;
+
+template <class T, class CompareFunc = std::less<>>
+    requires std::is_invocable_r_v<bool, CompareFunc, T, T>
+using InplaceBinarySetView = BinarySetView<T, false, false, CompareFunc>;
+
+template <class T, class CompareFunc = std::less<>>
+    requires std::is_invocable_r_v<bool, CompareFunc, T, T>
+using IndexedInplaceBinarySetView = BinarySetView<T, false, true, CompareFunc>;
+
+template <class T, class CompareFunc = std::less<>>
+    requires std::is_invocable_r_v<bool, CompareFunc, T, T>
+using DetachedBinarySetView = BinarySetView<T, true, false, CompareFunc>;
+
+template <class T, class CompareFunc = std::less<>>
+    requires std::is_invocable_r_v<bool, CompareFunc, T, T>
+using MappedBinarySetView = BinarySetView<T, true, true, CompareFunc>;
 } // namespace tx
