@@ -72,8 +72,6 @@ concept contiguous_iterator_value_type =
     iterator_value_type<It, T>;
 
 
-class vec2;
-
 enum class TypeEnum : u32 {
 	Float,
 	Int,

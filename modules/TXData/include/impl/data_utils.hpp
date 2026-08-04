@@ -9,7 +9,7 @@
 namespace tx {
 template <std::input_iterator It>
 inline u32 findIteratorIndex(It begin, It it) {
-	return static_cast<u32>(std::distance(begin, it)); // O(n)
+	return static_cast<u32>(std::distance(begin, it));
 }
 
 template <class T>
@@ -23,6 +23,7 @@ inline void free(T* ptr) {
 	if (!ptr) return;
 	::operator delete(ptr, std::align_val_t{ alignof(T) });
 }
+
 struct IndexRange {
 	u32 offset = 0;
 	u32 size = 0;
