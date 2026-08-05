@@ -2,7 +2,6 @@
 // Module: TXData
 
 #pragma once
-#include "impl/avl_tree.hpp"
 #include "tx/basic_types.hpp"
 #include "impl/data_utils.hpp"
 #include "tx/exception.hpp"
@@ -21,16 +20,24 @@ class PackedPartedArrayOverlay {
 	/**
 	 * The size of each partition that is not at the back is unable to change.
 	 * Only the partition at the back (called BackPartition) can be freely
-	 * modified like a normal std::vector
+	 * modified like a normal std::vector.
+	 * 
+	 * All the accessor functions works across all partitions, returning
+	 * uniform results: Partition/ConstPartition. To obtain a size-mutable
+	 * partition proxy, use backPartition().
+	 * 
+	 * A new constructed object of this class is unable to do anything except
+	 * create a new partition. Having at least one partition is required for
+	 * anything to be written on the data buffer.
 	 */
 public:
 	using value_type = T;
 
 public:
 	PackedPartedArrayOverlay(T* ptr, u32 size, u32* metaPtr, u32 metaSize)
-	    : m_data(ptr), m_size(0), m_capacity(size),
-	      m_meta(metaPtr), m_metaSize(0), m_metaCapacity(metaSize),
-	      m_backPart(0, 0) {
+	    : m_data(ptr), m_capacity(size),
+	      m_meta(metaPtr), m_metaSize(1), m_metaCapacity(metaSize) {
+		m_meta[0] = 0;
 	}
 	PackedPartedArrayOverlay() = default;
 
@@ -50,7 +57,10 @@ public:
 		 */
 
 	public:
-		BackPartition() = default;
+		// default constructor is delibrately removed. only copy constructors
+		// are available, and only way to obtain a object of this class is by
+		// tx::PackedPartedArrayOverlay::backPartition(). Think of this like
+		// std::vector::iterator.
 
 		// ================ Viewers ================
 
@@ -70,7 +80,7 @@ public:
 		iterator begin() const { return span().begin(); }
 		iterator end() const { return span().end(); }
 
-		u32 capacity() const { return m_parent->capacity_elements(); }
+		u32 capacity() const { return m_parent->capacity_elements() - range_impl().offset; }
 
 		// ================ Modifiers ================
 
@@ -95,21 +105,19 @@ public:
 		void pop_back() {
 			assert_impl([&]() { return this->size() > 0; },
 			            "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
-			m_parent->m_size--;
-			IndexRange& range = range_impl();
-			range.size--;
-			std::destroy_at(m_parent->m_data + range.end());
+			u32 head = m_parent->m_metaSize - 1;
+			m_parent->m_meta[head]--;
+			std::destroy_at(m_parent->m_data + m_parent->m_meta[head]);
 		}
 
 		void clear() {
-			IndexRange& range = range_impl();
+			IndexRange range = range_impl();
 			if (range.size == 0) return;
 
 			std::destroy(m_parent->m_data + range.offset,
 			             m_parent->m_data + range.offset + range.size);
 
-			m_parent->m_size -= range.size;
-			range.size = 0;
+			m_parent->m_meta[m_parent->m_metaSize - 1] = range.offset;
 		}
 
 		iterator erase(const_iterator pos) {
@@ -122,7 +130,7 @@ public:
 			if (eraseCount == 0)
 				return begin() + eraseOffset;
 
-			IndexRange& range = range_impl();
+			IndexRange range = range_impl();
 			assert_impl([&]() { return eraseOffset + eraseCount <= range.size; },
 			            "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
 
@@ -133,8 +141,7 @@ public:
 			std::move(erasePtr + eraseCount, partEnd, erasePtr);
 			std::destroy(partEnd - eraseCount, partEnd);
 
-			range.size -= eraseCount;
-			m_parent->m_size -= eraseCount;
+			m_parent->m_meta[m_parent->m_metaSize - 1] -= eraseCount;
 
 			return begin() + eraseOffset;
 		}
@@ -175,14 +182,18 @@ public:
 	private:
 		PackedPartedArrayOverlay<T>* m_parent = nullptr;
 
-		IndexRange& range_impl() { return m_parent->m_backPart; }
+		IndexRange range_impl() const {
+			u32 head = m_parent->m_metaSize - 1;
+			u32 offset = m_parent->m_meta[head - 1];
+			return IndexRange{ offset, m_parent->m_meta[head] - offset };
+		}
 		u32 itIndex_impl(const_iterator it) const { return findIteratorIndex(this->cbegin(), it); }
 
 		T* push_impl(u32 count = 1) {
-			IndexRange& range = range_impl();
-			range.size += count;
-			m_parent->m_size += count;
-			return m_parent->m_data + range.end() - count;
+			u32 head = m_parent->m_metaSize - 1;
+			T* ptr = m_parent->m_data + m_parent->m_meta[head];
+			m_parent->m_meta[head] += count;
+			return ptr;
 		}
 
 		// using STL's 2 phase move optimization
@@ -191,9 +202,8 @@ public:
 		// @return `first`: the pointer to the first element made available
 		//         `second`: the size of trailing uninitialized memory
 		std::pair<T*, u32> makeSpace_impl(u32 begin, u32 size = 1) {
-			IndexRange& range = range_impl();
+			IndexRange range = range_impl();
 			T* eraseBegin = m_parent->m_data + range.begin() + begin;
-			T* eraseEnd = eraseBegin + size;
 			T* partEnd = m_parent->m_data + range.end();
 
 			u32 uninitMemSize = 0;
@@ -205,8 +215,7 @@ public:
 				std::move_backward(eraseBegin, partEnd - size, partEnd);
 			}
 
-			m_parent->m_size += size;
-			range.size += size;
+			m_parent->m_meta[m_parent->m_metaSize - 1] += size;
 			return { eraseBegin, uninitMemSize };
 		}
 
@@ -217,12 +226,12 @@ public:
 
 	// ################ Viewers ################
 
-	u32 size_elements() const { return m_size; }
-	u32 size_partitions() const { return partSize_impl(); }
+	u32 size_elements() const { return m_meta[m_metaSize - 1]; }
+	u32 size_partitions() const { return m_metaSize - 1; }
 	u32 capacity_elements() const { return m_capacity; }
-	u32 capacity_partitions() const { return m_metaCapacity; }
+	u32 capacity_partitions() const { return m_metaCapacity - 1; }
 
-	bool empty() const { return !size_elements() && !size_partitions(); }
+	bool empty() const { return !size_partitions(); }
 	operator bool() const { return !empty(); }
 
 	// data of elements
@@ -230,34 +239,40 @@ public:
 	// user don't suppose to access m_meta buffer directly
 
 	ConstPartition front() const {
-		assert_impl([&]() { return m_metaSize >= 1; },
+		assert_impl([&]() { return m_metaSize >= 2; },
 		            "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	Partition front() {
-		assert_impl([&]() { return m_metaSize >= 1; },
+		assert_impl([&]() { return m_metaSize >= 2; },
 		            "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	ConstPartition back() const {
-		assert_impl([&]() { return m_metaSize >= 1; },
+		assert_impl([&]() { return m_metaSize >= 2; },
 		            "tx::PackedPartedArray::back(): Call on empty object.");
-		return ConstPartition(m_data + m_backPart.begin(), m_data + m_backPart.end());
+		return at_impl(m_metaSize - 2);
 	}
 	// special function that returns an expandable partition
 	BackPartition back() {
-		assert_impl([&]() { return m_metaSize >= 1; },
+		assert_impl([&]() { return m_metaSize >= 2; },
 		            "tx::PackedPartedArray::back(): Call on empty object.");
+		return at_impl(m_metaSize - 2);
+	}
+
+	BackPartition backPartition() {
+		assert_impl([&]() { return m_metaSize >= 2; },
+		            "tx::PackedPartedArray::backPartition(): Call on empty object.");
 		return BackPartition(this);
 	}
 
 	ConstPartition operator[](u32 index) const {
-		assert_impl([&]() { return m_metaSize > index; },
+		assert_impl([&]() { return m_metaSize - 1 > index; },
 		            "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
 	Partition operator[](u32 index) {
-		assert_impl([&]() { return m_metaSize > index; },
+		assert_impl([&]() { return m_metaSize - 1 > index; },
 		            "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
@@ -265,10 +280,8 @@ public:
 	// ################ Modifiers ################
 
 	BackPartition push_back() {
-		if (m_backPart.offset != InvalidU32)
-			*(m_meta + m_metaSize++) = m_backPart.offset;
-		m_backPart.offset = m_size;
-		m_backPart.size = 0;
+		m_meta[m_metaSize] = m_meta[m_metaSize - 1];
+		m_metaSize++;
 		return BackPartition(this);
 	}
 	template <class... Args>
@@ -281,50 +294,37 @@ public:
 	}
 
 	void pop_back() {
-		assert_impl([&]() { return m_backPart.offset != InvalidU32; },
+		assert_impl([&]() { return m_metaSize >= 2; },
 		            "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
-		std::destroy(m_data + m_backPart.begin(), m_data + m_backPart.end());
-		m_size -= m_backPart.size;
-		if (m_metaSize > 0) {
-			m_backPart.offset = *(m_meta + --m_metaSize);
-			m_backPart.size = m_size - m_backPart.offset;
-		} else {
-			m_backPart.offset = InvalidU32;
-			m_backPart.size = 0;
-		}
+		std::destroy(m_data + m_meta[m_metaSize - 2], m_data + m_meta[m_metaSize - 1]);
+		m_metaSize--;
 	}
 	void clear() {
-		std::destroy(m_data, m_data + m_size);
-		std::destroy(m_meta, m_meta + m_metaSize);
-		m_size = 0;
-		m_metaSize = 0;
-		m_backPart.offset = InvalidU32;
-		m_backPart.size = 0;
+		std::destroy(m_data, m_data + m_meta[m_metaSize - 1]);
+		m_metaSize = 1;
+		m_meta[0] = 0;
 	}
-
 
 private:
 	T* m_data = nullptr;
-	u32 m_size = 0,
-	    m_capacity = 0;
+	u32 m_capacity = 0;
 	u32* m_meta = nullptr;
 	u32 m_metaSize = 0,
 	    m_metaCapacity = 0;
-	IndexRange m_backPart{
-		.offset = InvalidU32,
-		.size = 0,
-	}; // back partition
 
 	/**
-	 * The backPart is excluded from m_meta. Once a new partition is created,
-	 * the current backPart is pushed into m_meta.
+	 * Each element of m_meta is the `offset` / begin of a partition.
+	 * The last element of m_meta is equivalent with m_size: the total count of
+	 * elements in the buffer. It also represents the end of the last partition.
+	 * Therefore, the range of every partition can be calculated with the same
+	 * algorithm (at_impl) without edge cases.
+	 * 
 	 */
 
 	Partition at_impl(u32 index) const {
 		return Partition(m_data + m_meta[index],
-		                 m_data + (index >= m_metaSize - 1 ? m_backPart.offset : m_meta[index + 1]));
+		                 m_data + m_meta[index + 1]);
 	}
-	u32 partSize_impl() const { return m_backPart.offset == InvalidU32 ? 0 : m_metaSize + 1; }
 
 protected:
 };
