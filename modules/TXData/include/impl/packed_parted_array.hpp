@@ -2,6 +2,7 @@
 // Module: TXData
 
 #pragma once
+#include "impl/avl_tree.hpp"
 #include "tx/basic_types.hpp"
 #include "impl/data_utils.hpp"
 #include "tx/exception.hpp"
@@ -12,14 +13,24 @@
 #include <span>
 
 namespace tx {
+// Packed Partitioned Array, made for building a write once, read many buffer
+// All partitions are packed together without gap, producing maximum memory
+// efficiency and cache locality
 template <class T>
 class PackedPartedArrayOverlay {
+	/**
+	 * The size of each partition that is not at the back is unable to change.
+	 * Only the partition at the back (called BackPartition) can be freely
+	 * modified like a normal std::vector
+	 */
 public:
 	using value_type = T;
 
 public:
-	PackedPartedArrayOverlay(T* ptr, u32 size, IndexRange* metaPtr, u32 metaSize)
-	    : m_data(ptr), m_size(0), m_capacity(size), m_meta(metaPtr), m_metaSize(0), m_metaCapacity(metaSize) {
+	PackedPartedArrayOverlay(T* ptr, u32 size, u32* metaPtr, u32 metaSize)
+	    : m_data(ptr), m_size(0), m_capacity(size),
+	      m_meta(metaPtr), m_metaSize(0), m_metaCapacity(metaSize),
+	      m_backPart(0, 0) {
 	}
 	PackedPartedArrayOverlay() = default;
 
@@ -44,7 +55,7 @@ public:
 		// ================ Viewers ================
 
 		std::span<T> span() const {
-			if (!m_parent || m_partIndex == InvalidU32) return {};
+			if (!m_parent) return {};
 			IndexRange range = range_impl();
 			return std::span<T>(m_parent->m_data + range.offset, range.size);
 		}
@@ -163,9 +174,8 @@ public:
 
 	private:
 		PackedPartedArrayOverlay<T>* m_parent = nullptr;
-		u32 m_partIndex = InvalidU32;
 
-		IndexRange& range_impl() { return m_parent->m_meta[m_partIndex]; }
+		IndexRange& range_impl() { return m_parent->m_backPart; }
 		u32 itIndex_impl(const_iterator it) const { return findIteratorIndex(this->cbegin(), it); }
 
 		T* push_impl(u32 count = 1) {
@@ -202,13 +212,13 @@ public:
 
 	private:
 		BackPartition(PackedPartedArrayOverlay<T>* parent)
-		    : m_parent(parent), m_partIndex(parent->m_metaSize - 1) {}
+		    : m_parent(parent) {}
 	};
 
 	// ################ Viewers ################
 
 	u32 size_elements() const { return m_size; }
-	u32 size_partitions() const { return m_metaSize; }
+	u32 size_partitions() const { return partSize_impl(); }
 	u32 capacity_elements() const { return m_capacity; }
 	u32 capacity_partitions() const { return m_metaCapacity; }
 
@@ -217,7 +227,7 @@ public:
 
 	// data of elements
 	T* data() const { return m_data; }
-	// user don't suppose to access meta buffer directly
+	// user don't suppose to access m_meta buffer directly
 
 	ConstPartition front() const {
 		assert_impl([&]() { return m_metaSize >= 1; },
@@ -232,7 +242,7 @@ public:
 	ConstPartition back() const {
 		assert_impl([&]() { return m_metaSize >= 1; },
 		            "tx::PackedPartedArray::back(): Call on empty object.");
-		return at_impl(m_metaSize - 1);
+		return ConstPartition(m_data + m_backPart.begin(), m_data + m_backPart.end());
 	}
 	// special function that returns an expandable partition
 	BackPartition back() {
@@ -255,31 +265,41 @@ public:
 	// ################ Modifiers ################
 
 	BackPartition push_back() {
-		std::construct_at(m_meta + m_metaSize++, m_size, 0);
+		if (m_backPart.offset != InvalidU32)
+			*(m_meta + m_metaSize++) = m_backPart.offset;
+		m_backPart.offset = m_size;
+		m_backPart.size = 0;
 		return BackPartition(this);
 	}
 	template <class... Args>
 	    requires requires(BackPartition& p, Args&&... args) {
 		    p.push_back(std::forward<Args>(args)...);
-	    }
+	    } && (sizeof...(Args) > 0)
 	BackPartition push_back(Args&&... args) {
-		std::construct_at(m_meta + m_metaSize++, m_size, 0);
-		BackPartition(this).push_back(std::forward<Args>(args)...);
+		push_back().push_back(std::forward<Args>(args)...);
 		return BackPartition(this);
 	}
 
 	void pop_back() {
-		m_metaSize--;
-		IndexRange range = m_meta[m_metaSize];
-		m_size -= range.size;
-		std::destroy(m_data + range.begin(), m_data + range.end());
-		std::destroy_at(m_meta + m_metaSize);
+		assert_impl([&]() { return m_backPart.offset != InvalidU32; },
+		            "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
+		std::destroy(m_data + m_backPart.begin(), m_data + m_backPart.end());
+		m_size -= m_backPart.size;
+		if (m_metaSize > 0) {
+			m_backPart.offset = *(m_meta + --m_metaSize);
+			m_backPart.size = m_size - m_backPart.offset;
+		} else {
+			m_backPart.offset = InvalidU32;
+			m_backPart.size = 0;
+		}
 	}
 	void clear() {
 		std::destroy(m_data, m_data + m_size);
 		std::destroy(m_meta, m_meta + m_metaSize);
 		m_size = 0;
 		m_metaSize = 0;
+		m_backPart.offset = InvalidU32;
+		m_backPart.size = 0;
 	}
 
 
@@ -287,14 +307,24 @@ private:
 	T* m_data = nullptr;
 	u32 m_size = 0,
 	    m_capacity = 0;
-	IndexRange* m_meta = nullptr;
+	u32* m_meta = nullptr;
 	u32 m_metaSize = 0,
 	    m_metaCapacity = 0;
+	IndexRange m_backPart{
+		.offset = InvalidU32,
+		.size = 0,
+	}; // back partition
+
+	/**
+	 * The backPart is excluded from m_meta. Once a new partition is created,
+	 * the current backPart is pushed into m_meta.
+	 */
 
 	Partition at_impl(u32 index) const {
-		return Partition(m_data + m_meta[index].begin(),
-		                 m_data + m_meta[index].end());
+		return Partition(m_data + m_meta[index],
+		                 m_data + (index >= m_metaSize - 1 ? m_backPart.offset : m_meta[index + 1]));
 	}
+	u32 partSize_impl() const { return m_backPart.offset == InvalidU32 ? 0 : m_metaSize + 1; }
 
 protected:
 };
