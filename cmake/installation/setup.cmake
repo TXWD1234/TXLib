@@ -85,6 +85,8 @@ else() # add the whole library
 
 	# note: because TXLib_MODULES list is already topologically sorted, therefore no sorting required.
 	foreach(MODULE IN LISTS TXLib_MODULES)
+		tx_log_verbose("Adding ${MODULE}")
+
 		tx_add_module("${MODULE}")
 	endforeach()
 endif()

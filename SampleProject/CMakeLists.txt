@@ -20,15 +20,6 @@ tx_add_txlib(
 		"../"
 	BIN_DIR
 		"./build/TXLib"
-	MODULES
-		TXFoundation
-		TXMath
-		TXData
-		TXUtility
-		
-		TXGrid
-		TXResource
-		TXGraphics
 )
 
 add_executable(TXProject 
