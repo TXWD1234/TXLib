@@ -17,9 +17,10 @@ function(tx_add_txlib)
 	# resolve BIN_DIR
 	if(ARG_BIN_DIR)
 		message(VERBOSE "add_txlib.cmake: Using specialized bin dir: ${ARG_BIN_DIR}")
-		set(TXLib_BINARY_DIR "${ARG_BIN_DIR}")
+		set(TXLib_BINARY_DIR "${ARG_BIN_DIR}/TXLib")
 	else()
 		message(VERBOSE "add_txlib.cmake: Using default bin dir: \${CMAKE_CURRENT_BINARY_DIR}: ${CMAKE_CURRENT_BINARY_DIR}")
+		set(TXLib_BINARY_DIR "${TXLib_BINARY_DIR}/TXLib")
 	endif()
 
 	# prepare source
@@ -37,7 +38,6 @@ function(tx_add_txlib)
 			message(VERBOSE "add_txlib.cmake: LOCAL_DIR path not found! downloading TXLib.")
 			set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 		endif()
-		set(TXLib_BINARY_DIR "${TXLib_BINARY_DIR}/TXLib")
 	endif()
 
 	if(REQUIRE_REMOTE_DOWNLOAD) # fetch from remote

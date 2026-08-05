@@ -2,34 +2,9 @@
 
 cmake_minimum_required(VERSION 4.2)
 
-# Modules
-add_subdirectory("TXMath")
-add_subdirectory("TXMap")
-add_subdirectory("TXJson")
-add_subdirectory("TXGrid")
-add_subdirectory("TXResource")
-add_subdirectory("TXData")
-add_subdirectory("TXGraphics")
-add_subdirectory("TXUtility")
-
-# Umbrella target for everything
-if(TARGET TXLib)
-	return()
-endif()
-
-add_library(TXLib INTERFACE
-	"${CMAKE_CURRENT_SOURCE_DIR}/include/tx/txlib.h"
-)
-target_link_libraries(TXLib INTERFACE
-	TXMath
-	TXMap
-	TXJson
-	TXGrid
-	TXResource
-	TXData
-	TXGraphics
-	TXUtility
-)
-target_include_directories(TXLib INTERFACE
-	${CMAKE_CURRENT_SOURCE_DIR}/include
+tx_add_txlib(
+	LOCAL_DIR
+		"${CMAKE_CURRENT_SOURCE_DIR}"
+	BIN_DIR
+		"${CMAKE_CURRENT_BINARY_DIR}"
 )

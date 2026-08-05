@@ -78,17 +78,21 @@ if(TXLib_INSTALLATION_MODULES) # if given requested modules
 	endforeach()
 
 else() # add the whole library
+	# note: because TXLib_MODULES list is already topologically sorted, therefore no sorting required.
+	set(TXLib_INSTALLATION_MODULES ${TXLib_MODULES})
+
 	tx_log_verbose("Modules:")
-	foreach(MODULE IN LISTS TXLib_MODULES)
+	foreach(MODULE IN LISTS TXLib_INSTALLATION_MODULES)
 		tx_log_verbose("  ${MODULE}")
 	endforeach()
 
-	# note: because TXLib_MODULES list is already topologically sorted, therefore no sorting required.
-	foreach(MODULE IN LISTS TXLib_MODULES)
+	foreach(MODULE IN LISTS TXLib_INSTALLATION_MODULES)
 		tx_log_verbose("Adding ${MODULE}")
 
 		tx_add_module("${MODULE}")
 	endforeach()
 endif()
+
+include("${TXLib_INSTALLATION_DIR}/add_umbrella_target.cmake")
 
 tx_log("Done adding TXLib.")

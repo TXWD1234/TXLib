@@ -19,7 +19,7 @@ tx_add_txlib(
 	LOCAL_DIR
 		"../"
 	BIN_DIR
-		"./build/TXLib"
+		"./build"
 )
 
 add_executable(TXProject 
@@ -37,14 +37,7 @@ target_compile_features(TXProject PUBLIC cxx_std_23)
 
 # dependencies
 target_link_libraries(TXProject PRIVATE 
-	TXFoundation
-	TXMath
-	TXData
-	TXUtility
-	
-	TXGrid
-	TXResource
-	TXGraphics
+	TXLib
 )
 
 # optimization
