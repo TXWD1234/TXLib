@@ -40,6 +40,14 @@ concept any_of = (std::same_as<T, Ts> || ...);
 template <class T>
 concept numeric = (std::integral<T> || std::floating_point<T>) && !std::same_as<T, bool>;
 
+// allocator
+template <typename Alloc>
+concept allocator = requires(Alloc a, std::size_t n) {
+	typename Alloc::value_type;
+	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
+	{ a.deallocate(a.allocate(n), n) } -> std::same_as<void>;
+};
+
 // std add on
 
 // std::invocable with return type
