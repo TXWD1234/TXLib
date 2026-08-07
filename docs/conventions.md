@@ -42,4 +42,19 @@ TXData: BinarySetView [3]: Refactor ...
 
 ## PR
 
-# File Names
+# Code
+## Naming
+| Field | Specification |
+| - | - |
+| Variable     | camelCase  |
+| Function     | camelCase  |
+| Class / Type | PascalCase |
+| Concept      | snake_case |
+
+### Special Case
+- Anything about Type Traits are in snake_case.
+- Basic math types such as `u32` and `vec2` are in snake_case, as long as there's only one word. (so the `_` is never used)
+
+### Rules
+- Class members all have `m_` prefix.
+- Class implementation functions and classes all have `_impl` suffix.
