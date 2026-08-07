@@ -54,6 +54,7 @@ TXData: BinarySetView [3]: Refactor ...
 ### Special Case
 - Anything about Type Traits are in snake_case.
 - Basic math types such as `u32` and `vec2` are in snake_case, as long as there's only one word. (so the `_` is never used)
+- Std addons follows whatever naming convensions that Std compoenent has.
 
 ### Rules
 - Class members all have `m_` prefix.
