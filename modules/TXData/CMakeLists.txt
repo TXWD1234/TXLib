@@ -10,6 +10,7 @@ tx_txlib_module(
 		"parted_array.hpp"
 		"sorted_array.hpp"
 		"data_utils.hpp"
+		"value_group.hpp"
 		"circular_queue.hpp"
 		"binary_set_view.hpp"
 		"avl_tree.hpp"

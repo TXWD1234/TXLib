@@ -3,6 +3,7 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
+#include "impl/numeric_utils.hpp"
 #include <concepts>
 #include <array>
 #include <bitset>
@@ -31,13 +32,13 @@ public:
 	ValueGroup() = delete;
 
 	static constexpr bool contains(T val) {
-		return inRange(val, m_min, m_max) &&
+		return tx::inRange(val, m_min, m_max) &&
 		       m_table[val - m_min];
 	}
 
 private:
-	inline static constexpr const T m_min = min<T, vals...>();
-	inline static constexpr const T m_max = max<T, vals...>();
+	inline static constexpr const T m_min = tx::min<T, vals...>();
+	inline static constexpr const T m_max = tx::max<T, vals...>();
 	inline static constexpr const size_t m_size = m_max - m_min + 1;
 
 	inline static constexpr const std::array<bool, m_size> m_table = []() -> std::array<bool, m_size> {
@@ -69,13 +70,13 @@ public:
 	ValueGroupBitSet() = delete;
 
 	static constexpr bool contains(T val) {
-		return inRange(val, m_min, m_max) &&
+		return tx::inRange(val, m_min, m_max) &&
 		       m_table.test(static_cast<size_t>(val - m_min));
 	}
 
 private:
-	inline static constexpr const T m_min = min<T, vals...>();
-	inline static constexpr const T m_max = max<T, vals...>();
+	inline static constexpr const T m_min = tx::min<T, vals...>();
+	inline static constexpr const T m_max = tx::max<T, vals...>();
 	inline static constexpr const size_t m_size = m_max - m_min + 1;
 
 	inline static constexpr const std::bitset<m_size> m_table = []() -> std::bitset<m_size> {
@@ -88,6 +89,7 @@ private:
 
 
 // utilities
+
 using CharWhiteSpaceGroup = ValueGroup<
     char,
     ' ',
