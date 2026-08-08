@@ -5,6 +5,7 @@
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include "tx/exception.hpp"
+#include <memory>
 
 namespace tx {
 template <std::input_iterator It>
@@ -22,6 +23,25 @@ template <class T>
 inline void free(T* ptr) {
 	if (!ptr) return;
 	::operator delete(ptr, std::align_val_t{ alignof(T) });
+}
+
+template <class T, tx::allocator Allocator = std::allocator<T>>
+inline T* resize(T* data, u32 currentSize, u32 targetSize, u32 currentCapacity = InvalidU32) {
+	using alloc_t = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
+	using alloc_traits = std::allocator_traits<alloc_t>;
+
+	if (currentCapacity == InvalidU32) currentCapacity = currentSize;
+	if (targetSize < currentSize) return data;
+
+	alloc_t allocator;
+	T* newData = alloc_traits::allocate(allocator, targetSize);
+	if (!data) return newData;
+
+	std::uninitialized_move(data, data + currentSize, newData);
+	std::destroy(data, data + currentSize);
+
+	alloc_traits::deallocate(allocator, data, currentCapacity);
+	return newData;
 }
 
 struct IndexRange {
