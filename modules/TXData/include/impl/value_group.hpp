@@ -2,7 +2,6 @@
 // Module: TXData
 
 #pragma once
-#include "tx/basic_types.hpp"
 #include "impl/numeric_utils.hpp"
 #include <concepts>
 #include <array>

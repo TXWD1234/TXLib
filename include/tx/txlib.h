@@ -2,7 +2,6 @@
 
 #pragma once
 #include "tx/math.h"
-#include "tx/map.h"
 #include "tx/json.h"
 #include "tx/grid.h"
 #include "tx/resource.h"
