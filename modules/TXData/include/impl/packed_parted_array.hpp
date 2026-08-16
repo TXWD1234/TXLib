@@ -13,7 +13,7 @@
 
 namespace tx {
 // Packed Partitioned Array, made for building a write once, read many buffer
-// All partitions are packed together without gap, producing maximum memory
+// All partitions are packed together without gap, providing maximum memory
 // efficiency and cache locality
 template <class T>
 class PackedPartedArrayOverlay {
@@ -48,6 +48,10 @@ public:
 	using value_type = T;
 
 public:
+	// Because internal implementation, the total available capacity of meta
+	// is one less then the capacity provided, meaning that the actual count of
+	// maximum partitions is `metaSize - 1`, therefore allocate
+	// `desired_size + 1` meta buffer to meet expected buffer size.
 	PackedPartedArrayOverlay(T* data, u32 size, u32* metaData, u32 metaSize, StateStorage* statePtr)
 	    : m_data(data), m_capacity(size),
 	      m_metaData(metaData), m_metaDataCapacity(metaSize),
