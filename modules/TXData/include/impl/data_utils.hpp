@@ -14,6 +14,11 @@ inline u32 findIteratorIndex(It begin, It it) {
 }
 
 template <class T>
+constexpr inline u8* nextAlign(u8* ptr) {
+	return reinterpret_cast<u8*>((reinterpret_cast<uintptr_t>(ptr) + alignof(T) - 1) & ~(uintptr_t)(alignof(T) - 1));
+}
+
+template <class T>
 inline T* allocate(u32 size) {
 	if (size == 0) return nullptr;
 	return static_cast<T*>(::operator new(
