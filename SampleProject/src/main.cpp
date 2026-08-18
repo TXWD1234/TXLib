@@ -479,6 +479,8 @@ int main() {
 
 
 	tx::JsonDocument a;
+	tx::JsonParser parser("");
+	parser.parse();
 
 	std::cout << "AVLTree Test Suite\n";
 	std::cout << "==================\n";
