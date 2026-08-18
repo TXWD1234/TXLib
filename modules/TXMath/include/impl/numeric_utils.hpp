@@ -59,4 +59,9 @@ constexpr inline int makeOdd(int in) { // by ++
 constexpr inline bool isInt(float f) {
 	return std::fabs(f - std::round(f)) < EPSILON;
 }
+
+template <std::unsigned_integral T>
+constexpr inline bool isPowTwo(T val) {
+	return val > 0 && (val & (val - 1)) == 0;
+}
 } // namespace tx

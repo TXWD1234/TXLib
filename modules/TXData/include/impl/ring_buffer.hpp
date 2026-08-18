@@ -4,6 +4,7 @@
 #pragma once
 #include "tx/basic_types.hpp"
 #include "impl/data_utils.hpp" // include for the exception
+#include "impl/numeric_utils.hpp"
 #include <span>
 #include <memory>
 
@@ -30,8 +31,8 @@ public:
 	 * size?
 	 */
 	RingBufferOverlay(T* ptr, u32 size)
-	    : m_data(isPowTwo(size) ? ptr : nullptr),
-	      m_size(isPowTwo(size) ? size : 0) {
+	    : m_data(tx::isPowTwo(size) ? ptr : nullptr),
+	      m_size(tx::isPowTwo(size) ? size : 0) {
 		assert_impl([&]() { return valid(); },
 		            "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
 	}
@@ -43,8 +44,8 @@ public:
 	 * size?
 	 */
 	RingBufferOverlay(std::span<T> buffer)
-	    : m_data(isPowTwo(buffer.size()) ? buffer.data() : nullptr),
-	      m_size(isPowTwo(buffer.size()) ? buffer.size() : 0) {
+	    : m_data(tx::isPowTwo(buffer.size()) ? buffer.data() : nullptr),
+	      m_size(tx::isPowTwo(buffer.size()) ? buffer.size() : 0) {
 		assert_impl([&]() { return valid(); },
 		            "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
 	}
@@ -179,10 +180,6 @@ private:
 private:
 	// helpers
 
-	// is power of 2
-	static bool isPowTwo(u32 val) {
-		return val > 0 && (val & (val - 1)) == 0;
-	}
 	// find physical index
 	u32 findPhysIndex(u32 index) const {
 		return index & (m_size - 1);
