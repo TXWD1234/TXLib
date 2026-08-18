@@ -2,10 +2,11 @@
 // Module: TXJson
 
 #pragma once
-#include "impl/packed_parted_array.hpp"
-#include "impl/value_group.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
+#include "impl/numeric_utils.hpp"
+#include "impl/packed_parted_array.hpp"
+#include "impl/value_group.hpp"
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -214,14 +215,46 @@ private:
 		      m_str(parent->m_str),
 		      m_stringPool(parent->m_stringPool),
 		      m_token(parent->m_token),
-		      m_tokenSize(parent->m_tokenSize) {
-			m_stack.reserve(16);
+		      m_tokenSize(parent->m_tokenSize),
+		      m_state({ parent->m_str.data(), parent->m_token }) {
 		}
 
 		void run() {
 			skipWhiteSpace_impl();
 			stepCur_impl('{');
+			parseObject_impl(
+			    *tokenPush_impl<u32>());
 		}
+
+	private:
+		// ================ Meta & State ================
+
+		JsonParser<Allocator>* m_parent;
+		std::string_view m_str;
+
+		tx::PackedPartedArrayOverlay<u8> m_stringPool;
+		u8* m_token = nullptr;
+		u32 m_tokenSize = 0;
+
+		struct State_impl {
+			u8* str = nullptr; // cursor ptr in m_str (document string)
+			u8* token = nullptr; // cursor ptr in m_token (token buffer)
+		} m_state;
+
+	private:
+		// ================ Token Managing ================
+		// prefix: token
+
+		// assume it's always aligned
+		// alignment need to be manually solve beforehand
+		template <class T>
+		T* tokenPush_impl() {
+			u8* oldToken = m_state.token;
+			m_state.token += sizeof(T);
+			return std::construct_at(
+			    reinterpret_cast<T>(oldToken));
+		}
+
 
 	private:
 		// ================ String Parsing ================
@@ -234,17 +267,22 @@ private:
 		    '\r'>;
 		// advance index to the first non-white space character
 		void skipWhiteSpace_impl() {
-			while (WhiteSpaceGroup::contains(m_str[m_state.index])) {
-				m_state.index++;
+			while (WhiteSpaceGroup::contains(cur())) {
+				m_state.str++;
 			}
 		}
 
-		char cur() const { return m_str[m_state.index]; }
+		char cur() const { return *m_state.str; }
 		void stepCur_impl(char val) {
 			if (cur() != val) {
 				// DevNote: Error
 			}
-			m_state.index++;
+			m_state.str++;
+		}
+		u32 strIndex_impl() { return static_cast<u32>(m_state.str - m_str.data()); }
+
+		inline bool isNumber_impl(char val) {
+			return (val >= '0' && val < '9') || val == '-';
 		}
 
 		struct StringParser_impl {
@@ -266,143 +304,92 @@ private:
 			Output m_output;
 		};
 
-	private:
-		// ================ Meta & State ================
-
-		JsonParser<Allocator>* m_parent;
-		std::string_view m_str;
-
-		tx::PackedPartedArrayOverlay<u8> m_stringPool;
-		u8* m_token = nullptr;
-		u32 m_tokenSize = 0;
-
-		struct State_impl {
-			u32 index = 0; // document index (index in m_str)
-			u32 tokenIndex = 0; // index in token buffer
-			bool isParsingObject = true; // flag for state machine
-			// could be an enum but since there's only 2 options bool is enough
-		} m_state;
-
-	private:
-		// ================ Stack ================
-
-		struct StackObject_impl {
-			bool isObject; // true is JsonObject, false is JsonArray
-			u32 index; // index of the
-		};
-		std::vector<StackObject_impl> m_stack;
+		// @return id in string pool
+		u32 parseString_impl() {
+			m_state.str +=
+			    StringParser_impl(
+			        m_str.substr(strIndex_impl()),
+			        m_stringPool.push_back())
+			        .run();
+			return m_stringPool.size_partitions() - 1;
+		}
 
 	private:
 		// ================ Parsing ================
 		// the actual thing
-		// function prefix: parse
-
-		// Master function of the entire state machine
-		void parse_impl() {
-			if (m_state.isParsingObject) {
-				parseObject_impl();
-			} else {
-				parseArray_impl();
-			}
-
-			parseResume_impl();
-		}
-		void parseResume_impl() {
-			if (!m_stack.empty()) {
-			}
-		}
+		// prefix: parse
 
 		// ---------------- Structure Parsing ----------------
 
-		// InputState: parseObjectBegin_impl called; m_state.index after last
-		// control char
+		// InputState:  m_state.str one after `{`
+		// OutputState: m_state.str one after `}`
+		// @param root object root variable, recording the number of entries
 		// master function for json object
-		void parseObject_impl() {
-
-			parseKey_impl();
+		void parseObject_impl(u32& root) {
+			skipWhiteSpace_impl();
+			if (cur() == '}') return;
+			stepCur_impl('"');
+			parseEntry_impl();
+			skipWhiteSpace_impl();
 
 			while (true) {
-
-
-				skipWhiteSpace_impl();
-				if (cur() == '}') {
-					m_state.index++;
-					parseObjectEnd_impl();
+				switch (cur()) {
+				case '}':
+					// end of object
+					m_state.str++;
 					return;
+				case ',':
+					// new entry
+					m_state.str++;
+					root++;
+
+					skipWhiteSpace_impl();
+					stepCur_impl('"');
+					parseEntry_impl();
+					skipWhiteSpace_impl();
+					break;
+				default:
+					// DevNote: Error
+					break;
 				}
 			}
 		}
-		void parseArray_impl() {
+		// InputState:  m_state.str one after `[`
+		// OutputState: m_state.str one after `]`
+		// @param root array root variable, recording the number of entries
+		// master function for json array
+		void parseArray_impl(u32& root) {
 		}
 
-		// InputState:  m_state.index at next char of `{`; stack in parent
-		// OutputState: m_state.index at next char of `{`; stack in self
-		// This function don't actually finish parsing the object, but instead
-		// only update the state of the object. The entries in the object are
-		// parsed after this function returned.
-		// Call `parseObjectEnd_impl` to exit the object state when finished
-		// parsing all entries and had reached `}`
-		void parseObjectBegin_impl() {
-			m_stack.push_back({ true, m_state.m_tokenIndex });
-		}
-		// InputState:  m_state.index at next char of `}`; stack in self
-		// OutputState: m_state.index at next char of `}`; stack in parent
-		void parseObjectEnd_impl() {
-			m_stack.pop_back();
-		}
-
-		// // InputState:  m_state.index at next char of last control char; stack
-		// //              in self
-		// // OutputState: vary between parseKey_impl and parseObjectEnd_impl
-		// // @return isNotEndOfObject / continue parsing object
-		// // Connection between entries, decide whether to finish current object
-		// // or start another entry
-		// bool parseIsEndOfObject_impl() {
-		// 	skipWhiteSpace_impl();
-		// 	return cur() == '}';
-		// }
-
-		// InputState:  m_state.index at next char of last control char; stack
-		//              in self
-		// OutputState: m_state.index at first char of value; stack in self
+		// InputState:  m_state.str one after first `"`
+		// OutputState: m_state.str one after value back
 		// Handles one entry in JsonObject. It parses the key string, and
-		// advance m_state.index to the value the key is according to.
-		void parseKey_impl() {
-			stepCur_impl('"');
-
-			m_state.index +=
-			    StringParser_impl(
-			        m_str.substr(m_state.index),
-			        m_stringPool.backPartition())
-			        .run();
+		// advance m_state.str to the value the key is according to.
+		void parseEntry_impl() {
+			// key
+			*tokenPush_impl<u32>() = parseString_impl(); // <---------------------
 			skipWhiteSpace_impl();
 			stepCur_impl(':');
 			skipWhiteSpace_impl();
-		}
+			// end at first char of value
 
-		// InputState:  m_state.index at first char of value; stack in self
-		// OutputState:
-		// @return need escape. If true then it's either an object or an array
-		bool parseValueBegin_impl() {
-		}
-		// InputState:  m_state.index at next char of last char of value; stack
-		//              in self
-		// OutputState: m_state.index at next char of `,`; stack in self
-		void parseValueEnd_impl() {
-			skipWhiteSpace_impl();
-			if (cur() == '}') {
-				m_state.index++;
-				parseObjectEnd_impl();
-				return;
-			}
-			stepCur_impl(',')
+			// value
+			parseValue_impl();
 		}
 
 		// ---------------- Value Parsing ----------------
 		// prefix: parseValue
-		// InputState: m_state.index at first char of value; stack in self
+		// InputState:  m_state.str at first char of value
+		// OutputState: m_state.str one after value back
 
-		void parseValueString_impl() {
+		// master function
+		void parseValue_impl() {
+		}
+
+
+		void parseValueString_impl(u32& root) {
+		}
+		void parseValueNumber_impl(u32& root) {
 		}
 	};
 
