@@ -6,12 +6,12 @@
 #include "tx/type_traits.hpp"
 #include <stdexcept>
 
-namespace tx {
+namespace tx::impl {
 template <tx::invocable_r<bool> Expr>
-inline static void assert_impl(Expr&& expr, const char* message) {
+inline static void assert(Expr&& expr, const char* message) {
 	if constexpr (config::enabled_debug && config::enabled_exception) {
 		if (!expr()) [[unlikely]]
 			throw std::runtime_error(message);
 	}
 }
-} // namespace tx
+} // namespace tx::impl

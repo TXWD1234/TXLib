@@ -57,8 +57,8 @@ public:
 	const T* data() const { return m_data; }
 
 	void resize(u32 newSize) {
-		assert_impl([&]() { return newSize <= m_capacity; },
-		            "tx::GrowArrayOverlay::resize(): requested newSize overflows capacity.");
+		impl::assert([&]() { return newSize <= m_capacity; },
+		             "tx::GrowArrayOverlay::resize(): requested newSize overflows capacity.");
 		if (newSize < m_size) {
 			std::destroy(m_data + newSize, m_data + m_size);
 		} else {
@@ -69,8 +69,8 @@ public:
 	// resize but don't zero init PODs
 	// exist only for performance
 	void resize_no_zero_init(u32 newSize) {
-		assert_impl([&]() { return newSize <= m_capacity; },
-		            "tx::GrowArrayOverlay::resize_no_zero_init(): requested newSize overflows capacity.");
+		impl::assert([&]() { return newSize <= m_capacity; },
+		             "tx::GrowArrayOverlay::resize_no_zero_init(): requested newSize overflows capacity.");
 		if (newSize < m_size) {
 			std::destroy(m_data + newSize, m_data + m_size);
 		} else {
@@ -81,8 +81,8 @@ public:
 
 	It_t erase(ConstIt_t it) {
 		u32 index = findIteratorIndex(this->cbegin(), it);
-		assert_impl([&]() { return index < m_size; },
-		            "tx::GrowArrayOverlay::erase(): subscript out of range.");
+		impl::assert([&]() { return index < m_size; },
+		             "tx::GrowArrayOverlay::erase(): subscript out of range.");
 		It_t mit = this->begin() + index; // mutable it
 		m_size--;
 		if (index != m_size)
@@ -93,10 +93,10 @@ public:
 	It_t erase(ConstIt_t begin, ConstIt_t end) {
 		u32 indexBegin = findIteratorIndex(this->cbegin(), begin);
 		u32 indexEnd = findIteratorIndex(this->cbegin(), end);
-		assert_impl([&]() { return indexBegin < m_size && indexEnd <= m_size; },
-		            "tx::GrowArrayOverlay::erase(): subscript out of range.");
-		assert_impl([&]() { return indexBegin <= indexEnd; },
-		            "tx::GrowArrayOverlay::erase(): Invalid range [begin, end). Begin index is greater than end index.");
+		impl::assert([&]() { return indexBegin < m_size && indexEnd <= m_size; },
+		             "tx::GrowArrayOverlay::erase(): subscript out of range.");
+		impl::assert([&]() { return indexBegin <= indexEnd; },
+		             "tx::GrowArrayOverlay::erase(): Invalid range [begin, end). Begin index is greater than end index.");
 		It_t mbegin = this->begin() + indexBegin; // mutable begin
 		It_t mend = this->begin() + indexEnd; // mutable end
 		u32 eraseSize = static_cast<u32>(std::distance(begin, end));
@@ -116,60 +116,60 @@ public:
 	}
 
 	void push_back(const T& val) {
-		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::push_back(): called on full buffer.");
+		impl::assert([&]() { return m_size < m_capacity; },
+		             "tx::GrowArrayOverlay::push_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, val);
 		m_size++;
 	}
 	void push_back(T&& val) {
-		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::push_back(): called on full buffer.");
+		impl::assert([&]() { return m_size < m_capacity; },
+		             "tx::GrowArrayOverlay::push_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, std::move(val));
 		m_size++;
 	}
 	template <class... Args>
 	void emplace_back(Args&&... args) {
-		assert_impl([&]() { return m_size < m_capacity; },
-		            "tx::GrowArrayOverlay::emplace_back(): called on full buffer.");
+		impl::assert([&]() { return m_size < m_capacity; },
+		             "tx::GrowArrayOverlay::emplace_back(): called on full buffer.");
 		std::construct_at(m_data + m_size, std::forward<Args>(args)...);
 		m_size++;
 	}
 	void pop_back() {
-		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::pop_back(): called on empty buffer.");
+		impl::assert([&]() { return m_size > 0; },
+		             "tx::GrowArrayOverlay::pop_back(): called on empty buffer.");
 		m_size--;
 		std::destroy_at(m_data + m_size);
 	}
 
 	T& operator[](u32 index) {
-		assert_impl([&]() { return index < m_size; },
-		            "tx::GrowArrayOverlay::operator[]: subscript out of range.");
+		impl::assert([&]() { return index < m_size; },
+		             "tx::GrowArrayOverlay::operator[]: subscript out of range.");
 		return *(m_data + index);
 	}
 	const T& operator[](u32 index) const {
-		assert_impl([&]() { return index < m_size; },
-		            "tx::GrowArrayOverlay::operator[]: subscript out of range.");
+		impl::assert([&]() { return index < m_size; },
+		             "tx::GrowArrayOverlay::operator[]: subscript out of range.");
 		return *(m_data + index);
 	}
 
 	T& front() {
-		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::front(): called on empty buffer.");
+		impl::assert([&]() { return m_size > 0; },
+		             "tx::GrowArrayOverlay::front(): called on empty buffer.");
 		return *m_data;
 	}
 	const T& front() const {
-		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::front(): called on empty buffer.");
+		impl::assert([&]() { return m_size > 0; },
+		             "tx::GrowArrayOverlay::front(): called on empty buffer.");
 		return *m_data;
 	}
 	T& back() {
-		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::back(): called on empty buffer.");
+		impl::assert([&]() { return m_size > 0; },
+		             "tx::GrowArrayOverlay::back(): called on empty buffer.");
 		return *(m_data + m_size - 1);
 	}
 	const T& back() const {
-		assert_impl([&]() { return m_size > 0; },
-		            "tx::GrowArrayOverlay::back(): called on empty buffer.");
+		impl::assert([&]() { return m_size > 0; },
+		             "tx::GrowArrayOverlay::back(): called on empty buffer.");
 		return *(m_data + m_size - 1);
 	}
 

@@ -124,8 +124,8 @@ public:
 		}
 
 		void pop_back() {
-			assert_impl([&]() { return this->size() > 0; },
-			            "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
+			impl::assert([&]() { return this->size() > 0; },
+			             "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
 			u32 head = m_parent->m_state->metaDataSize - 1;
 			m_parent->m_metaData[head]--;
 			std::destroy_at(m_parent->m_data + m_parent->m_metaData[head]);
@@ -152,8 +152,8 @@ public:
 				return begin() + eraseOffset;
 
 			IndexRange range = range_impl();
-			assert_impl([&]() { return eraseOffset + eraseCount <= range.size; },
-			            "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
+			impl::assert([&]() { return eraseOffset + eraseCount <= range.size; },
+			             "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
 
 			T* partBegin = m_parent->m_data + range.offset;
 			T* partEnd = m_parent->m_data + range.end();
@@ -260,41 +260,41 @@ public:
 	// user don't suppose to access m_meta buffer directly
 
 	ConstPartition front() const {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	Partition front() {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	ConstPartition back() const {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArray::back(): Call on empty object.");
 		return at_impl(m_state->metaDataSize - 2);
 	}
 	Partition back() {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArray::back(): Call on empty object.");
 		return at_impl(m_state->metaDataSize - 2);
 	}
 
 	// explicitly request an expandable partition
 	BackPartition backPartition() {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArray::backPartition(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArray::backPartition(): Call on empty object.");
 		return BackPartition(this);
 	}
 
 	ConstPartition operator[](u32 index) const {
-		assert_impl([&]() { return m_state->metaDataSize - 1 > index; },
-		            "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert([&]() { return m_state->metaDataSize - 1 > index; },
+		             "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
 	Partition operator[](u32 index) {
-		assert_impl([&]() { return m_state->metaDataSize - 1 > index; },
-		            "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert([&]() { return m_state->metaDataSize - 1 > index; },
+		             "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
 
@@ -315,8 +315,8 @@ public:
 	}
 
 	void pop_back() {
-		assert_impl([&]() { return m_state->metaDataSize >= 2; },
-		            "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
+		impl::assert([&]() { return m_state->metaDataSize >= 2; },
+		             "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
 		std::destroy(m_data + m_metaData[m_state->metaDataSize - 2], m_data + m_metaData[m_state->metaDataSize - 1]);
 		m_state->metaDataSize--;
 	}
