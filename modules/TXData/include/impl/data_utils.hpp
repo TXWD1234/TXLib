@@ -16,6 +16,10 @@ template <class T>
 constexpr inline u8* nextAlign(u8* ptr) {
 	return reinterpret_cast<u8*>((reinterpret_cast<uintptr_t>(ptr) + alignof(T) - 1) & ~(uintptr_t)(alignof(T) - 1));
 }
+template <class T>
+constexpr inline u32 nextAlign(u32 index) {
+	return (index + alignof(T) - 1) & ~(u32)(alignof(T) - 1);
+}
 
 template <class T>
 inline T* allocate(u32 size) {
@@ -30,25 +34,26 @@ inline void free(T* ptr) {
 }
 
 template <class T, tx::allocator Allocator = std::allocator<T>>
-inline T* resize(
-    T* data, u32 currentSize,
+inline void resize(
+    T*& data, u32 currentSize,
     u32 targetSize, u32 currentCapacity = InvalidU32,
     const Allocator& alloc = Allocator()) {
 	using alloc_t = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 	using alloc_traits = std::allocator_traits<alloc_t>;
 
 	if (currentCapacity == InvalidU32) currentCapacity = currentSize;
-	if (targetSize < currentSize) return data;
+	if (targetSize < currentSize) return;
 
 	alloc_t allocator(alloc);
 	T* newData = alloc_traits::allocate(allocator, targetSize);
-	if (!data) return newData;
 
-	std::uninitialized_move(data, data + currentSize, newData);
-	std::destroy(data, data + currentSize);
+	if (data) {
+		std::uninitialized_move(data, data + currentSize, newData);
+		std::destroy(data, data + currentSize);
+		alloc_traits::deallocate(allocator, data, currentCapacity);
+	}
 
-	alloc_traits::deallocate(allocator, data, currentCapacity);
-	return newData;
+	data = newData;
 }
 
 struct IndexRange {
