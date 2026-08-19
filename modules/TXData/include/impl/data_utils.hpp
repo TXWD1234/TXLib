@@ -4,7 +4,6 @@
 #pragma once
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
-#include "tx/exception.hpp"
 #include <memory>
 
 namespace tx {
@@ -31,14 +30,17 @@ inline void free(T* ptr) {
 }
 
 template <class T, tx::allocator Allocator = std::allocator<T>>
-inline T* resize(T* data, u32 currentSize, u32 targetSize, u32 currentCapacity = InvalidU32) {
+inline T* resize(
+    T* data, u32 currentSize,
+    u32 targetSize, u32 currentCapacity = InvalidU32,
+    const Allocator& alloc = Allocator()) {
 	using alloc_t = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
 	using alloc_traits = std::allocator_traits<alloc_t>;
 
 	if (currentCapacity == InvalidU32) currentCapacity = currentSize;
 	if (targetSize < currentSize) return data;
 
-	alloc_t allocator;
+	alloc_t allocator(alloc);
 	T* newData = alloc_traits::allocate(allocator, targetSize);
 	if (!data) return newData;
 
