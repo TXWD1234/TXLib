@@ -2,6 +2,7 @@
 // Module: TXJson
 
 #pragma once
+#include "impl/data_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include "impl/numeric_utils.hpp"
@@ -104,7 +105,7 @@ public:
 		JsonDocument result;
 		result.m_data = m_result;
 		result.m_size = m_resultSize;
-		result.m_root = m_rootIndex;
+		result.m_root = m_connState.rootIndex;
 		clearState_impl();
 		return result;
 	}
@@ -118,7 +119,7 @@ private:
 		m_token = nullptr;
 		m_resultSize = 0;
 		m_tokenSize = 0;
-		m_rootIndex = 0;
+		m_connState.rootIndex = 0;
 	}
 
 private:
@@ -138,8 +139,15 @@ private:
 	tx::PackedPartedArrayOverlay<u8> m_stringPool;
 	tx::PackedPartedArrayOverlay<u8>::StateStorage m_stringPoolStateStorage;
 
-	u32 m_rootIndex = 0;
+	struct ConnectionState_impl {
+		// tokenlizer to compiler
+		u8* tokenEnd;
+		u32 objectArrayEntryCount;
+		u32 booleanNullNumberCount;
 
+		// compiler to product
+		u32 rootIndex = 0;
+	} m_connState;
 
 private:
 	// ################ Memory Management ################
@@ -167,11 +175,6 @@ private:
 private:
 	// ################ Static Helpers ################
 
-	template <class T>
-	static T* at_impl(u8* ptr, u32 index) {
-		return std::launder(reinterpret_cast<T*>(ptr + index));
-	}
-
 	static u8* next64_impl(u8* ptr) {
 		return reinterpret_cast<u8*>((reinterpret_cast<uintptr_t>(ptr) + 7) & ~(uintptr_t)0b111);
 	}
@@ -183,6 +186,8 @@ private:
 	// ################ Assets ################
 
 	// clang-format off
+
+	// ================ Value Type Enum ================
 	enum class ValueType_impl : u32 {
 		Object  = 0b0,
 		Array   = 0b1,
@@ -194,7 +199,22 @@ private:
 	};
 	// clang-format on
 
+	// ================ Value Struct ================
+	// all value structs have sizeof(u32)
 
+	struct ValueU32_impl {
+		ValueType_impl type : 3;
+		u32 val : 29 = 0;
+	};
+	struct ValueNull_impl {
+		ValueType_impl type : 3 = ValueType_impl::Null;
+		u32 : 29;
+	};
+	struct ValueBoolean_impl {
+		ValueType_impl type : 3 = ValueType_impl::Boolean;
+		bool boolean : 1;
+		u32 : 28;
+	};
 
 private:
 	// ################ Logic Implementation ################
@@ -206,7 +226,7 @@ private:
 	}
 
 	// ====================================================
-	// **************** Stage 1: Tokenlize ****************
+	// **************** Phase 1: Tokenlize ****************
 	// ====================================================
 
 	struct Tokenlizer_impl {
@@ -229,25 +249,36 @@ private:
 		 */
 	public:
 		Tokenlizer_impl(JsonParser<Allocator>* parent)
-		    : m_parent(parent),
-		      m_str(parent->m_str),
+		    : m_str(parent->m_str),
 		      m_stringPool(parent->m_stringPool),
 		      m_token(parent->m_token),
 		      m_tokenSize(parent->m_tokenSize),
 		      m_state(parent->m_str.data(), parent->m_token) {
 		}
 
-		void run() {
+		struct TokenlizerResult {
+			u8* token;
+			u8* tokenEnd;
+			u32 tokenBufferSize; // buffer size
+			u32 objectArrayEntryCount; // record
+			u32 booleanNullNumberCount; // record
+		};
+
+		TokenlizerResult run() {
 			skipWhiteSpace_impl();
 			stepCur_impl('{');
 			parseObject_impl(
 			    *tokenPush_impl<ValueU32_impl>());
+			return TokenlizerResult{
+				m_token, m_state.token, m_tokenSize,
+				m_record.objectArrayEntryCount,
+				m_record.booleanNullNumberCount
+			};
 		}
 
 	private:
 		// ================ Meta & State ================
 
-		JsonParser<Allocator>* m_parent;
 		std::string_view m_str;
 
 		tx::PackedPartedArrayOverlay<u8> m_stringPool;
@@ -259,6 +290,11 @@ private:
 			u8* token = nullptr; // cursor ptr in m_token (token buffer)
 		} m_state;
 
+		struct {
+			u32 objectArrayEntryCount = 0;
+			u32 booleanNullNumberCount = 0;
+		} m_record;
+
 	private:
 		// ================ Token Managing ================
 		// prefix: token
@@ -269,7 +305,7 @@ private:
 		T* tokenPush_impl() {
 			u8* oldToken = m_state.token;
 			m_state.token += sizeof(T);
-			// <-------------------------------------------- resize on overflow
+			// <-------------------------------------------- DevNote: resize on overflow
 			return std::construct_at(
 			    reinterpret_cast<T*>(oldToken));
 		}
@@ -277,23 +313,6 @@ private:
 		void tokenAlign64_impl() {
 			m_state.token = next64_impl(m_state.token);
 		}
-
-		// all value structs have sizeof(u32)
-
-		struct ValueU32_impl {
-			ValueType_impl type : 3;
-			u32 val : 29 = 0;
-		};
-		struct ValueNull_impl {
-			ValueType_impl type : 3 = ValueType_impl::Null;
-			u32 : 29;
-		};
-		struct ValueBoolean_impl {
-			ValueType_impl type : 3 = ValueType_impl::Boolean;
-			bool boolean : 1;
-			u32 : 28;
-		};
-
 
 	private:
 		// ================ String Parsing ================
@@ -341,7 +360,9 @@ private:
 					switch (*m_state.ptr) {
 					case '\\':
 						pushStr_impl();
-						m_state.ptr = EscapeCharacterParser_impl(m_state.ptr + 1, m_strEnd, m_output).run();
+						m_state.ptr = EscapeCharacterParser_impl(
+						                  m_state.ptr + 1, m_strEnd, m_output)
+						                  .run();
 						m_state.lastPush = m_state.ptr;
 						break;
 					case '"':
@@ -359,7 +380,8 @@ private:
 			public:
 				// @param str m_str pointer from the parent scope, pointing at
 				// next char after the '\' character
-				EscapeCharacterParser_impl(const char* str, const char* strEnd, Output output)
+				EscapeCharacterParser_impl(
+				    const char* str, const char* strEnd, Output output)
 				    : m_str(str), m_strEnd(strEnd), m_output(output) {}
 
 				// @return cursor ptr pointing no the next char after the
@@ -438,6 +460,8 @@ private:
 					break;
 				}
 			}
+
+			m_record.objectArrayEntryCount += root.val;
 		}
 		// InputState:  m_state.str one after `[`
 		// OutputState: m_state.str one after `]`
@@ -472,6 +496,8 @@ private:
 					break;
 				}
 			}
+
+			m_record.objectArrayEntryCount += root.val;
 		}
 
 		// InputState:  m_state.str one after first `"`
@@ -522,6 +548,7 @@ private:
 				} else {
 					// DevNote: Error
 				}
+				m_record.booleanNullNumberCount++;
 			}
 		}
 
@@ -576,16 +603,98 @@ private:
 		    m_stringPoolMeta, m_str.size() / 3,
 		    &m_stringPoolStateStorage);
 
-		Tokenlizer_impl tokenlizer{ this };
-		tokenlizer.run();
+		auto [token, tokenEnd, tokenBufferSize, oaec, bnnc] =
+		    Tokenlizer_impl{ this }.run();
+		m_token = token;
+		m_tokenSize = tokenBufferSize;
+		m_connState.tokenEnd = tokenEnd;
+		m_connState.objectArrayEntryCount = oaec;
+		m_connState.booleanNullNumberCount = bnnc;
 	}
 
+	// ==================================================
+	// **************** Phase 2: Compile ****************
+	// ==================================================
 
-	// ==================================================
-	// **************** Stage 2: Compile ****************
-	// ==================================================
+	struct Compiler_impl {
+	public:
+		Compiler_impl(JsonParser<Allocator>* parent)
+		    : m_source(
+		          parent->m_token,
+		          parent->m_connState.tokenEnd,
+		          parent->m_stringPool) {}
+
+		struct CompilerResult {};
+
+		CompilerResult run() {
+		}
+
+	private:
+		struct {
+			const u8* token;
+			const u8* tokenEnd;
+			tx::PackedPartedArrayOverlay<u8> stringPool;
+		} m_source;
+
+		struct {
+			u8* result;
+		} m_state;
+	};
+
+	// reallocate m_result
+	void compileRealloc_impl() {
+		/**
+		 * The size of the final m_result can be precisely calculated with
+		 * records recorded during the tokenlizing phase.
+		 * The final document data size can be derived from the token buffer
+		 * size.
+		 * In the 7 types of objects:
+		 * - String remains the same memory footprint since it's still just an
+		 *   ID in StringPool.
+		 * - Object and Array each require one more u32 for each entry of them
+		 *   for their entry meta data.
+		 * - Number, Boolean and Null each will release one u32. It used to
+		 *   store the type of the value, but now in the final compilation, the
+		 *   type is stored in the meta data.
+		 * Plus the string pool data and meta data, which are stored at the
+		 * front of the buffer.
+		 * 
+		 * note: all size calculated in unit of byte (sizeof(u8))
+		 */
+
+		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
+		u32 stringPoolMetaSize = m_stringPool.size_meta() * sizeof(u32);
+		u32 tokenDataSize = static_cast<u32>(m_connState.tokenEnd - m_token);
+		u32 bnncSize = m_connState.booleanNullNumberCount * sizeof(u32);
+		u32 oaecSize = m_connState.objectArrayEntryCount * sizeof(u32);
+
+		u32 targetSize =
+		    stringPoolDataSize +
+		    stringPoolMetaSize +
+		    tokenDataSize -
+		    bnncSize + oaecSize;
+
+		if (targetSize > m_resultSize) {
+			// realloc
+			tx::resize(
+			    m_result,
+			    stringPoolDataSize,
+			    targetSize,
+			    m_resultSize,
+			    m_allocator64);
+		}
+	}
+	void compileStringPool_impl() {
+		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
+		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
+		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta();
+		m_stringPool.relocateMeta(stringPoolMetaPtr);
+	}
 
 	void compile_impl() {
+		compileRealloc_impl();
+		compileStringPool_impl();
+		Compiler_impl{ this }.run();
 	}
 };
 

@@ -338,7 +338,8 @@ public:
 
 	// ################ Relocation ################
 
-	void relocateData(T* newData, u32 newCapacity) {
+	void relocateData(T* newData, u32 newCapacity = InvalidU32) {
+		if (newCapacity == InvalidU32) newCapacity = m_capacity;
 		assert_impl([&]() { return newCapacity >= size_elements(); },
 		            "tx::PackedPartedArrayOverlay::relocateData(): new buffer too small.");
 
@@ -353,7 +354,8 @@ public:
 		m_capacity = newCapacity;
 	}
 
-	void relocateMeta(u32* newMeta, u32 newMetaCapacity) {
+	void relocateMeta(u32* newMeta, u32 newMetaCapacity = InvalidU32) {
+		if (newMetaCapacity == InvalidU32) newMetaCapacity = m_metaCapacity;
 		assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
 		            "tx::PackedPartedArrayOverlay::relocateMeta(): new buffer too small.");
 
