@@ -332,20 +332,63 @@ private:
 			// @param str sub string of the json file, started with next char
 			// after the first `"` of the string targeted to be parsed
 			StringParser_impl(std::string_view str, Output output)
-			    : m_str(str), m_output(output) {}
+			    : m_strEnd(str.data() + str.size()), m_output(output),
+			      m_state(str.data(), str.data()) {}
 
-			// @return end index (next index of the last `"`)
-			u32 run() {
+			// @return end ptr (next char of the last `"`)
+			const char* run() {
+				while (true) {
+					switch (*m_state.ptr) {
+					case '\\':
+						pushStr_impl();
+						m_state.ptr = EscapeCharacterParser_impl(m_state.ptr + 1, m_strEnd, m_output).run();
+						m_state.lastPush = m_state.ptr;
+						break;
+					case '"':
+						pushStr_impl();
+						return m_state.ptr + 1;
+					default:
+						m_state.ptr++;
+						break;
+					}
+				}
 			}
 
 		private:
-			std::string_view m_str;
+			struct EscapeCharacterParser_impl {
+			public:
+				// @param str m_str pointer from the parent scope, pointing at
+				// next char after the '\' character
+				EscapeCharacterParser_impl(const char* str, const char* strEnd, Output output)
+				    : m_str(str), m_strEnd(strEnd), m_output(output) {}
+
+				// @return cursor ptr pointing no the next char after the
+				// escape char
+				const char* run() {}
+
+			private:
+				const char* m_str;
+				const char* m_strEnd;
+				Output m_output;
+			};
+
+		private:
+			const char* m_strEnd;
 			Output m_output;
+
+			struct State_impl {
+				const char* ptr;
+				const char* lastPush;
+			} m_state;
+
+			void pushStr_impl() {
+				m_output.push_back(m_state.lastPush, m_state.ptr);
+			}
 		};
 
 		// @return id in string pool
 		u32 parseString_impl() {
-			m_state.str +=
+			m_state.str =
 			    StringParser_impl(
 			        m_str.substr(strIndex_impl()),
 			        m_stringPool.push_back())
