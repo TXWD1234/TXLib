@@ -42,21 +42,21 @@ public:
 	// basic operations
 
 	void push(const T& val) {
-		impl::assert([&]() { return !full(); },
-		             "tx::CircularQueueOverlay::push(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::CircularQueueOverlay::push(): called on full buffer");
 		std::construct_at(m_data + m_end, val);
 		push_impl();
 	}
 	void push(T&& val) {
-		impl::assert([&]() { return !full(); },
-		             "tx::CircularQueueOverlay::push(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::CircularQueueOverlay::push(): called on full buffer");
 		std::construct_at(m_data + m_end, std::move(val));
 		push_impl();
 	}
 	template <class... Args>
 	void emplace(Args&&... args) {
-		impl::assert([&]() { return !full(); },
-		             "tx::CircularQueueOverlay::emplace(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::CircularQueueOverlay::emplace(): called on full buffer");
 		std::construct_at(m_data + m_end, std::forward<Args>(args)...);
 		push_impl();
 	}
@@ -102,23 +102,23 @@ public:
 	// data getters
 
 	T& front() {
-		impl::assert([&]() { return !empty(); },
-		             "tx::CircularQueueOverlay::front(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::CircularQueueOverlay::front(): called on empty buffer");
 		return *(m_data + m_begin);
 	}
 	const T& front() const {
-		impl::assert([&]() { return !empty(); },
-		             "tx::CircularQueueOverlay::front(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::CircularQueueOverlay::front(): called on empty buffer");
 		return *(m_data + m_begin);
 	}
 	T& back() {
-		impl::assert([&]() { return !empty(); },
-		             "tx::CircularQueueOverlay::back(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::CircularQueueOverlay::back(): called on empty buffer");
 		return *(m_data + m_end - 1);
 	}
 	const T& back() const {
-		impl::assert([&]() { return !empty(); },
-		             "tx::CircularQueueOverlay::back(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::CircularQueueOverlay::back(): called on empty buffer");
 		return *(m_data + m_end - 1);
 	}
 

@@ -125,8 +125,8 @@ public:
 		}
 
 		void pop_back() {
-			impl::assert([&]() { return this->size() > 0; },
-			             "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
+			impl::assert_impl([&]() { return this->size() > 0; },
+			                  "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
 			u32 head = m_parent->m_state->metaSize - 1;
 			m_parent->m_meta[head]--;
 			std::destroy_at(m_parent->m_data + m_parent->m_meta[head]);
@@ -153,8 +153,8 @@ public:
 				return begin() + eraseOffset;
 
 			IndexRange range = range_impl();
-			impl::assert([&]() { return eraseOffset + eraseCount <= range.size; },
-			             "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
+			impl::assert_impl([&]() { return eraseOffset + eraseCount <= range.size; },
+			                  "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
 
 			T* partBegin = m_parent->m_data + range.offset;
 			T* partEnd = m_parent->m_data + range.end();
@@ -263,41 +263,41 @@ public:
 	// user don't suppose to access m_meta buffer directly
 
 	ConstPartition front() const {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	Partition front() {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArray::front(): Call on empty object.");
 		return at_impl(0);
 	}
 	ConstPartition back() const {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArray::back(): Call on empty object.");
 		return at_impl(m_state->metaSize - 2);
 	}
 	Partition back() {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArray::back(): Call on empty object.");
 		return at_impl(m_state->metaSize - 2);
 	}
 
 	// explicitly request an expandable partition
 	BackPartition backPartition() {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArray::backPartition(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArray::backPartition(): Call on empty object.");
 		return BackPartition(this);
 	}
 
 	ConstPartition operator[](u32 index) const {
-		impl::assert([&]() { return m_state->metaSize - 1 > index; },
-		             "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert_impl([&]() { return m_state->metaSize - 1 > index; },
+		                  "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
 	Partition operator[](u32 index) {
-		impl::assert([&]() { return m_state->metaSize - 1 > index; },
-		             "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert_impl([&]() { return m_state->metaSize - 1 > index; },
+		                  "tx::PackedPartedArray::operator[]: Subscript out of range.");
 		return at_impl(index);
 	}
 
@@ -318,8 +318,8 @@ public:
 	}
 
 	void pop_back() {
-		impl::assert([&]() { return m_state->metaSize >= 2; },
-		             "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
+		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
+		                  "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
 		std::destroy(m_data + m_meta[m_state->metaSize - 2], m_data + m_meta[m_state->metaSize - 1]);
 		m_state->metaSize--;
 	}
@@ -356,8 +356,8 @@ public:
 
 	void relocateMeta(u32* newMeta, u32 newMetaCapacity = InvalidU32) {
 		if (newMetaCapacity == InvalidU32) newMetaCapacity = m_metaCapacity;
-		assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
-		            "tx::PackedPartedArrayOverlay::relocateMeta(): new buffer too small.");
+		impl::assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
+		                  "tx::PackedPartedArrayOverlay::relocateMeta(): new buffer too small.");
 
 		std::copy(m_meta, m_meta + m_state->metaSize, newMeta);
 

@@ -67,8 +67,12 @@ struct IndexRange {
 
 namespace impl {
 template <class T>
-static T* at(u8* ptr, u32 index) {
+inline constexpr T* at(u8* ptr, u32 index = 0) {
 	return std::launder(reinterpret_cast<T*>(ptr + index));
+}
+template <class T>
+inline constexpr const T* at(const u8* ptr, u32 index = 0) {
+	return std::launder(reinterpret_cast<const T*>(ptr + index));
 }
 } // namespace impl
 } // namespace tx

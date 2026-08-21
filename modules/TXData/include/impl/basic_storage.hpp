@@ -49,13 +49,13 @@ public:
 	const T* data() const { return m_data; }
 
 	T& operator[](u32 index) {
-		impl::assert([&]() { return index < m_size; },
-		             "tx::BasicStorage::operator[] subscript out of range.");
+		impl::assert_impl([&]() { return index < m_size; },
+		                  "tx::BasicStorage::operator[] subscript out of range.");
 		return *(m_data + index);
 	}
 	const T& operator[](u32 index) const {
-		impl::assert([&]() { return index < m_size; },
-		             "tx::BasicStorage::operator[] subscript out of range.");
+		impl::assert_impl([&]() { return index < m_size; },
+		                  "tx::BasicStorage::operator[] subscript out of range.");
 		return *(m_data + index);
 	}
 
@@ -79,8 +79,8 @@ public:
 	// UB when called on initialized element / already constructed element
 	template <class... Args>
 	void construct(u32 index, Args&&... args) {
-		impl::assert([&]() { return index < m_size; },
-		             "tx::BasicStorage::construct() subscript out of range.");
+		impl::assert_impl([&]() { return index < m_size; },
+		                  "tx::BasicStorage::construct() subscript out of range.");
 		std::construct_at(m_data + index, std::forward<Args>(args)...);
 	}
 	// UB when called on initialized element / already constructed element
@@ -92,8 +92,8 @@ public:
 
 	// UB when called on uninitialized element / already destroied element
 	void destroy(u32 index) {
-		impl::assert([&]() { return index < m_size; },
-		             "tx::BasicStorage::destroy() subscript out of range.");
+		impl::assert_impl([&]() { return index < m_size; },
+		                  "tx::BasicStorage::destroy() subscript out of range.");
 		std::destroy_at(m_data + index);
 	}
 	// UB when called on uninitialized element / already destroied element
@@ -104,10 +104,10 @@ public:
 
 	// UB when called on initialized element / already constructed element
 	void construct(u32 indexBegin, u32 indexEnd) {
-		impl::assert([&]() { return indexBegin < m_size && indexEnd <= m_size; },
-		             "tx::BasicStorage::construct(): subscript out of range.");
-		impl::assert([&]() { return indexBegin <= indexEnd; },
-		             "tx::BasicStorage::construct(): Invalid range [begin, end). Begin index is greater than end index.");
+		impl::assert_impl([&]() { return indexBegin < m_size && indexEnd <= m_size; },
+		                  "tx::BasicStorage::construct(): subscript out of range.");
+		impl::assert_impl([&]() { return indexBegin <= indexEnd; },
+		                  "tx::BasicStorage::construct(): Invalid range [begin, end). Begin index is greater than end index.");
 		std::uninitialized_value_construct(m_data + indexBegin, m_data + indexEnd);
 	}
 	// UB when called on initialized element / already constructed element
@@ -118,10 +118,10 @@ public:
 	}
 	// UB when called on initialized element / already constructed element
 	void construct_no_zero_init(u32 indexBegin, u32 indexEnd) {
-		impl::assert([&]() { return indexBegin < m_size && indexEnd <= m_size; },
-		             "tx::BasicStorage::construct(): subscript out of range.");
-		impl::assert([&]() { return indexBegin <= indexEnd; },
-		             "tx::BasicStorage::construct(): Invalid range [begin, end). Begin index is greater than end index.");
+		impl::assert_impl([&]() { return indexBegin < m_size && indexEnd <= m_size; },
+		                  "tx::BasicStorage::construct(): subscript out of range.");
+		impl::assert_impl([&]() { return indexBegin <= indexEnd; },
+		                  "tx::BasicStorage::construct(): Invalid range [begin, end). Begin index is greater than end index.");
 		std::uninitialized_default_construct(m_data + indexBegin, m_data + indexEnd);
 	}
 	// UB when called on initialized element / already constructed element
@@ -133,10 +133,10 @@ public:
 
 	// UB when called on uninitialized element / already destroied element
 	void destroy(u32 indexBegin, u32 indexEnd) {
-		impl::assert([&]() { return indexBegin < m_size && indexEnd <= m_size; },
-		             "tx::BasicStorage::destroy(): subscript out of range.");
-		impl::assert([&]() { return indexBegin <= indexEnd; },
-		             "tx::BasicStorage::destroy(): Invalid range [begin, end). Begin index is greater than end index.");
+		impl::assert_impl([&]() { return indexBegin < m_size && indexEnd <= m_size; },
+		                  "tx::BasicStorage::destroy(): subscript out of range.");
+		impl::assert_impl([&]() { return indexBegin <= indexEnd; },
+		                  "tx::BasicStorage::destroy(): Invalid range [begin, end). Begin index is greater than end index.");
 		std::destroy(m_data + indexBegin, m_data + indexEnd);
 	}
 	// UB when called on uninitialized element / already destroied element

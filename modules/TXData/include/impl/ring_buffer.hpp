@@ -33,8 +33,8 @@ public:
 	RingBufferOverlay(T* ptr, u32 size)
 	    : m_data(tx::isPowTwo(size) ? ptr : nullptr),
 	      m_size(tx::isPowTwo(size) ? size : 0) {
-		impl::assert([&]() { return valid(); },
-		             "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
+		impl::assert_impl([&]() { return valid(); },
+		                  "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
 	}
 	/**
 	 * @param buffer the provided storage memory buffer
@@ -46,8 +46,8 @@ public:
 	RingBufferOverlay(std::span<T> buffer)
 	    : m_data(tx::isPowTwo(buffer.size()) ? buffer.data() : nullptr),
 	      m_size(tx::isPowTwo(buffer.size()) ? buffer.size() : 0) {
-		impl::assert([&]() { return valid(); },
-		             "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
+		impl::assert_impl([&]() { return valid(); },
+		                  "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
 	}
 	/**
      * Note on the destructor:
@@ -81,22 +81,22 @@ public:
 	template <class U>
 	    requires std::is_constructible_v<T, U&&>
 	void push_back(U&& val) {
-		impl::assert([&]() { return !full(); },
-		             "tx::RingBufferOverlay::push_back(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::RingBufferOverlay::push_back(): called on full buffer");
 		std::construct_at(m_data + findPhysIndex(m_end), std::forward<U>(val));
 		m_end++;
 	}
 	template <class... Args>
 	void emplace_back(Args&&... args) {
-		impl::assert([&]() { return !full(); },
-		             "tx::RingBufferOverlay::emplace_back(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::RingBufferOverlay::emplace_back(): called on full buffer");
 		std::construct_at(m_data + findPhysIndex(m_end), std::forward<Args>(args)...);
 		m_end++;
 	}
 
 	void pop_back() {
-		impl::assert([&]() { return !empty(); },
-		             "tx::RingBufferOverlay::pop_back(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::RingBufferOverlay::pop_back(): called on empty buffer");
 		m_end--;
 		std::destroy_at(m_data + findPhysIndex(m_end));
 	}
@@ -104,22 +104,22 @@ public:
 	template <class U>
 	    requires std::is_constructible_v<T, U&&>
 	void push_front(U&& val) {
-		impl::assert([&]() { return !full(); },
-		             "tx::RingBufferOverlay::push_front(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::RingBufferOverlay::push_front(): called on full buffer");
 		m_begin--;
 		std::construct_at(m_data + findPhysIndex(m_begin), std::forward<U>(val));
 	}
 	template <class... Args>
 	void emplace_front(Args&&... args) {
-		impl::assert([&]() { return !full(); },
-		             "tx::RingBufferOverlay::emplace_front(): called on full buffer");
+		impl::assert_impl([&]() { return !full(); },
+		                  "tx::RingBufferOverlay::emplace_front(): called on full buffer");
 		m_begin--;
 		std::construct_at(m_data + findPhysIndex(m_begin), std::forward<Args>(args)...);
 	}
 
 	void pop_front() {
-		impl::assert([&]() { return !empty(); },
-		             "tx::RingBufferOverlay::pop_front(): called on empty buffer");
+		impl::assert_impl([&]() { return !empty(); },
+		                  "tx::RingBufferOverlay::pop_front(): called on empty buffer");
 		std::destroy_at(m_data + findPhysIndex(m_begin));
 		m_begin++;
 	}
@@ -128,14 +128,14 @@ public:
 
 	template <class Self>
 	decltype(auto) front(this Self&& self) {
-		impl::assert([&]() { return !self.empty(); },
-		             "tx::RingBufferOverlay::front(): called on empty buffer");
+		impl::assert_impl([&]() { return !self.empty(); },
+		                  "tx::RingBufferOverlay::front(): called on empty buffer");
 		return *(self.m_data + self.findPhysIndex(self.m_begin));
 	}
 	template <class Self>
 	decltype(auto) back(this Self&& self) {
-		impl::assert([&]() { return !self.empty(); },
-		             "tx::RingBufferOverlay::back(): called on empty buffer");
+		impl::assert_impl([&]() { return !self.empty(); },
+		                  "tx::RingBufferOverlay::back(): called on empty buffer");
 		return *(self.m_data + self.findPhysIndex(self.m_end - 1));
 	}
 
@@ -143,8 +143,8 @@ public:
 
 	template <class Self>
 	decltype(auto) operator[](this Self&& self, u32 index) {
-		impl::assert([&]() { return index < self.size(); },
-		             "tx::RingBufferOverlay::operator[]: subscript out of range");
+		impl::assert_impl([&]() { return index < self.size(); },
+		                  "tx::RingBufferOverlay::operator[]: subscript out of range");
 		return *(self.m_data + self.findPhysIndex(self.m_begin + index));
 	}
 
