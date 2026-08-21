@@ -64,4 +64,10 @@ template <std::unsigned_integral T>
 constexpr inline bool isPowTwo(T val) {
 	return val > 0 && (val & (val - 1)) == 0;
 }
+
+template <std::unsigned_integral T>
+constexpr inline T divCeil(T dividend, T divisor) {
+	T is_non_zero = (dividend != 0);
+	return is_non_zero + (dividend - is_non_zero) / divisor;
+}
 } // namespace tx

@@ -29,6 +29,45 @@ class JsonDocument {
 	 * Itself does not contain logic, nor memory management. It is only
 	 * responsible of displaying the data to user. 
 	 */
+private:
+	// ################ Assets ################
+
+	// clang-format off
+
+	// ================ Value Type Enum ================
+	enum class ValueType_impl : u32 {
+		Object  = 0b0,
+		Array   = 0b1,
+		String  = 0b10,
+		Int     = 0b11,  // actually is i64 (long long)
+		Float   = 0b100, // actually is f64 (double)
+		Boolean = 0b101,
+		Null    = 0b110,
+	};
+	// clang-format on
+
+	// ================ Value Struct ================
+	// all value structs have sizeof(u32)
+
+	struct ValueU32_impl {
+		ValueType_impl type : 3;
+		u32 val : 29 = 0;
+	};
+	struct ValueNull_impl {
+		ValueType_impl type : 3 = ValueType_impl::Null;
+		u32 : 29;
+	};
+	struct ValueBoolean_impl {
+		ValueType_impl type : 3 = ValueType_impl::Boolean;
+		bool val : 1;
+		u32 : 28;
+	};
+
+	// Json Object Entry
+	struct ValueEntry_impl {
+		ValueU32_impl key, value;
+	};
+
 
 public:
 	JsonObject root();
@@ -85,6 +124,10 @@ inline JsonObject JsonDocument::root() {
 
 template <tx::allocator Allocator = std::allocator<u8>>
 class JsonParser {
+	friend JsonDocument;
+	friend JsonObject;
+	friend JsonArray;
+
 private:
 	/**
 	 * Rebind to u64 for u64 alignment
@@ -164,7 +207,7 @@ private:
 		m_stringPoolMeta = alloc32_traits::allocate(
 		    m_allocator32, m_str.size() / 3);
 
-		m_resultSize *= sizeof(u64) / sizeof(u8);
+		m_resultSize *= sizeof(u64);
 		m_tokenSize = m_resultSize;
 	}
 	void dealloc_impl() {
@@ -183,38 +226,10 @@ private:
 	}
 
 private:
-	// ################ Assets ################
-
-	// clang-format off
-
-	// ================ Value Type Enum ================
-	enum class ValueType_impl : u32 {
-		Object  = 0b0,
-		Array   = 0b1,
-		String  = 0b10,
-		Int     = 0b11,  // actually is i64 (long long)
-		Float   = 0b100, // actually is f64 (double)
-		Boolean = 0b101,
-		Null    = 0b110,
-	};
-	// clang-format on
-
-	// ================ Value Struct ================
-	// all value structs have sizeof(u32)
-
-	struct ValueU32_impl {
-		ValueType_impl type : 3;
-		u32 val : 29 = 0;
-	};
-	struct ValueNull_impl {
-		ValueType_impl type : 3 = ValueType_impl::Null;
-		u32 : 29;
-	};
-	struct ValueBoolean_impl {
-		ValueType_impl type : 3 = ValueType_impl::Boolean;
-		bool boolean : 1;
-		u32 : 28;
-	};
+	using ValueType_impl = JsonDocument::ValueType_impl;
+	using ValueU32_impl = JsonDocument::ValueU32_impl;
+	using ValueNull_impl = JsonDocument::ValueNull_impl;
+	using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
 
 private:
 	// ################ Logic Implementation ################
@@ -299,7 +314,7 @@ private:
 		// ================ Token Managing ================
 		// prefix: token
 
-		// assume it's always aligned
+		// assume it's always aligned.
 		// alignment need to be manually solve beforehand
 		template <class T>
 		T* tokenPush_impl() {
@@ -541,10 +556,10 @@ private:
 					tokenPush_impl<ValueNull_impl>();
 				} else if (m_str.compare(strIndex_impl(), 4, "true") == 0) {
 					m_state.str += 4;
-					tokenPush_impl<ValueBoolean_impl>()->boolean = true;
+					tokenPush_impl<ValueBoolean_impl>()->val = true;
 				} else if (m_str.compare(strIndex_impl(), 5, "false") == 0) {
 					m_state.str += 5;
-					tokenPush_impl<ValueBoolean_impl>()->boolean = false;
+					tokenPush_impl<ValueBoolean_impl>()->val = false;
 				} else {
 					// DevNote: Error
 				}
@@ -622,7 +637,9 @@ private:
 		    : m_source(
 		          parent->m_token,
 		          parent->m_connState.tokenEnd,
-		          parent->m_stringPool) {}
+		          parent->m_stringPool),
+		      m_state(parent->m_result + parent->m_connState.rootIndex),
+		      m_resultRoot(m_state.result) {}
 
 		struct CompilerResult {};
 
@@ -630,6 +647,8 @@ private:
 		}
 
 	private:
+		// ================ Meta & State ================
+
 		struct {
 			const u8* token;
 			const u8* tokenEnd;
@@ -639,6 +658,159 @@ private:
 		struct {
 			u8* result;
 		} m_state;
+
+		u8* m_resultRoot;
+
+	private:
+		using ValueType_impl = JsonDocument::ValueType_impl;
+		using ValueU32_impl = JsonDocument::ValueU32_impl;
+		using ValueNull_impl = JsonDocument::ValueNull_impl;
+		using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
+		using ValueEntry_impl = JsonDocument::ValueEntry_impl;
+
+	private:
+		// ================ Helper Functions ================
+
+		// ---------------- Result Placement Managing ----------------
+		// the 2 token managing functions are directly copied from tokenlizer,
+		// but removed the resizing branch (therefore cannot be generalized)
+
+		// assume it's always aligned.
+		// alignment need to be manually solve beforehand
+		template <class T, class... Args>
+		T* resultPush_impl(Args&&... args) {
+			u8* old = m_state.result;
+			m_state.result += sizeof(T);
+			return std::construct_at(
+			    reinterpret_cast<T*>(old), std::forward<Args>(args)...);
+		}
+		template <class T, class... Args>
+		T* resultPushAt_impl(u8*& ptr, Args&&... args) {
+			u8* old = ptr;
+			ptr += sizeof(T);
+			return std::construct_at(
+			    reinterpret_cast<T*>(old), std::forward<Args>(args)...);
+		}
+
+		void resultAlign64_impl() {
+			m_state.result = next64_impl(m_state.result);
+		}
+
+		// assume it's always aligned
+		template <class T>
+		u8* resultAdvance_impl(u32 count) {
+			u8* old = m_state.result;
+			m_state.result += sizeof(T) * count;
+			return old;
+		}
+
+		template <class T>
+		const T& tokenAt_impl() {
+			return *impl::at<T>(m_source.token);
+		}
+		template <class T>
+		const T& tokenConsume_impl() {
+			u8* old = m_source.token;
+			m_source.token += sizeof(T);
+			return *impl::at<T>(old);
+		}
+		// template <class T>
+		// T& tokenAt_impl(u8* ptr) {
+		// 	return *impl::at<T>(ptr);
+		// }
+
+		u32 resultIndex(u8* ptr) {
+			return static_cast<u32>(ptr - m_resultRoot);
+		}
+
+	private:
+		// ================ Compiling ================
+		// parsing the token buffer and compile it into result buffer
+		// prefix: compile
+		// Terminology:
+		// - IState / OState: InputState / OutputState
+		// - "IOState: Regular": IState: m_source.token at root;
+		//                       OState: m_source.token at next root.
+
+		/**
+		 * Because the source: token buffer was generated by internal
+		 * implementation, it is guaranteed to not have malformed structure,
+		 * therefore no security check is required here.
+		 */
+
+		// IState: m_source.token at object root
+		// OState: m_source.token at root of next entry
+		void compileObject_impl() {
+			const u32 entryCount = resultPush_impl(
+			                           tokenConsume_impl<ValueU32_impl>().val)
+			                           ->val;
+			u8* metaHead = resultAdvance_impl<ValueEntry_impl>(entryCount);
+			u8* resultGap = m_state.result;
+
+			for (u32 i = 0; i < entryCount; i++) {
+				compileEntry_impl(resultPushAt_impl<ValueEntry_impl>(metaHead),
+				                  resultGap);
+			}
+		}
+
+		// IOState: Regular
+		// @param meta meta data object at object root for this entry
+		// @param resultGap forward to compileValue_impl
+		void compileEntry_impl(ValueEntry_impl& meta, u8* resultGap) {
+			meta.key = tokenConsume_impl<ValueU32_impl>();
+			compileValue_impl(meta.value, resultGap);
+		}
+		// IOState: Regular
+		// @return index and type of the value compiled in result buffer
+		void compileValue_impl(ValueU32_impl& root, u8* resultGap) {
+			ValueNull_impl header;
+			std::memcpy(&header, m_source.token, sizeof(ValueNull_impl));
+			root.type = header.type;
+
+			switch (header.type) {
+			case ValueType_impl::Null:
+				m_source.token += sizeof(ValueNull_impl);
+				break;
+			case ValueType_impl::Int:
+			case ValueType_impl::Float: { // same operation for both
+				m_source.token += sizeof(ValueNull_impl);
+
+				u8* aligned = next64_impl(m_state.result);
+				if (aligned != m_state.result) { // if gap created
+					/**
+					 * It is impossible for a gap to be created while there's
+					 * another existing gap, since if there's a gap the 32-bit
+					 * object would go there to fill the gap instead of here
+					 * creating another gap. Therefore where we can safely
+					 * assume that there's no gap.
+					 */
+					resultGap = m_state.result;
+				}
+				std::memcpy(aligned, m_source.token, sizeof(i64));
+				m_source.token += sizeof(i64);
+
+				root.val = resultIndex(aligned);
+			} break;
+			case ValueType_impl::Boolean:
+				/**
+				 * This is kind of an inconsistency: the tokenlizer enforce
+				 * boolean to be an unique type, but here just uses the u32 to
+				 * store the boolean directly. But doing another cast or
+				 * something here is just way too complicated and not worth the
+				 * effort, seeing that there's no actual performance difference
+				 * between 2 approaches.
+				 */
+				root.val = tokenConsume_impl<ValueBoolean_impl>().val;
+				break;
+			case ValueType_impl::String:
+				root.val = tokenConsume_impl<ValueU32_impl>().val;
+				break;
+			case ValueType_impl::Object:
+				break;
+			case ValueType_impl::Array:
+				break;
+			}
+		}
 	};
 
 	// reallocate m_result
@@ -676,12 +848,16 @@ private:
 
 		if (targetSize > m_resultSize) {
 			// realloc
+			u64* newResultPtr = reinterpret_cast<u64*>(m_result);
+			u32 targetSize64 = tx::divCeil(targetSize, (u32)sizeof(u64));
 			tx::resize(
-			    m_result,
-			    stringPoolDataSize,
-			    targetSize,
-			    m_resultSize,
+			    newResultPtr,
+			    tx::divCeil(stringPoolDataSize, (u32)sizeof(u64)),
+			    targetSize64,
+			    m_resultSize / sizeof(u64),
 			    m_allocator64);
+			m_result = reinterpret_cast<u8*>(newResultPtr);
+			m_resultSize = targetSize64 * sizeof(u64);
 		}
 	}
 	void compileStringPool_impl() {
