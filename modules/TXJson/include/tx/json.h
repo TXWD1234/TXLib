@@ -65,6 +65,17 @@ private:
 
 	// Json Object Entry
 	struct ValueEntry_impl {
+		/**
+		 * key:   .type = String; .val = string id of the key in StringPool
+		 * value: .type = type of entry; .val = data of entry / absolute index
+		 *                                      from root to the data of entry
+		 * For value.val, it will be the data of entry when .type is:
+		 *   String / Boolean / Null
+		 *                it will be the index of the data when .type is:
+		 *   Object / Array / Int / Float
+		 * The index of data  is relative to the root address of the [Document]
+		 * partition in the JsonDocument arena.
+		 */
 		ValueU32_impl key, value;
 	};
 
@@ -182,11 +193,11 @@ private:
 	tx::PackedPartedArrayOverlay<u8> m_stringPool;
 	tx::PackedPartedArrayOverlay<u8>::StateStorage m_stringPoolStateStorage;
 
+	struct TokenlizerRecord;
 	struct ConnectionState_impl {
 		// tokenlizer to compiler
 		u8* tokenEnd;
-		u32 objectArrayEntryCount;
-		u32 booleanNullNumberCount;
+		TokenlizerRecord record;
 
 		// compiler to product
 		u32 rootIndex = 0;
@@ -231,6 +242,7 @@ private:
 	using ValueNull_impl = JsonDocument::ValueNull_impl;
 	using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
 
+
 private:
 	// ################ Logic Implementation ################
 
@@ -244,6 +256,11 @@ private:
 	// **************** Phase 1: Tokenlize ****************
 	// ====================================================
 
+	struct TokenlizerRecord {
+		u32 oaec = 0; // objectArrayEntryCount
+		u32 oac = 0; // objectArrayCount
+		u32 bnnsc = 0; // booleanNullNumberStringCount
+	};
 	struct Tokenlizer_impl {
 		/**
 		 * m_stringPool will not overflow capacity for both data and meta,
@@ -256,11 +273,6 @@ private:
 		 * Terminology:
 		 * InputState:  The current global state when a function is called
 		 * OutputState: The current global state when a function is returned
-		 * 
-		 * Exit:   Expand a new object / array from the middle of parsing an
-		 *         object / array, and interupt the current parsing progress
-		 * Resume: After parsed the interupting object / array, back to parsing
-		 *         the object / array that was being parsed before
 		 */
 	public:
 		Tokenlizer_impl(JsonParser<Allocator>* parent)
@@ -275,8 +287,7 @@ private:
 			u8* token;
 			u8* tokenEnd;
 			u32 tokenBufferSize; // buffer size
-			u32 objectArrayEntryCount; // record
-			u32 booleanNullNumberCount; // record
+			TokenlizerRecord record;
 		};
 
 		TokenlizerResult run() {
@@ -285,9 +296,7 @@ private:
 			parseObject_impl(
 			    *tokenPush_impl<ValueU32_impl>());
 			return TokenlizerResult{
-				m_token, m_state.token, m_tokenSize,
-				m_record.objectArrayEntryCount,
-				m_record.booleanNullNumberCount
+				m_token, m_state.token, m_tokenSize, m_record
 			};
 		}
 
@@ -305,10 +314,7 @@ private:
 			u8* token = nullptr; // cursor ptr in m_token (token buffer)
 		} m_state;
 
-		struct {
-			u32 objectArrayEntryCount = 0;
-			u32 booleanNullNumberCount = 0;
-		} m_record;
+		TokenlizerRecord m_record;
 
 	private:
 		// ================ Token Managing ================
@@ -459,6 +465,8 @@ private:
 				case '}':
 					// end of object
 					m_state.str++;
+					m_record.oaec += root.val;
+					m_record.oac++;
 					return;
 				case ',':
 					// new entry
@@ -475,8 +483,6 @@ private:
 					break;
 				}
 			}
-
-			m_record.objectArrayEntryCount += root.val;
 		}
 		// InputState:  m_state.str one after `[`
 		// OutputState: m_state.str one after `]`
@@ -496,6 +502,8 @@ private:
 				case ']':
 					// end of array
 					m_state.str++;
+					m_record.oaec += root.val;
+					m_record.oac++;
 					return;
 				case ',':
 					// new entry
@@ -511,8 +519,6 @@ private:
 					break;
 				}
 			}
-
-			m_record.objectArrayEntryCount += root.val;
 		}
 
 		// InputState:  m_state.str one after first `"`
@@ -539,14 +545,15 @@ private:
 		// master function
 		void parseValue_impl() {
 			switch (cur()) {
-			case '"':
-				parseValueString_impl(*tokenPush_impl<ValueU32_impl>());
-				break;
 			case '[':
 				parseArray_impl(*tokenPush_impl<ValueU32_impl>());
 				break;
 			case '{':
 				parseObject_impl(*tokenPush_impl<ValueU32_impl>());
+				break;
+			case '"':
+				parseValueString_impl(*tokenPush_impl<ValueU32_impl>());
+				m_record.bnnsc++;
 				break;
 			default:
 				if (isNumber_impl(cur())) {
@@ -563,7 +570,7 @@ private:
 				} else {
 					// DevNote: Error
 				}
-				m_record.booleanNullNumberCount++;
+				m_record.bnnsc++;
 			}
 		}
 
@@ -618,13 +625,12 @@ private:
 		    m_stringPoolMeta, m_str.size() / 3,
 		    &m_stringPoolStateStorage);
 
-		auto [token, tokenEnd, tokenBufferSize, oaec, bnnc] =
+		auto [token, tokenEnd, tokenBufferSize, record] =
 		    Tokenlizer_impl{ this }.run();
 		m_token = token;
 		m_tokenSize = tokenBufferSize;
 		m_connState.tokenEnd = tokenEnd;
-		m_connState.objectArrayEntryCount = oaec;
-		m_connState.booleanNullNumberCount = bnnc;
+		m_connState.record = record;
 	}
 
 	// ==================================================
@@ -632,6 +638,32 @@ private:
 	// ==================================================
 
 	struct Compiler_impl {
+		/**
+		 * The data structure of the compiled JsonDocument arena:
+		 * ```
+		 * [StringPoolData][StringPoolMeta][Docuemnt]
+		 * ```
+		 * Inside [Document], there are 2 recurse structures: Object and Array
+		 * Both of them have the same structure of: (Unit: byte)
+		 * ```
+		 * [root][meta][data]
+		 * ^     ^     ^
+		 * 0     4     (potential padding of 4) sizeof(meta) * entryCount
+		 * ```
+		 * Where both [root] and [data] are similar, only meta differs:
+		 * [root]:
+		 * ValueU32_impl object with .val = entryCount, .type = Object / Array
+		 * [meta]:
+		 * - Object:
+		 * [meta] is an array of ValueEntry_impl.
+		 * - Array:
+		 * [meta] is an array of ValueU32_impl, which only record the location
+		 * of the entries, exluding the `key` from ValueEntry_impl
+		 * [data]:
+		 * The actual data of entries (exluding those entries that can already
+		 * fit in [meta]), which can encompass sub-structures of other Object
+		 * or Array.
+		 */
 	public:
 		Compiler_impl(JsonParser<Allocator>* parent)
 		    : m_source(
@@ -710,7 +742,7 @@ private:
 		}
 		template <class T>
 		const T& tokenConsume_impl() {
-			u8* old = m_source.token;
+			const u8* old = m_source.token;
 			m_source.token += sizeof(T);
 			return *impl::at<T>(old);
 		}
@@ -731,6 +763,7 @@ private:
 		// - IState / OState: InputState / OutputState
 		// - "IOState: Regular": IState: m_source.token at root;
 		//                       OState: m_source.token at next root.
+		// comment: this is one of the most satisfying code i've even written
 
 		/**
 		 * Because the source: token buffer was generated by internal
@@ -741,28 +774,40 @@ private:
 		// IState: m_source.token at object root
 		// OState: m_source.token at root of next entry
 		void compileObject_impl() {
-			const u32 entryCount = resultPush_impl(
-			                           tokenConsume_impl<ValueU32_impl>().val)
+			const u32 entryCount = resultPush_impl<ValueU32_impl>(
+			                           tokenConsume_impl<ValueU32_impl>())
 			                           ->val;
 			u8* metaHead = resultAdvance_impl<ValueEntry_impl>(entryCount);
-			u8* resultGap = m_state.result;
 
 			for (u32 i = 0; i < entryCount; i++) {
-				compileEntry_impl(resultPushAt_impl<ValueEntry_impl>(metaHead),
-				                  resultGap);
+				compileEntry_impl(resultPushAt_impl<ValueEntry_impl>(metaHead));
+			}
+
+			// sorting <-----------------------------------------------------------------------------------
+		}
+
+		// IState: m_source.token at object root
+		// OState: m_source.token at root of next entry
+		void compileArray_impl() {
+			const u32 entryCount = resultPush_impl<ValueU32_impl>(
+			                           tokenConsume_impl<ValueU32_impl>())
+			                           ->val;
+			u8* metaHead = resultAdvance_impl<ValueU32_impl>(entryCount);
+
+			for (u32 i = 0; i < entryCount; i++) {
+				compileValue_impl(resultPushAt_impl<ValueU32_impl>(metaHead));
 			}
 		}
 
 		// IOState: Regular
 		// @param meta meta data object at object root for this entry
-		// @param resultGap forward to compileValue_impl
-		void compileEntry_impl(ValueEntry_impl& meta, u8* resultGap) {
+		void compileEntry_impl(ValueEntry_impl& meta) {
 			meta.key = tokenConsume_impl<ValueU32_impl>();
-			compileValue_impl(meta.value, resultGap);
+			compileValue_impl(meta.value);
 		}
 		// IOState: Regular
 		// @return index and type of the value compiled in result buffer
-		void compileValue_impl(ValueU32_impl& root, u8* resultGap) {
+		void compileValue_impl(ValueU32_impl& root) {
 			ValueNull_impl header;
 			std::memcpy(&header, m_source.token, sizeof(ValueNull_impl));
 			root.type = header.type;
@@ -776,18 +821,10 @@ private:
 				m_source.token += sizeof(ValueNull_impl);
 
 				u8* aligned = next64_impl(m_state.result);
-				if (aligned != m_state.result) { // if gap created
-					/**
-					 * It is impossible for a gap to be created while there's
-					 * another existing gap, since if there's a gap the 32-bit
-					 * object would go there to fill the gap instead of here
-					 * creating another gap. Therefore where we can safely
-					 * assume that there's no gap.
-					 */
-					resultGap = m_state.result;
-				}
-				std::memcpy(aligned, m_source.token, sizeof(i64));
-				m_source.token += sizeof(i64);
+				const u8* tokenAligned = next64_impl(m_source.token);
+				std::memcpy(aligned, tokenAligned, sizeof(i64));
+				m_source.token = tokenAligned + sizeof(i64);
+				m_state.result = aligned + sizeof(i64);
 
 				root.val = resultIndex(aligned);
 			} break;
@@ -806,28 +843,32 @@ private:
 				root.val = tokenConsume_impl<ValueU32_impl>().val;
 				break;
 			case ValueType_impl::Object:
+				root.val = resultIndex(m_state.result);
+				compileObject_impl();
 				break;
 			case ValueType_impl::Array:
+				root.val = resultIndex(m_state.result);
+				compileArray_impl();
 				break;
 			}
 		}
 	};
 
 	// reallocate m_result
-	void compileRealloc_impl() {
+	void compileRealloc_impl() { // <------------------------ -String (StringCount * 32), +padding (ObjectArrayCount * u32)
 		/**
 		 * The size of the final m_result can be precisely calculated with
 		 * records recorded during the tokenlizing phase.
 		 * The final document data size can be derived from the token buffer
 		 * size.
 		 * In the 7 types of objects:
-		 * - String remains the same memory footprint since it's still just an
-		 *   ID in StringPool.
 		 * - Object and Array each require one more u32 for each entry of them
-		 *   for their entry meta data.
-		 * - Number, Boolean and Null each will release one u32. It used to
-		 *   store the type of the value, but now in the final compilation, the
-		 *   type is stored in the meta data.
+		 *   for their entry meta data. Plus one extra u32 for each Object /
+		 *   Array for potential padding between [meta] and [data] in their
+		 *   structure.
+		 * - Boolean, Null, Number and String each will release one u32. It
+		 *   used to store the type of the value, but now in the final
+		 *   compilation, the type is stored in the meta data.
 		 * Plus the string pool data and meta data, which are stored at the
 		 * front of the buffer.
 		 * 
@@ -837,14 +878,14 @@ private:
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		u32 stringPoolMetaSize = m_stringPool.size_meta() * sizeof(u32);
 		u32 tokenDataSize = static_cast<u32>(m_connState.tokenEnd - m_token);
-		u32 bnncSize = m_connState.booleanNullNumberCount * sizeof(u32);
-		u32 oaecSize = m_connState.objectArrayEntryCount * sizeof(u32);
+		u32 subSize = m_connState.record.bnnsc * sizeof(u32);
+		u32 addSize = (m_connState.record.oaec + m_connState.record.oac) * sizeof(u32);
 
 		u32 targetSize =
 		    stringPoolDataSize +
 		    stringPoolMetaSize +
 		    tokenDataSize -
-		    bnncSize + oaecSize;
+		    subSize + addSize;
 
 		if (targetSize > m_resultSize) {
 			// realloc
@@ -863,8 +904,8 @@ private:
 	void compileStringPool_impl() {
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
-		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta();
 		m_stringPool.relocateMeta(stringPoolMetaPtr);
+		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
 	}
 
 	void compile_impl() {
