@@ -3,11 +3,11 @@
 
 #pragma once
 #include "impl/data_utils.hpp"
-#include "tx/basic_types.hpp"
-#include "tx/type_traits.hpp"
 #include "impl/numeric_utils.hpp"
 #include "impl/packed_parted_array.hpp"
 #include "impl/value_group.hpp"
+#include "tx/basic_types.hpp"
+#include "tx/type_traits.hpp"
 #include <memory>
 #include <string_view>
 #include <charconv>
@@ -193,11 +193,11 @@ private:
 	tx::PackedPartedArrayOverlay<u8> m_stringPool;
 	tx::PackedPartedArrayOverlay<u8>::StateStorage m_stringPoolStateStorage;
 
-	struct TokenlizerRecord;
+	struct TokenizerRecord;
 	struct ConnectionState_impl {
-		// tokenlizer to compiler
+		// tokenizer to compiler
 		u8* tokenEnd;
-		TokenlizerRecord record;
+		TokenizerRecord record;
 
 		// compiler to product
 		u32 rootIndex = 0;
@@ -207,7 +207,7 @@ private:
 	// ################ Memory Management ################
 
 	void alloc_impl() {
-		m_resultSize = (m_str.size() + sizeof(u64) - 1) / sizeof(u64);
+		m_resultSize = tx::divCeil(m_str.size(), sizeof(u64));
 		m_tokenSize = m_resultSize;
 
 		m_result = reinterpret_cast<u8*>(alloc64_traits::allocate(
@@ -222,7 +222,7 @@ private:
 		m_tokenSize = m_resultSize;
 	}
 	void dealloc_impl() {
-		alloc64_traits::deallocate(m_allocator64, reinterpret_cast<u64*>(m_token), m_tokenSize);
+		alloc64_traits::deallocate(m_allocator64, reinterpret_cast<u64*>(m_token), m_tokenSize / sizeof(u64));
 		alloc32_traits::deallocate(m_allocator32, reinterpret_cast<u32*>(m_stringPoolMeta), m_str.size() / 3);
 	}
 
@@ -248,20 +248,20 @@ private:
 
 	void parse_impl() {
 		alloc_impl();
-		tokenlize_impl();
+		tokenize_impl();
 		compile_impl();
 	}
 
 	// ====================================================
-	// **************** Phase 1: Tokenlize ****************
+	// **************** Phase 1: Tokenize ****************
 	// ====================================================
 
-	struct TokenlizerRecord {
+	struct TokenizerRecord {
 		u32 oaec = 0; // objectArrayEntryCount
 		u32 oac = 0; // objectArrayCount
 		u32 bnnsc = 0; // booleanNullNumberStringCount
 	};
-	struct Tokenlizer_impl {
+	struct Tokenizer_impl {
 		/**
 		 * m_stringPool will not overflow capacity for both data and meta,
 		 * given that the character count in all strings in impossible to be
@@ -275,7 +275,7 @@ private:
 		 * OutputState: The current global state when a function is returned
 		 */
 	public:
-		Tokenlizer_impl(JsonParser<Allocator>* parent)
+		Tokenizer_impl(JsonParser<Allocator>* parent)
 		    : m_str(parent->m_str),
 		      m_stringPool(parent->m_stringPool),
 		      m_token(parent->m_token),
@@ -283,19 +283,19 @@ private:
 		      m_state(parent->m_str.data(), parent->m_token) {
 		}
 
-		struct TokenlizerResult {
+		struct TokenizerResult {
 			u8* token;
 			u8* tokenEnd;
 			u32 tokenBufferSize; // buffer size
-			TokenlizerRecord record;
+			TokenizerRecord record;
 		};
 
-		TokenlizerResult run() {
+		TokenizerResult run() {
 			skipWhiteSpace_impl();
 			stepCur_impl('{');
 			parseObject_impl(
 			    *tokenPush_impl<ValueU32_impl>());
-			return TokenlizerResult{
+			return TokenizerResult{
 				m_token, m_state.token, m_tokenSize, m_record
 			};
 		}
@@ -314,7 +314,7 @@ private:
 			u8* token = nullptr; // cursor ptr in m_token (token buffer)
 		} m_state;
 
-		TokenlizerRecord m_record;
+		TokenizerRecord m_record;
 
 	private:
 		// ================ Token Managing ================
@@ -454,7 +454,10 @@ private:
 			root.type = ValueType_impl::Object;
 
 			skipWhiteSpace_impl();
-			if (cur() == '}') return;
+			if (cur() == '}') {
+				m_state.str++;
+				return;
+			}
 			stepCur_impl('"');
 			root.val++;
 			parseEntry_impl();
@@ -492,7 +495,10 @@ private:
 			root.type = ValueType_impl::Array;
 
 			skipWhiteSpace_impl();
-			if (cur() == ']') return;
+			if (cur() == ']') {
+				m_state.str++;
+				return;
+			}
 			root.val++;
 			parseValue_impl();
 			skipWhiteSpace_impl();
@@ -600,7 +606,7 @@ private:
 				m_state.str = ptr;
 			}
 		}
-		using NumberInteruptingSymbolGroup = ValueGroup<
+		using NumberInterruptingSymbolGroup = ValueGroup<
 		    char,
 		    ' ',
 		    ',',
@@ -610,15 +616,16 @@ private:
 		bool parseValueNumberTestType_impl() {
 			const char* ptr = m_state.str;
 			if (*ptr == '-') ptr++;
-			while (!NumberInteruptingSymbolGroup::contains(*ptr)) {
-				if (*ptr == '.') return true;
+			while (!NumberInterruptingSymbolGroup::contains(*ptr)) {
+				if (*ptr == '.' || *ptr == 'e' || *ptr == 'E')
+					return true;
 				ptr++;
 			}
 			return false;
 		}
 	};
 
-	void tokenlize_impl() {
+	void tokenize_impl() {
 		m_stringPool = tx::PackedPartedArrayOverlay<u8>(
 		    m_result,
 		    m_resultSize,
@@ -626,7 +633,7 @@ private:
 		    &m_stringPoolStateStorage);
 
 		auto [token, tokenEnd, tokenBufferSize, record] =
-		    Tokenlizer_impl{ this }.run();
+		    Tokenizer_impl{ this }.run();
 		m_token = token;
 		m_tokenSize = tokenBufferSize;
 		m_connState.tokenEnd = tokenEnd;
@@ -641,7 +648,7 @@ private:
 		/**
 		 * The data structure of the compiled JsonDocument arena:
 		 * ```
-		 * [StringPoolData][StringPoolMeta][Docuemnt]
+		 * [StringPoolData][StringPoolMeta][Document]
 		 * ```
 		 * Inside [Document], there are 2 recurse structures: Object and Array
 		 * Both of them have the same structure of: (Unit: byte)
@@ -704,7 +711,7 @@ private:
 		// ================ Helper Functions ================
 
 		// ---------------- Result Placement Managing ----------------
-		// the 2 token managing functions are directly copied from tokenlizer,
+		// the 2 token managing functions are directly copied from tokenizer,
 		// but removed the resizing branch (therefore cannot be generalized)
 
 		// assume it's always aligned.
@@ -737,7 +744,7 @@ private:
 		}
 
 		template <class T>
-		const T& tokenAt_impl() {
+		const T& tokenRead_impl() {
 			return *impl::at<T>(m_source.token);
 		}
 		template <class T>
@@ -822,6 +829,8 @@ private:
 
 				u8* aligned = next64_impl(m_state.result);
 				const u8* tokenAligned = next64_impl(m_source.token);
+				// by definition both i64 and f64 are 8 bytes, therefore using
+				// `sizeof(i64)` works for both types
 				std::memcpy(aligned, tokenAligned, sizeof(i64));
 				m_source.token = tokenAligned + sizeof(i64);
 				m_state.result = aligned + sizeof(i64);
@@ -830,7 +839,7 @@ private:
 			} break;
 			case ValueType_impl::Boolean:
 				/**
-				 * This is kind of an inconsistency: the tokenlizer enforce
+				 * This is kind of an inconsistency: the tokenizer enforce
 				 * boolean to be an unique type, but here just uses the u32 to
 				 * store the boolean directly. But doing another cast or
 				 * something here is just way too complicated and not worth the
@@ -843,19 +852,34 @@ private:
 				root.val = tokenConsume_impl<ValueU32_impl>().val;
 				break;
 			case ValueType_impl::Object:
-				root.val = resultIndex(m_state.result);
-				compileObject_impl();
+				/**
+				 * If an object / array is empty, it will not have an object in
+				 * [data] partition of it's parent, but instead have a value of
+				 * 0 in it's meta entry, seeing that root can never have parent
+				 */
+				if (tokenRead_impl<ValueU32_impl>().val == 0) {
+					root.val = 0;
+					m_source.token += sizeof(ValueU32_impl);
+				} else {
+					root.val = resultIndex(m_state.result);
+					compileObject_impl();
+				}
 				break;
 			case ValueType_impl::Array:
-				root.val = resultIndex(m_state.result);
-				compileArray_impl();
+				if (tokenRead_impl<ValueU32_impl>().val == 0) {
+					root.val = 0;
+					m_source.token += sizeof(ValueU32_impl);
+				} else {
+					root.val = resultIndex(m_state.result);
+					compileArray_impl();
+				}
 				break;
 			}
 		}
 	};
 
 	// reallocate m_result
-	void compileRealloc_impl() { // <------------------------ -String (StringCount * 32), +padding (ObjectArrayCount * u32)
+	void compileRealloc_impl() {
 		/**
 		 * The size of the final m_result can be precisely calculated with
 		 * records recorded during the tokenlizing phase.
@@ -899,12 +923,13 @@ private:
 			    m_allocator64);
 			m_result = reinterpret_cast<u8*>(newResultPtr);
 			m_resultSize = targetSize64 * sizeof(u64);
+			m_stringPool.rebindData(m_result, m_stringPool.size_elements());
 		}
 	}
 	void compileStringPool_impl() {
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
-		m_stringPool.relocateMeta(stringPoolMetaPtr);
+		m_stringPool.relocateMeta(stringPoolMetaPtr, m_stringPool.size_meta());
 		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
 	}
 
@@ -920,3 +945,11 @@ private:
 
 
 } // namespace tx
+
+/**
+ * Todo:
+ * - add sort in compiler
+ * - add resize in tokenizer
+ * - value root instead of object root
+ * - escape character parser
+ */

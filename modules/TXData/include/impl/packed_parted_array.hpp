@@ -338,9 +338,9 @@ public:
 
 	// ################ Relocation ################
 
-	void relocateData(T* newData, u32 newCapacity = InvalidU32) {
-		if (newCapacity == InvalidU32) newCapacity = m_capacity;
-		assert_impl([&]() { return newCapacity >= size_elements(); },
+	// includes copy
+	void relocateData(T* newData, u32 newCapacity) {
+		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
 		            "tx::PackedPartedArrayOverlay::relocateData(): new buffer too small.");
 
 		if constexpr (std::is_trivially_copyable_v<T>) {
@@ -353,9 +353,8 @@ public:
 		m_data = newData;
 		m_capacity = newCapacity;
 	}
-
-	void relocateMeta(u32* newMeta, u32 newMetaCapacity = InvalidU32) {
-		if (newMetaCapacity == InvalidU32) newMetaCapacity = m_metaCapacity;
+	// includes copy
+	void relocateMeta(u32* newMeta, u32 newMetaCapacity) {
 		impl::assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
 		                  "tx::PackedPartedArrayOverlay::relocateMeta(): new buffer too small.");
 
@@ -365,7 +364,21 @@ public:
 		m_metaCapacity = newMetaCapacity;
 	}
 
-
+	// excludes copy
+	void rebindData(T* newData, u32 newCapacity) {
+		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
+		            "tx::PackedPartedArrayOverlay::rebindData(): new buffer too small.");
+		m_data = newData;
+		m_capacity = newCapacity;
+	}
+	// excludes copy
+	void rebindMeta(u32* newMeta, u32 newMetaCapacity) {
+		impl::assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
+		                  "tx::PackedPartedArrayOverlay::rebindMeta(): new buffer too small.");
+		m_meta = newMeta;
+		m_metaCapacity = newMetaCapacity;
+	}
+	
 private:
 	T* m_data = nullptr;
 	u32 m_capacity = 0;

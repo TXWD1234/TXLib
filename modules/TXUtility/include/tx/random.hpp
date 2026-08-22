@@ -83,7 +83,7 @@ public:
 	void unban(std::initializer_list<T> vals) { removeBlacklistEntry(vals); }
 
 	template <std::uniform_random_bit_generator GeneratorT>
-	T operator()(GeneratorT& gen) { // not count because std::uniform_int_distribution::operator() is not const
+	T operator()(GeneratorT& gen) { // not const because std::uniform_int_distribution::operator() is not const
 		T result = m_dist(gen);
 		u32 begin = 0;
 		while (marchBlacklist_impl(result, begin)) {}

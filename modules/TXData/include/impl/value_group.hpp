@@ -50,7 +50,7 @@ private:
 #if __cplusplus >= 202302L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202302L)
 /**
  * A helper class wrapping a look up table, to perform fast O(1) exist check
- * Only work best for range that's smaller then 1000.
+ * Only work best for range that's smaller than 1000.
  * If larger than that, you should consider std::unordered_map or tx::KVMap
  * If performance is major concern, use ValueGroup instead for faster lookup without bit operation
  * 
