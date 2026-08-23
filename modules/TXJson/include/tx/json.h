@@ -952,4 +952,7 @@ private:
  * - add resize in tokenizer
  * - value root instead of object root
  * - escape character parser
+ * - string pool optmizations
+ *   - SSO inlining
+ *   - deduplication
  */

@@ -7,6 +7,7 @@
 #include <concepts>
 #include <algorithm>
 #include <cmath>
+#include <bit>
 
 namespace tx {
 
@@ -62,7 +63,11 @@ constexpr inline bool isInt(float f) {
 
 template <std::unsigned_integral T>
 constexpr inline bool isPowTwo(T val) {
-	return val > 0 && (val & (val - 1)) == 0;
+	return std::has_single_bit(val);
+}
+template <std::unsigned_integral T>
+constexpr inline bool nextPowTwo(T val) {
+	return std::bit_ceil(val);
 }
 
 template <std::unsigned_integral T>
