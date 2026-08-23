@@ -3,7 +3,8 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
-#include "impl/data_utils.hpp" // include for the exception
+#include "tx/exception.hpp"
+#include "impl/data_utils.hpp"
 #include <span>
 #include <concepts>
 #include <memory>
