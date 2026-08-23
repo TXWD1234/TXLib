@@ -2,9 +2,10 @@
 // Module: TXData
 
 #pragma once
-#include "tx/basic_types.hpp"
-#include "impl/data_utils.hpp" // include for the exception
+#include "impl/data_utils.hpp"
 #include "impl/numeric_utils.hpp"
+#include "tx/exception.hpp"
+#include "tx/basic_types.hpp"
 #include <span>
 #include <memory>
 
@@ -34,7 +35,7 @@ public:
 	    : m_data(tx::isPowTwo(size) ? ptr : nullptr),
 	      m_size(tx::isPowTwo(size) ? size : 0) {
 		impl::assert_impl([&]() { return valid(); },
-		                  "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
+		                  "tx::RingBufferOverlay::RingBufferOverlay: Invalid object.");
 	}
 	/**
 	 * @param buffer the provided storage memory buffer
@@ -47,7 +48,7 @@ public:
 	    : m_data(tx::isPowTwo(buffer.size()) ? buffer.data() : nullptr),
 	      m_size(tx::isPowTwo(buffer.size()) ? buffer.size() : 0) {
 		impl::assert_impl([&]() { return valid(); },
-		                  "tx::RingBufferOverlay::RingBufferOverlay: invalid object");
+		                  "tx::RingBufferOverlay::RingBufferOverlay: Invalid object.");
 	}
 	/**
      * Note on the destructor:
@@ -180,9 +181,11 @@ private:
 private:
 	// helpers
 
+
+
 	// find physical index
 	u32 findPhysIndex(u32 index) const {
-		return index & (m_size - 1);
+		return impl::findPowTwoWrappedPhysIndex(index, m_size);
 	}
 
 protected:

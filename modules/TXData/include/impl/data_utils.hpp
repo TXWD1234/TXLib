@@ -2,7 +2,9 @@
 // Module: TXData
 
 #pragma once
+#include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
+#include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
 #include <memory>
 
@@ -73,6 +75,16 @@ inline T* at(u8* ptr) {
 template <class T>
 inline const T* at(const u8* ptr) {
 	return std::launder(reinterpret_cast<const T*>(ptr));
+}
+
+constexpr u32 ByteSize = 8;
+
+// @param size have to be power of 2
+template <std::integral T>
+inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
+	impl::assert_impl([&]() { return tx::isPowTwo(size); },
+	                  "tx::impl::findPowTwoWrappedPhysIndex(): Invalid parameter value: `size` is not power of 2");
+	return index & (size - (T)1);
 }
 } // namespace impl
 } // namespace tx
