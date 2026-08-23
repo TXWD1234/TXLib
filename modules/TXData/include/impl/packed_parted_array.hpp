@@ -36,8 +36,8 @@ private:
 		u32 metaSize = 1;
 	};
 
-	inline static constexpr const u32 StateStorageSize = sizeof(State_impl);
-	inline static constexpr const u32 StateStorageAlign = alignof(State_impl);
+	static constexpr u32 StateStorageSize = sizeof(State_impl);
+	static constexpr u32 StateStorageAlign = alignof(State_impl);
 
 public:
 	struct alignas(StateStorageAlign) StateStorage {
@@ -341,7 +341,7 @@ public:
 	// includes copy
 	void relocateData(T* newData, u32 newCapacity) {
 		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
-		            "tx::PackedPartedArrayOverlay::relocateData(): new buffer too small.");
+		                  "tx::PackedPartedArrayOverlay::relocateData(): new buffer too small.");
 
 		if constexpr (std::is_trivially_copyable_v<T>) {
 			std::memcpy(newData, m_data, size_elements() * sizeof(T));
@@ -367,7 +367,7 @@ public:
 	// excludes copy
 	void rebindData(T* newData, u32 newCapacity) {
 		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
-		            "tx::PackedPartedArrayOverlay::rebindData(): new buffer too small.");
+		                  "tx::PackedPartedArrayOverlay::rebindData(): new buffer too small.");
 		m_data = newData;
 		m_capacity = newCapacity;
 	}
@@ -378,7 +378,7 @@ public:
 		m_meta = newMeta;
 		m_metaCapacity = newMetaCapacity;
 	}
-	
+
 private:
 	T* m_data = nullptr;
 	u32 m_capacity = 0;

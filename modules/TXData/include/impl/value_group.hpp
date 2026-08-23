@@ -36,11 +36,11 @@ public:
 	}
 
 private:
-	inline static constexpr const T m_min = tx::min<T, vals...>();
-	inline static constexpr const T m_max = tx::max<T, vals...>();
-	inline static constexpr const size_t m_size = m_max - m_min + 1;
+	static constexpr T m_min = tx::min<T, vals...>();
+	static constexpr T m_max = tx::max<T, vals...>();
+	static constexpr size_t m_size = m_max - m_min + 1;
 
-	inline static constexpr const std::array<bool, m_size> m_table = []() -> std::array<bool, m_size> {
+	static constexpr std::array<bool, m_size> m_table = []() -> std::array<bool, m_size> {
 		std::array<bool, m_size> table = { false };
 		((table[vals - m_min] = true), ...);
 		return table;
@@ -74,11 +74,11 @@ public:
 	}
 
 private:
-	inline static constexpr const T m_min = tx::min<T, vals...>();
-	inline static constexpr const T m_max = tx::max<T, vals...>();
-	inline static constexpr const size_t m_size = m_max - m_min + 1;
+	static constexpr T m_min = tx::min<T, vals...>();
+	static constexpr T m_max = tx::max<T, vals...>();
+	static constexpr size_t m_size = m_max - m_min + 1;
 
-	inline static constexpr const std::bitset<m_size> m_table = []() -> std::bitset<m_size> {
+	static constexpr std::bitset<m_size> m_table = []() -> std::bitset<m_size> {
 		std::bitset<m_size> table;
 		((table.set(static_cast<size_t>(vals - m_min))), ...);
 		return table;

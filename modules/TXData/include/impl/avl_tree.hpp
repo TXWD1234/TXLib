@@ -220,7 +220,7 @@ private:
 		i8 bf;
 	};
 
-	inline static constexpr const u32 null = InvalidU32;
+	static constexpr u32 null = InvalidU32;
 
 private:
 	std::vector<T> m_data;
