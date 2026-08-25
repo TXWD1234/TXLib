@@ -7,6 +7,16 @@ CompileFlags:
     - -std=c++23
     - -Wall
     - -Wextra
+---
+If:
+  PathMatch: .*\.(c|cpp)
+CompileFlags:
+  CompilationDatabase: "SampleProject/build"
+---
+If:
+  PathMatch: .*\.(h|hpp)
+CompileFlags:
+  Add:
     - -xc++-header
     - -I../../../TXFoundation/include
     - -I../../../TXMath/include
