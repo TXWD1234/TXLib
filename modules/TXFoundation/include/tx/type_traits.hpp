@@ -41,12 +41,20 @@ template <class T>
 concept numeric = (std::integral<T> || std::floating_point<T>) && !std::same_as<T, bool>;
 
 // allocator
-template <typename Alloc>
+template <class Alloc>
 concept allocator = requires(Alloc a, std::size_t n) {
 	typename Alloc::value_type;
 	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
 	{ a.deallocate(a.allocate(n), n) } -> std::same_as<void>;
 };
+template <class Alloc, u32 Alignment>
+concept aligned_allocator =
+    allocator<Alloc> &&
+    (Alloc::Alignment >= Alignment || alignof(typename Alloc::value_type) >= Alignment);
+
+// transparent
+template <typename T>
+concept transparent = requires { typename T::is_transparent; };
 
 // std add on
 

@@ -13,8 +13,13 @@ TextureArray::TextureArray(
     TextureRule xWrapRule,
     TextureRule yWrapRule,
     u8* data)
-    : m_format(format), m_dimension(dimension), m_layerCount(layerCount), m_useMipmap(useMipmap),
-      m_scaleRule(scaleRule), m_xWrapRule(xWrapRule), m_yWrapRule(yWrapRule) {
+    : m_format(format),
+      m_scaleRule(scaleRule),
+      m_xWrapRule(xWrapRule),
+      m_yWrapRule(yWrapRule),
+      m_dimension(dimension),
+      m_layerCount(layerCount),
+      m_useMipmap(useMipmap) {
 	gl::createTextures(gl::enums::TEXTURE_2D_ARRAY, 1, &m_id);
 	init_impl();
 	if (data != nullptr) { // assign data

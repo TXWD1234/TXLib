@@ -2,8 +2,6 @@
 // Module: TXGraphics
 
 #pragma once
-#include <cmath>
-#include <vector>
 #include "tx/basic_types.hpp"
 #include "tx/math.h"
 
@@ -20,9 +18,9 @@ public:
 	constexpr RGB() : m_r{}, m_g{}, m_b{} {
 	}
 
-	constexpr inline const float r() const { return this->m_r; }
-	constexpr inline const float g() const { return this->m_g; }
-	constexpr inline const float b() const { return this->m_b; }
+	constexpr inline float r() const { return this->m_r; }
+	constexpr inline float g() const { return this->m_g; }
+	constexpr inline float b() const { return this->m_b; }
 
 	inline bool operator==(const tx::RGB& other) const {
 		return this->m_r == other.m_r && this->m_g == other.m_g && this->m_b == other.m_b;
@@ -213,10 +211,10 @@ constexpr RGB MikuColorEnd = RGB(0, 255, 200);
 
 class Rainbow {
 public:
-	Rainbow(int range) { // maybe more rainbow generating algorithms?
+	Rainbow(u32 range) { // maybe more rainbow generating algorithms?
 		float increment = PI / range,
 		      third = PI / 3;
-		for (int i = 0; i < range; i++) {
+		for (u32 i = 0; i < range; i++) {
 			m_rainbow.push_back(RGB(
 			    std::abs(std::sinf(increment * i)),
 			    std::abs(std::sinf(increment * i + third)),
@@ -224,7 +222,7 @@ public:
 		}
 	}
 
-	inline const RGB& operator[](int index) const {
+	inline const RGB& operator[](u32 index) const {
 		return m_rainbow[index];
 	}
 	inline const RGB& getNextColor() {
@@ -237,6 +235,6 @@ public:
 
 private:
 	std::vector<RGB> m_rainbow;
-	int index = -1;
+	u32 index = -1;
 };
 } // namespace tx

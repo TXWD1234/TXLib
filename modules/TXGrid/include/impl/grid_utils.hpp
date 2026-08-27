@@ -2,6 +2,7 @@
 // Module: TXGrid
 
 #pragma once
+#include "tx/basic_types.hpp"
 #include "impl/coord_map.hpp"
 #include "impl/geom_utils.hpp"
 #include "impl/geometry.hpp"
@@ -68,7 +69,7 @@ private:
 			}
 		}
 
-		for (int row = 0; row < this->sector.size(); row++) {
+		for (u64 row = 0; row < this->sector.size(); row++) {
 			int rowOffset = this->sector[row];
 			for (int i = -rowOffset; i <= rowOffset; i++) {
 				operation(center + Coord(i, row + 1));
@@ -85,8 +86,16 @@ class GridLine {
 	// OFB = Out of Bound
 public:
 	GridLine() {}
-	GridLine(const vec2& in_start, const vec2& in_end, int in_width, int in_height)
-	    : width(in_width), height(in_height), topRight(in_width, in_height), rangeEnd(in_width, in_height), line(makeLineSegment(in_start, in_end)) {
+	GridLine(
+	    vec2 in_start,
+	    vec2 in_end,
+	    i32 in_width,
+	    i32 in_height)
+	    : width(in_width),
+	      height(in_height),
+	      topRight(in_width, in_height),
+	      line(makeLineSegment(in_start, in_end)),
+	      rangeEnd(in_width, in_height) {
 		init_impl(in_start, in_end);
 	}
 

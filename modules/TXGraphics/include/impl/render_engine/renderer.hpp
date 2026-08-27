@@ -166,7 +166,7 @@ private:
 	// sections are separated by different shaders
 	struct SectionMeta {
 		ShaderProduct shader;
-		u32 offset, size;
+		u32 offset = 0, size = 0;
 	};
 
 private:

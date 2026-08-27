@@ -2,6 +2,11 @@ include_guard(GLOBAL)
 
 # scope should be PUBLIC | PRIVATE | INTERFACE (case-sensitive in CMake)
 function(tx_set_compile_flags in_target scope)
+	target_compile_options(${in_target} ${scope}
+		-Wall -Wextra
+		-Wno-comment -Wno-unused-parameter
+    )
+
     # Check if we are in any Release-based configuration
     if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")     
         
