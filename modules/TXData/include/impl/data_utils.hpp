@@ -86,5 +86,10 @@ inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 	                  "tx::impl::findPowTwoWrappedPhysIndex(): Invalid parameter value: `size` is not power of 2");
 	return index & (size - (T)1);
 }
+
+template <class T>
+struct alignas(alignof(T)) Storage {
+	std::byte data[sizeof(T)];
+};
 } // namespace impl
 } // namespace tx

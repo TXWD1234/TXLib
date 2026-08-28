@@ -71,14 +71,8 @@ private:
 public:
 	// ################ Object Lifetime ################
 
-	// storage object of the meta of each entry
-	struct alignas(alignof(Entry_impl)) EntryStorage {
-		std::byte data[sizeof(Entry_impl)];
-	};
-	// storage object of the state of the class
-	struct alignas(alignof(State_impl)) StateStorage {
-		std::byte data[sizeof(State_impl)];
-	};
+	using EntryStorage = impl::Storage<Entry_impl>;
+	using StateStorage = impl::Storage<State_impl>;
 	// storage object of the value T if it's none trivial
 	using ValueStorage = Traits::ValueStorage_t;
 

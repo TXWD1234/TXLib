@@ -36,14 +36,8 @@ private:
 		u32 metaSize = 1;
 	};
 
-	static constexpr u32 StateStorageSize = sizeof(State_impl);
-	static constexpr u32 StateStorageAlign = alignof(State_impl);
-
 public:
-	struct alignas(StateStorageAlign) StateStorage {
-	private:
-		std::byte data[StateStorageSize];
-	};
+	using StateStorage = impl::Storage<State_impl>;
 
 public:
 	using value_type = T;
