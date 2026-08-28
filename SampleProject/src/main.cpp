@@ -1,5 +1,7 @@
 #include "Project.hpp"
+#include "impl/hash_set.hpp"
 #include "tx/json.h"
+#include <string>
 // #include "stb_image.hpp"
 // #include <concepts>
 
@@ -475,12 +477,16 @@ void test_custom_comparator() {
 
 // ---- Main ----
 
+template class tx::HashSetOverlay<int>;
+template class tx::HashSetOverlay<std::string>;
+
 int main() {
 
 
 	tx::JsonDocument a;
 	tx::JsonParser parser("");
 	parser.parse();
+
 
 	std::cout << "AVLTree Test Suite\n";
 	std::cout << "==================\n";

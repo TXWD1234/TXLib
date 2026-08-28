@@ -14,6 +14,7 @@
 #include "impl/basic_storage.hpp"
 #include "impl/ring_buffer.hpp"
 #include "impl/packed_parted_array.hpp"
+#include "impl/hash_set.hpp"
 
 /**
  * Terminology:

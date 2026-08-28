@@ -22,7 +22,18 @@ inline constexpr bool false_v = false;
 // Conditional Presence
 class Nothing {};
 
-// Concepts
+// ================ ########### ================
+// **************** Type Traits ****************
+// ================ ########### ================
+
+// propagate constness from type From to type To
+template <class From, class To>
+using const_propagate = std::conditional_t<
+    std::is_const_v<std::remove_reference_t<From>>, const To, To>;
+
+// ================ ######## ================
+// **************** Concepts ****************
+// ================ ######## ================
 
 // is instantiatin of
 template <typename T, template <typename...> class Template>
@@ -55,6 +66,8 @@ concept aligned_allocator =
 // transparent
 template <typename T>
 concept transparent = requires { typename T::is_transparent; };
+
+
 
 // std add on
 

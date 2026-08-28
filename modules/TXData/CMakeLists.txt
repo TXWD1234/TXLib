@@ -17,6 +17,7 @@ tx_txlib_module(
 		"grow_array.hpp"
 		"basic_storage.hpp"
 		"ring_buffer.hpp"
+		"hash_set.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )
