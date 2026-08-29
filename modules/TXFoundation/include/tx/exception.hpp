@@ -24,31 +24,28 @@ public:
 };
 
 namespace impl {
-
-struct AssertProxy {
-	template <std::convertible_to<std::string_view> T>
-	constexpr AssertProxy(
-	    T message,
-	    std::source_location location =
-	        std::source_location::current())
-	    : str(message), loc(location) {}
-
-	std::string_view str;
-	std::source_location loc;
-};
-
-template <tx::invocable_r<bool> Expr, std::convertible_to<std::string_view>... Args>
-inline static void assert_impl(Expr&& expr, AssertProxy proxy, const Args&... message) {
+template <tx::invocable_r<bool> Cond, class Message>
+    requires tx::invocable_r<Message, std::string_view> ||
+             std::convertible_to<Message, std::string_view>
+inline void assert_impl(
+    Cond&& expr, Message&& msg,
+    std::source_location loc = std::source_location::current()) {
 	if constexpr (config::enabled_debug && config::enabled_exception) {
 		if (!expr()) [[unlikely]] {
-			std::string str(proxy.str);
-			(str.append(message), ...);
+			std::string_view text;
+			std::string storage;
+			if constexpr (tx::invocable_r<Message, std::string_view>) {
+				storage = msg();
+				text = storage;
+			} else {
+				text = msg;
+			}
 			throw tx::assertion_failure(std::format(
 			    "[{}:{}] {}: {}",
-			    proxy.loc.file_name(),
-			    proxy.loc.line(),
-			    proxy.loc.function_name(),
-			    str));
+			    loc.file_name(),
+			    loc.line(),
+			    loc.function_name(),
+			    text));
 		}
 	}
 }
