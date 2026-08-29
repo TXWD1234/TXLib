@@ -7,6 +7,7 @@
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
 #include <memory>
+#include <numeric>
 
 namespace tx {
 template <std::input_iterator It>
@@ -67,6 +68,15 @@ struct IndexRange {
 	[[nodiscard]] constexpr bool empty() const noexcept { return size == 0; }
 };
 
+constexpr size_t CacheLineSize = std::hardware_destructive_interference_size;
+
+template <class T>
+struct alignas(CacheLineSize) alignas(T) CacheLineStorage {
+	static constexpr size_t ElementCount =
+	    std::lcm(sizeof(T), CacheLineSize) / sizeof(T);
+	std::byte data[ElementCount * sizeof(T)];
+};
+
 namespace impl {
 template <class T>
 inline T* at(u8* ptr) {
@@ -88,7 +98,7 @@ inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 }
 
 template <class T>
-struct alignas(alignof(T)) Storage {
+struct alignas(T) Storage {
 	std::byte data[sizeof(T)];
 };
 } // namespace impl
