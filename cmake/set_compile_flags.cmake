@@ -26,6 +26,12 @@ function(tx_set_compile_flags in_target scope)
                 -fno-omit-frame-pointer
             )
         endif()
+	elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+		
+		target_compile_options(${in_target} ${scope}
+			-g
+    	)
+
 
     endif()
 

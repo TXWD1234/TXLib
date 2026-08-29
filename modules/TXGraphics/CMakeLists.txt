@@ -41,7 +41,7 @@ tx_txlib_module(
 		"framework/framework.cpp"	
 )
 
-target_link_libraries(TXGraphics PUBLIC 
+target_link_libraries(${TXLib_INSTALLATION_MODULE_NAME} PUBLIC 
 	glfw
 	glad
 	OpenGL::GL

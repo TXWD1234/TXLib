@@ -14,6 +14,6 @@ tx_txlib_module(
 		io_file.cpp
 )
 
-target_link_libraries(TXResource PUBLIC
+target_link_libraries(${TXLib_INSTALLATION_MODULE_NAME} PUBLIC
 	stb_image
 )

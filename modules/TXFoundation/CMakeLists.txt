@@ -12,3 +12,7 @@ tx_txlib_module(
 		"build_config.hpp"
 		"exception.hpp"
 )
+
+# target_link_libraries(${TXLib_INSTALLATION_MODULE_NAME} INTERFACE 
+# 	stdc++_libbacktrace
+# )

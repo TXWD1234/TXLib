@@ -68,7 +68,7 @@ struct IndexRange {
 	[[nodiscard]] constexpr bool empty() const noexcept { return size == 0; }
 };
 
-constexpr size_t CacheLineSize = std::hardware_destructive_interference_size;
+constexpr size_t CacheLineSize = 64;
 
 template <class T>
 struct alignas(CacheLineSize) alignas(T) CacheLineStorage {
