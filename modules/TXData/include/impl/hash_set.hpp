@@ -143,7 +143,7 @@ public:
 	template <class Self>
 	decltype(auto) at(this Self&& self, u32 index) {
 		impl::assert_impl([&]() { return index < self.getEntryCapacity_impl(); },
-		                  "tx::HashSetOverlay::at(): Index out of range.");
+		                  "tx::HashSetOverlay::at(): Invalid argument. Index out of range.");
 		return self.getValue_impl(self.dataAt_impl(index));
 	}
 

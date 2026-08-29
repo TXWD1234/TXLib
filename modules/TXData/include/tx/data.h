@@ -15,6 +15,7 @@
 #include "impl/ring_buffer.hpp"
 #include "impl/packed_parted_array.hpp"
 #include "impl/hash_set.hpp"
+#include "impl/freelist.hpp"
 
 /**
  * Terminology:
@@ -33,7 +34,7 @@
  *   A data structure that don't own the data, and don't manipulate the data
  *   by itself.
  *   But the user of the data structure can manipulate the data by calling
- *   methods of the data structure or geting the reference to the raw data.
+ *   methods of the data structure or getting the reference to the raw data.
  * 
  * - Buffer
  *   A contiguous chunck of raw memory, without any algorithm above it or

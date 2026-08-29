@@ -18,6 +18,7 @@ tx_txlib_module(
 		"basic_storage.hpp"
 		"ring_buffer.hpp"
 		"hash_set.hpp"
+		"freelist.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )
