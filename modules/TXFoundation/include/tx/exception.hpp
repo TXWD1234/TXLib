@@ -49,5 +49,18 @@ inline void assert_impl(
 		}
 	}
 }
+
+struct msg_out_of_range {
+	u32 m_size, m_index;
+	msg_out_of_range(u32 size, u32 index) : m_size(size), m_index(index) {}
+	std::string operator()() {
+		return std::format("Index out of range. index = {}; size = {}",
+		                   m_index, m_size);
+	}
+	msg_out_of_range(const msg_out_of_range&) = delete;
+	msg_out_of_range& operator=(const msg_out_of_range&) = delete;
+	msg_out_of_range(msg_out_of_range&& other) = delete;
+	msg_out_of_range& operator=(msg_out_of_range&& other) = delete;
+};
 } // namespace impl
 } // namespace tx

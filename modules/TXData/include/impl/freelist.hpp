@@ -6,6 +6,7 @@
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include <concepts>
+#include <format>
 
 namespace tx {
 // O(1) array deletion, alternative of swap-and-pop deletion pattern
@@ -31,13 +32,19 @@ public:
 	    : m_data(bufferPtr),
 	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))),
 	      m_dataSize(bufferSize) {
+		impl::assert_impl([&] { return bufferPtr && bufferSize && statePtr; },
+		                  "Invalid Object. Invalid pointer or size provided.");
 	}
+
 
 public:
 	SizeT allocate() {
 		if (m_state->freeCount == 0) { // no free slot, bump
-			impl::assert_impl([&]() { return m_state->size < m_dataSize; },
-			                  "tx::FreelistOverlay::free: Size overflowed capacity.");
+			impl::assert_impl(
+			    [&] { return m_state->size < m_dataSize; },
+			    [&] { return std::format(
+				          "Size overflowed capacity. size = {}; capacity = {}",
+				          m_state->size, m_dataSize); });
 			return m_state->size++;
 		} else {
 			m_state->freeCount--;
@@ -51,8 +58,8 @@ public:
 	// accessing freed slot is UB
 	// object originally at the freeing slot must be already destroyed
 	void free(SizeT index) {
-		impl::assert_impl([&]() { return index < m_state->size; },
-		                  "tx::FreelistOverlay::free: Invalid argument. Index out of range.");
+		impl::assert_impl([&] { return index < m_state->size; },
+		                  impl::msg_out_of_range{ m_state->size, index });
 
 		// index at back, pop
 		if (index == m_state->size - 1) {

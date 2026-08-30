@@ -92,8 +92,8 @@ constexpr u32 ByteSize = 8;
 // @param size have to be power of 2
 template <std::integral T>
 inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
-	impl::assert_impl([&]() { return tx::isPowTwo(size); },
-	                  "tx::impl::findPowTwoWrappedPhysIndex(): Invalid parameter value: `size` is not power of 2");
+	impl::assert_impl([&] { return tx::isPowTwo(size); },
+	                  "Invalid parameter value: size is not power of 2.");
 	return index & (size - (T)1);
 }
 

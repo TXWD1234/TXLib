@@ -482,27 +482,8 @@ void test_custom_comparator() {
 template class tx::HashSetOverlay<int>;
 template class tx::HashSetOverlay<std::string>;
 
-void aa(tx::impl::AssertProxy a) {
-	std::cout << a.loc.function_name();
-}
-
-template <tx::invocable_r<bool> Expr, std::convertible_to<std::string_view>... Args>
-inline static void aassert_impl(Expr&& expr, tx::impl::AssertProxy proxy, const Args&... message) {
-	if (!expr()) [[unlikely]] {
-		std::string str(proxy.str);
-		(str.append(message), ...);
-		std::cout << (std::format(
-		    "[{}:{}] {}: {}",
-		    proxy.loc.file_name(),
-		    proxy.loc.line(),
-		    proxy.loc.function_name(),
-		    str));
-	}
-}
 
 int main() {
-
-	aassert_impl([]() { return false; }, "hello ", "world", "!");
 
 
 	return 0;
