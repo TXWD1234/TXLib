@@ -24,43 +24,100 @@ public:
 };
 
 namespace impl {
-template <tx::invocable_r<bool> Cond, class Message>
-    requires tx::invocable_r<Message, std::string_view> ||
-             std::convertible_to<Message, std::string_view>
-inline void assert_impl(
-    Cond&& expr, Message&& msg,
+struct CompileTimeString {
+	std::string_view m_str;
+	template <std::convertible_to<std::string_view> T>
+	consteval CompileTimeString(T str) : m_str(str) {}
+};
+/**
+ * --- Assertion Documentation ---
+ * 
+ * Assertions only trigger in debug build, in release build they are completely
+ * gone and thereby producing zero runtime overhead.
+ * The expression to be asserted (@param expr) is always passed as a lambda, so
+ * that it's only evaluated in debug build, ensuring zero overhead in release.
+ * The message (@param msg) however, can either be passed as a lambda which
+ * returns something convertible to std::string_view (in the case of formatting
+ * required), or a compile time string literal for a plain message.
+ * The final error message is automaticly formatted, and contain information
+ * about the assert site:
+ * [<file-name>:<line>] <function-name>: <message>
+ * 
+ * --- Message Convention Specification ---
+ * 
+ * Error message is formatted like so:
+ * <error-type>. [root-cause]. [variable-value]; [variable-value]...
+ * Error type don't have to be rigid types, but error with similar behavior
+ * (such as "Index out of range") should have consistent <error-type> string.
+ */
+template <tx::invocable_r<bool> Cond,
+          tx::invocable_r<std::string_view> Message>
+constexpr void assert_impl(
+    Cond&& expr,
+    Message&& msg,
     std::source_location loc = std::source_location::current()) {
 	if constexpr (config::enabled_debug && config::enabled_exception) {
 		if (!expr()) [[unlikely]] {
-			std::string_view text;
-			std::string storage;
-			if constexpr (tx::invocable_r<Message, std::string_view>) {
-				storage = msg();
-				text = storage;
-			} else {
-				text = msg;
-			}
 			throw tx::assertion_failure(std::format(
 			    "[{}:{}] {}: {}",
 			    loc.file_name(),
 			    loc.line(),
 			    loc.function_name(),
-			    text));
+			    msg()));
+		}
+	}
+}
+template <tx::invocable_r<bool> Cond>
+constexpr void assert_impl(
+    Cond&& expr,
+    CompileTimeString msg,
+    std::source_location loc = std::source_location::current()) {
+	if constexpr (config::enabled_debug && config::enabled_exception) {
+		if (!expr()) [[unlikely]] {
+			throw tx::assertion_failure(std::format(
+			    "[{}:{}] {}: {}",
+			    loc.file_name(),
+			    loc.line(),
+			    loc.function_name(),
+			    msg.m_str));
 		}
 	}
 }
 
-struct msg_out_of_range {
-	u32 m_size, m_index;
-	msg_out_of_range(u32 size, u32 index) : m_size(size), m_index(index) {}
-	std::string operator()() {
-		return std::format("Index out of range. index = {}; size = {}",
-		                   m_index, m_size);
-	}
-	msg_out_of_range(const msg_out_of_range&) = delete;
-	msg_out_of_range& operator=(const msg_out_of_range&) = delete;
-	msg_out_of_range(msg_out_of_range&& other) = delete;
-	msg_out_of_range& operator=(msg_out_of_range&& other) = delete;
+template <class Expr, class Msg>
+struct AssertPreset {
+	Expr expr;
+	Msg msg;
 };
+// wrapper function for the preset pattern
+template <class Expr, class Msg>
+constexpr void assert_impl(AssertPreset<Expr, Msg> preset) {
+	impl::assert_impl(
+	    preset.expr,
+	    preset.msg);
+}
+
+namespace assert {
+inline auto out_of_range(u32 size, u32 index) {
+	return AssertPreset{
+		[=] { return index < size; },
+		[=] { return std::format("Index out of range. index = {}; size = {}", index, size); }
+	};
+}
+inline auto buffer_empty(u32 size) {
+	return AssertPreset{
+		[=] { return size; },
+		[=] { return "Buffer os empty."; }
+	};
+}
+inline auto buffer_full(u32 size, u32 capacity) {
+	return AssertPreset{
+		[=] { return size < capacity; }, // not <= because this assert is intended
+		// to be called before the size increasing operation (such as insertion)
+		[=] { return "Buffer is full."; }
+	};
+}
+} // namespace assert
+
 } // namespace impl
 } // namespace tx

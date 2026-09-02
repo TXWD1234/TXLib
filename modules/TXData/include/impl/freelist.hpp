@@ -58,8 +58,7 @@ public:
 	// accessing freed slot is UB
 	// object originally at the freeing slot must be already destroyed
 	void free(SizeT index) {
-		impl::assert_impl([&] { return index < m_state->size; },
-		                  impl::msg_out_of_range{ m_state->size, index });
+		impl::assert_impl(impl::assert::out_of_range(m_state->size, index));
 
 		// index at back, pop
 		if (index == m_state->size - 1) {
