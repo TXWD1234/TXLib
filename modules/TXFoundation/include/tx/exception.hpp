@@ -104,32 +104,44 @@ inline auto out_of_range(u32 size, u32 index) {
 		[=] { return std::format("Index out of range. index = {}; size = {}", index, size); }
 	};
 }
-inline auto buffer_empty(u32 size) {
+inline auto buffer_not_empty(u32 size) {
 	return AssertPreset{
 		[=] { return size; },
 		[=] { return "Buffer is empty."; }
 	};
 }
-inline auto buffer_full(u32 size, u32 capacity) {
+inline auto buffer_not_full(u32 size, u32 capacity) {
 	return AssertPreset{
 		[=] { return size < capacity; }, // not <= because this assert is intended
 		// to be called before the size increasing operation (such as insertion)
 		[=] { return "Buffer is full."; }
 	};
 }
+
+// ################ Overlay Pattern Specific Assertions ################
+
 // Valid Check targeted specificly for objects of the Overlay Pattern
 // The object provided must provide public method of `valid`
 template <class T>
     requires requires(T obj) {
 	    { obj.valid() } -> std::same_as<bool>;
     }
-inline auto object_valid(T* obj) {
+inline auto overlay_object_valid(T* obj) {
 	return AssertPreset{
 		[=] { return obj->valid(); },
 		[=] { return "Invalid object."; }
 	};
 }
+template <tx::invocable_r<u32> Func>
+inline auto overlay_relocation_buffer_too_small(u32 newBufferSize, Func&& currentElementSize) {
+	return AssertPreset{
+		[=] { return newBufferSize >= currentElementSize(); },
+		[=] { return std::format(
+		          "New buffer too small. newBufferSize = {}, currentElementSize = {}",
+		          newBufferSize,
+		          currentElementSize()); }
+	};
+}
 } // namespace assert
-
 } // namespace impl
 } // namespace tx

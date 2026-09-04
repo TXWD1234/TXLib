@@ -77,6 +77,17 @@ struct alignas(CacheLineSize) alignas(T) CacheLineStorage {
 	std::byte data[ElementCount * sizeof(T)];
 };
 
+// ################ STL Addon ################
+
+// Wrapper function that groups std::uninitialized_move and std::destroy
+// @return the last iterator of the destination
+template <typename InputIt, typename ForwardIt>
+ForwardIt uninitialized_relocate(InputIt first, InputIt last, ForwardIt destFirst) {
+	ForwardIt destLast = std::uninitialized_move(first, last, destFirst);
+	std::destroy(first, last);
+	return destLast;
+}
+
 namespace impl {
 template <class T>
 inline T* at(u8* ptr) {

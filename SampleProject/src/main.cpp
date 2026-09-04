@@ -1,7 +1,10 @@
 #include "Project.hpp"
 #include "impl/hash_set.hpp"
+#include "impl/ring_buffer.hpp"
 #include "tx/exception.hpp"
 #include "tx/json.h"
+#include <algorithm>
+#include <random>
 #include <string>
 #include <string_view>
 // #include "stb_image.hpp"
@@ -482,9 +485,74 @@ void test_custom_comparator() {
 template class tx::HashSetOverlay<int>;
 template class tx::HashSetOverlay<std::string>;
 
+struct Word {
+	std::string eng;
+	std::string chn = "";
+};
 
 int main() {
 
+	tx::u32 count;
+	std::cout << "请输入本次学习的单词数量：\n";
+	std::cin >> count;
+	std::cout << "请输入本次学习的单词（单词之间用空格分开）：\n";
+
+	std::vector<Word> data;
+	for (tx::u32 i = 0; i < count; i++) {
+		std::string eng;
+		std::cin >> eng;
+		data.push_back(Word(eng));
+	}
+
+	std::cout << "请输入本次学习的单词对应的中文（按英文输入的顺序）：\n";
+	for (tx::u32 i = 0; i < count; i++) {
+		std::string chn;
+		std::cin >> chn;
+		data[i].chn = chn;
+	}
+
+	std::cout << "\n\n开始复习。请输入以下中文对应的单词：\n\n";
+
+	std::mt19937 rng(std::random_device{}());
+	std::uniform_int_distribution<bool> dist(false, true);
+	std::shuffle(data.begin(), data.end(), rng);
+
+	while (!data.empty()) {
+		for (tx::u32 i = 0; i < data.size(); i++) {
+			Word& word = data[i];
+			std::cout << word.chn << '\n';
+			std::string ans;
+			std::cin >> ans;
+			if (ans == word.eng) {
+				std::cout << "正确。\n";
+				data.erase(data.begin() + i);
+				i--;
+			} else {
+				std::cout << "错误。正确答案：" << word.eng;
+			}
+			std::cin.ignore();
+			std::cin.get();
+			std::cout << "\033[2J\033[H";
+		}
+	}
+
+	std::cout << "恭喜完成今天任务！\n";
+
+
+
+
+	return 0;
+
+	//tx::impl::assert_impl(tx::impl::preset_out_of_range(0, 0));
+
+	//tx::impl::assert::buffer_empty(0, 0);
+
+	tx::RingBufferOverlay<int> a;
+
+	std::string str = "runtime";
+	tx::impl::assert_impl([] { return true; }, "compile time");
+	tx::impl::assert_impl([] { return true; }, [&] { return str; });
+	//tx::impl::assert_impl([] { return true; }, str);
 
 	return 0;
 
