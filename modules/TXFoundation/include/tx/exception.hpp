@@ -86,8 +86,8 @@ constexpr void assert_impl(
 
 template <class Expr, class Msg>
 struct AssertPreset {
-	Expr expr;
-	Msg msg;
+	[[no_unique_address]] Expr expr;
+	[[no_unique_address]] Msg msg;
 };
 // wrapper function for the preset pattern
 template <class Expr, class Msg>
@@ -107,7 +107,7 @@ inline auto out_of_range(u32 size, u32 index) {
 inline auto buffer_empty(u32 size) {
 	return AssertPreset{
 		[=] { return size; },
-		[=] { return "Buffer os empty."; }
+		[=] { return "Buffer is empty."; }
 	};
 }
 inline auto buffer_full(u32 size, u32 capacity) {
@@ -115,6 +115,18 @@ inline auto buffer_full(u32 size, u32 capacity) {
 		[=] { return size < capacity; }, // not <= because this assert is intended
 		// to be called before the size increasing operation (such as insertion)
 		[=] { return "Buffer is full."; }
+	};
+}
+// Valid Check targeted specificly for objects of the Overlay Pattern
+// The object provided must provide public method of `valid`
+template <class T>
+    requires requires(T obj) {
+	    { obj.valid() } -> std::same_as<bool>;
+    }
+inline auto object_valid(T* obj) {
+	return AssertPreset{
+		[=] { return obj->valid(); },
+		[=] { return "Invalid object."; }
 	};
 }
 } // namespace assert
