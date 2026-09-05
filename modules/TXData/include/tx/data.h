@@ -133,14 +133,11 @@
  * nothing had went wrong, an object should never enters the Null State.
  * 
  * ## Relocation
- * Every overlay class should provide a set of relocation method for each of
- * their buffer. A set of relocation method consist of 2 methods: `rebind` and
- * `relocate`, in which rebind does not move the data over while relocate does.
- * When there are multiple buffers, the name of the buffer is added as suffix
- * of the method name (eg. `rebindData` / `rebindMeta`). When there's only one
- * buffer, the suffix can be omited and the method name can simply be `rebind`/
- * `relocate`.
- * The purpose of relocation methods are to preserve the state while switching
- * buffer, since there's no way to construct a new overlay object with existing
- * state.
+ * A `fromExistingState` static factory function must be provided by every
+ * overlay class aside the constructor.
+ * The factory function constructs a new object, but preserve the existing
+ * state in StateStorage.
+ * If relocation of the buffer of an overlay object is required, use the
+ * factory function to construct a new object with the existing state of the
+ * old object.
  */

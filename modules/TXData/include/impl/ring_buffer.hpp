@@ -6,6 +6,7 @@
 #include "impl/numeric_utils.hpp"
 #include "tx/exception.hpp"
 #include "tx/basic_types.hpp"
+#include <concepts>
 #include <span>
 #include <memory>
 #include <format>
@@ -37,24 +38,8 @@ public:
 	 * invalid
 	 */
 	RingBufferOverlay(T* bufferPtr, u32 bufferSize, StateStorage* statePtr)
-	    : m_data(tx::isPowTwo(bufferSize) ? bufferPtr : nullptr),
-	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))),
-	      m_size(tx::isPowTwo(bufferSize) ? bufferSize : 0) {
-		impl::assert_impl(
-		    [&] { return valid(); },
-		    [&] {
-			    if (!tx::isPowTwo(bufferSize)) {
-				    return std::format(
-				        "Bad construction. Argument `bufferSize` must be a power of 2. bufferSize = {}",
-				        bufferSize);
-			    } else {
-				    return std::format(
-				        "Bad construction. Invalid pointers provided. bufferPtr = {}; statePtr = {}",
-				        static_cast<const void*>(bufferPtr),
-				        static_cast<const void*>(statePtr));
-			    }
-		    });
-	}
+	    : RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize),
+	      m_state(std::construct_at(m_state)) {}
 	/**
 	 * @param buffer the provided storage memory buffer
 	 * The size of `buffer` must be a power of 2. If not, the object
@@ -80,6 +65,18 @@ public:
 	RingBufferOverlay& operator=(const RingBufferOverlay&) = default;
 	RingBufferOverlay(RingBufferOverlay&& other) = default;
 	RingBufferOverlay& operator=(RingBufferOverlay&& other) = default;
+
+	// Construct a new object, but preserve the state in StateStorage
+	// There must be a live internal state object in StateStorage. It should be
+	// from another overlay object
+	static RingBufferOverlay<T> fromExistingState(
+	    T* bufferPtr, u32 bufferSize, StateStorage* statePtr) {
+		return RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize);
+	}
+	static RingBufferOverlay<T> fromExistingState(
+	    std::span<T> buffer, StateStorage* statePtr) {
+		return RingBufferOverlay<T>(statePtr, buffer.data(), buffer.size());
+	}
 
 	bool valid() const { return m_data && m_size && m_state; }
 
@@ -201,6 +198,40 @@ public:
 		m_state->end = 0;
 	}
 
+	// Flatten (unwrap) the ring buffer inplace
+	void flatten() {
+		// stub
+	}
+	// Flatten (unwrap) the ring buffer and copy it to another buffer
+	// The provided destination buffer must have size bigger then the current
+	// element count
+	void flattenCopy(T* dest) const {
+		flattenRelocate_impl(
+		    [this](u32 first, u32 last, T* dest) {
+			    std::uninitialized_copy(
+			        this->m_data + first,
+			        this->m_data + last,
+			        dest);
+		    },
+		    dest, m_size, m_state);
+	}
+	// Flatten (unwrap) the ring buffer and copy it to another buffer
+	// The provided destination buffer must have size bigger then the current
+	// element count
+	// After this function's execution, all elements in this object's buffer
+	// are in moved-from state. `clear()` is recommended to be called
+	// immediately after.
+	void flattenMove(T* dest) {
+		flattenRelocate_impl(
+		    [this](u32 first, u32 last, T* dest) {
+			    std::uninitialized_move(
+			        this->m_data + first,
+			        this->m_data + last,
+			        dest);
+		    },
+		    dest, m_size, m_state);
+	}
+
 public:
 	// lifetime APIs
 
@@ -215,35 +246,6 @@ public:
 		// the alias objects of this object, since they are not nulled.
 	}
 
-	// ################ Relocation ################
-
-	// includes data move
-	// also flattens (unwraps) the buffer
-	// @return if the buffer size is valid (isPowTwo), true if is pow2
-	bool relocate(T* newBuffer, u32 newBufferSize) {
-		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::overlay_relocation_buffer_too_small(
-		    newBufferSize, [this] { return this->size(); }));
-		if (!tx::isPowTwo(newBufferSize)) return false;
-		flattenRelocate_impl(newBuffer, m_data, m_size, m_state);
-		m_state->end = size();
-		m_state->begin = 0;
-		m_data = newBuffer;
-		m_size = newBufferSize;
-		return true;
-	}
-	// excludes data move
-	// @return if the buffer size is valid (isPowTwo), true if is pow2
-	bool rebind(T* newBuffer, u32 newBufferSize) {
-		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::overlay_relocation_buffer_too_small(
-		    newBufferSize, [this] { return this->size(); }));
-		if (!tx::isPowTwo(newBufferSize)) return false;
-		m_data = newBuffer;
-		m_size = newBufferSize;
-		return true;
-	}
-
 private:
 	T* m_data;
 	State_impl* m_state;
@@ -252,30 +254,57 @@ private:
 private:
 	// helpers
 
+	// base constructor
+	// moved statePtr to the front to prevent signature collision
+	// (it's shenanigan I know but there's no better solution)
+	RingBufferOverlay(StateStorage* statePtr, T* bufferPtr, u32 bufferSize)
+	    : m_data(tx::isPowTwo(bufferSize) ? bufferPtr : nullptr),
+	      // m_state will be handled later with constructor specific logic
+	      // here is only a default for valid() check to pass
+	      m_state(reinterpret_cast<State_impl*>(statePtr)),
+	      m_size(tx::isPowTwo(bufferSize) ? bufferSize : 0) {
+		impl::assert_impl(
+		    [&] { return valid(); },
+		    [&] {
+			    if (!tx::isPowTwo(bufferSize)) {
+				    return std::format(
+				        "Bad construction. Argument `bufferSize` must be a power of 2. bufferSize = {}",
+				        bufferSize);
+			    } else {
+				    return std::format(
+				        "Bad construction. Invalid pointers provided. bufferPtr = {}; statePtr = {}",
+				        static_cast<const void*>(bufferPtr),
+				        static_cast<const void*>(statePtr));
+			    }
+		    });
+	}
+
 	// find physical index
 	u32 findPhysIndex_impl(u32 index) const {
 		return impl::findPowTwoWrappedPhysIndex(index, m_size);
 	}
 
-	static void flattenRelocate_impl(T* dest, T* data, u32 dataBufferSize, const State_impl* state) {
+	template <std::invocable<u32, u32, T*> Func>
+	static void flattenRelocate_impl(
+	    Func&& copyFunc, T* dest, u32 dataBufferSize, const State_impl* state) {
 		if (state->begin == state->end) return;
 		u32 physBegin = impl::findPowTwoWrappedPhysIndex(state->begin, dataBufferSize);
 		u32 physEnd = impl::findPowTwoWrappedPhysIndex(state->end, dataBufferSize);
 		if (physBegin < physEnd) {
 			// linear
-			tx::uninitialized_relocate(
-			    data + physBegin,
-			    data + physEnd,
+			copyFunc(
+			    physBegin,
+			    physEnd,
 			    dest);
 		} else {
 			// wrap
-			tx::uninitialized_relocate(
-			    data + physBegin,
-			    data + dataBufferSize,
+			copyFunc(
+			    physBegin,
+			    dataBufferSize,
 			    dest);
-			tx::uninitialized_relocate(
-			    data,
-			    data + physEnd,
+			copyFunc(
+			    0,
+			    physEnd,
 			    dest + (dataBufferSize - physBegin));
 		}
 	}
