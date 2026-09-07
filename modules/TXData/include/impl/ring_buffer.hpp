@@ -38,8 +38,7 @@ public:
 	 * invalid
 	 */
 	RingBufferOverlay(T* bufferPtr, u32 bufferSize, StateStorage* statePtr)
-	    : RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize),
-	      m_state(std::construct_at(m_state)) {}
+	    : RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize) { std::construct_at(m_state); }
 	/**
 	 * @param buffer the provided storage memory buffer
 	 * The size of `buffer` must be a power of 2. If not, the object
@@ -71,11 +70,15 @@ public:
 	// from another overlay object
 	static RingBufferOverlay<T> fromExistingState(
 	    T* bufferPtr, u32 bufferSize, StateStorage* statePtr) {
-		return RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize);
+		RingBufferOverlay<T> obj(statePtr, bufferPtr, bufferSize);
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
 	}
 	static RingBufferOverlay<T> fromExistingState(
 	    std::span<T> buffer, StateStorage* statePtr) {
-		return RingBufferOverlay<T>(statePtr, buffer.data(), buffer.size());
+		RingBufferOverlay<T> obj(statePtr, buffer.data(), buffer.size());
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
 	}
 
 	bool valid() const { return m_data && m_size && m_state; }
@@ -272,7 +275,7 @@ private:
 				        bufferSize);
 			    } else {
 				    return std::format(
-				        "Bad construction. Invalid pointers provided. bufferPtr = {}; statePtr = {}",
+				        "Bad construction. Invalid pointer provided. bufferPtr = {}; statePtr = {}",
 				        static_cast<const void*>(bufferPtr),
 				        static_cast<const void*>(statePtr));
 			    }
