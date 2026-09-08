@@ -107,14 +107,14 @@ public:
 	    requires std::is_constructible_v<T, U&&>
 	void push_back(U&& val) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::buffer_not_full(size(), m_size));
+		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
 		std::construct_at(m_data + findPhysIndex_impl(m_state->end), std::forward<U>(val));
 		m_state->end++;
 	}
 	template <class... Args>
 	void emplace_back(Args&&... args) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::buffer_not_full(size(), m_size));
+		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
 		std::construct_at(m_data + findPhysIndex_impl(m_state->end), std::forward<Args>(args)...);
 		m_state->end++;
 	}
@@ -130,14 +130,14 @@ public:
 	    requires std::is_constructible_v<T, U&&>
 	void push_front(U&& val) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::buffer_not_full(size(), m_size));
+		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
 		m_state->begin--;
 		std::construct_at(m_data + findPhysIndex_impl(m_state->begin), std::forward<U>(val));
 	}
 	template <class... Args>
 	void emplace_front(Args&&... args) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::buffer_not_full(size(), m_size));
+		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
 		m_state->begin--;
 		std::construct_at(m_data + findPhysIndex_impl(m_state->begin), std::forward<Args>(args)...);
 	}

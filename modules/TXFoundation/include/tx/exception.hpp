@@ -41,7 +41,7 @@ struct CompileTimeString {
  * required), or a compile time string literal for a plain message.
  * The final error message is automaticly formatted, and contain information
  * about the assert site:
- * [<file-name>:<line>] <function-name>: <message>
+ * \[<file-name>:<line>\] <function-name>: <message>
  * 
  * --- Message Convention Specification ---
  * 
@@ -110,11 +110,12 @@ inline auto buffer_not_empty(u32 size) {
 		[=] { return "Buffer is empty."; }
 	};
 }
-inline auto buffer_not_full(u32 size, u32 capacity) {
+inline auto bad_expansion(u32 size, u32 capacity, u32 expansionCount = 1) {
 	return AssertPreset{
-		[=] { return size < capacity; }, // not <= because this assert is intended
-		// to be called before the size increasing operation (such as insertion)
-		[=] { return "Buffer is full."; }
+		[=] { return size + expansionCount <= capacity; },
+		[=] { return std::format(
+		          "Size overflows buffer capacity. size = {}; capacity = {}; expansionCount = {}",
+		          size, capacity, expansionCount); }
 	};
 }
 
@@ -130,16 +131,6 @@ inline auto overlay_object_valid(T* obj) {
 	return AssertPreset{
 		[=] { return obj->valid(); },
 		[=] { return "Invalid object."; }
-	};
-}
-template <tx::invocable_r<u32> Func>
-inline auto overlay_relocation_buffer_too_small(u32 newBufferSize, Func&& currentElementSize) {
-	return AssertPreset{
-		[=] { return newBufferSize >= currentElementSize(); },
-		[=] { return std::format(
-		          "New buffer too small. newBufferSize = {}, currentElementSize = {}",
-		          newBufferSize,
-		          currentElementSize()); }
 	};
 }
 } // namespace assert
