@@ -30,25 +30,36 @@ struct CompileTimeString {
 	consteval CompileTimeString(T str) : m_str(str) {}
 };
 /**
- * --- Assertion Documentation ---
+ * # Assertion Documentation
  * 
  * Assertions only trigger in debug build, in release build they are completely
  * gone and thereby producing zero runtime overhead.
- * The expression to be asserted (@param expr) is always passed as a lambda, so
- * that it's only evaluated in debug build, ensuring zero overhead in release.
- * The message (@param msg) however, can either be passed as a lambda which
- * returns something convertible to std::string_view (in the case of formatting
- * required), or a compile time string literal for a plain message.
+ * The expression to be asserted (`@param expr`) is always passed as a lambda,
+ * so that it's only evaluated in debug build, ensuring zero overhead in
+ * release.
+ * The message (`@param msg`) however, can either be passed as a lambda which
+ * returns something convertible to `std::string_view` (in the case of
+ * formatting required), or a compile time string literal for a plain message.
  * The final error message is automaticly formatted, and contain information
  * about the assert site:
+ * ```
  * \[<file-name>:<line>\] <function-name>: <message>
+ * ```
  * 
- * --- Message Convention Specification ---
+ * ## Message Convention Specification
  * 
  * Error message is formatted like so:
+ * ```
  * <error-type>. [root-cause]. [variable-value]; [variable-value]...
+ * ``` 
  * Error type don't have to be rigid types, but error with similar behavior
  * (such as "Index out of range") should have consistent <error-type> string.
+ * 
+ * ## Call Site Accuracy
+ * The assertion does not have to be triggered at the exact first call site
+ * from the user. For example, if a function only forwards it's argument to
+ * another function that does similar things and has the exact same assertion,
+ * the forwarding function don't have to assert.
  */
 template <tx::invocable_r<bool> Cond,
           tx::invocable_r<std::string_view> Message>
