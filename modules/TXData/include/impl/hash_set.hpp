@@ -14,27 +14,6 @@
 #include <concepts>
 
 namespace tx {
-namespace impl {
-
-template <class T, bool Trivial>
-class HashSetOverlayTraits;
-
-template <class T>
-class HashSetOverlayTraits<T, true> {
-public:
-	using Value_t = T;
-	using ValueStorage_t = void;
-};
-template <class T>
-class HashSetOverlayTraits<T, false> {
-public:
-	using Value_t = u32;
-	using ValueStorage_t = T;
-};
-
-} // namespace impl
-
-
 template <
     class T,
     tx::invocable_r<size_t, T> FuncHash = std::hash<T>,
@@ -47,9 +26,6 @@ private:
 	    std::is_trivially_move_assignable_v<T> &&
 	    std::is_trivially_move_constructible_v<T>;
 
-	using Traits = impl::HashSetOverlayTraits<T, Trivial>;
-	friend Traits;
-
 private:
 	// ################ Internal Typedefs & Constants ################
 
@@ -58,7 +34,7 @@ private:
 		u32 hash : HashSize;
 		// dist being 0xFF indicates the entry is empty
 		u32 dist : sizeof(u8) * impl::ByteSize = (u8)0xFF;
-		Traits::Value_t value;
+		std::conditional_t<Trivial, T, u32> value;
 	};
 	struct State_impl {
 		u32 entryCount = 0;
@@ -74,7 +50,7 @@ public:
 	using EntryStorage = impl::Storage<Entry_impl>;
 	using StateStorage = impl::Storage<State_impl>;
 	// storage object of the value T if it's none trivial
-	using ValueStorage = Traits::ValueStorage_t;
+	using ValueStorage = std::conditional_t<Trivial, void, T>;
 
 	HashSetOverlay(
 	    EntryStorage* bufferPtr, u32 bufferSize,
@@ -83,8 +59,20 @@ public:
 	    : m_data(tx::isPowTwo(bufferSize) ? reinterpret_cast<u8*>(bufferPtr) : nullptr),
 	      m_dataBufferSize(tx::isPowTwo(bufferSize) ? bufferSize * sizeof(Entry_impl) : 0),
 	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))) {
-		impl::assert_impl([&]() { return valid(); },
-		                  "tx::HashSetOverlay::HashSetOverlay: Invalid object.");
+		impl::assert_impl(
+		    [&] { return valid(); },
+		    [&] {
+			    if (!tx::isPowTwo(bufferSize)) {
+				    return std::format(
+				        "Bad construction. Argument `bufferSize` have to be power of 2. bufferSize = {}",
+				        bufferSize);
+			    } else {
+				    return std::format(
+				        "Bad construction. Invalid pointers provided. bufferPtr = {}; statePtr = {}",
+				        static_cast<const void*>(bufferPtr),
+				        static_cast<const void*>(statePtr));
+			    }
+		    });
 		std::uninitialized_value_construct(
 		    reinterpret_cast<Entry_impl*>(bufferPtr),
 		    reinterpret_cast<Entry_impl*>(bufferPtr + bufferSize));
@@ -96,12 +84,29 @@ public:
 	    StateStorage* statePtr)
 	    requires(!Trivial)
 	    : m_data(tx::isPowTwo(bufferSize) ? reinterpret_cast<u8*>(bufferPtr) : nullptr),
-	      m_value(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? reinterpret_cast<u8*>(valueBufferPtr) : nullptr),
+	      m_value(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferPtr : nullptr),
 	      m_dataBufferSize(tx::isPowTwo(bufferSize) ? bufferSize * sizeof(Entry_impl) : 0),
 	      m_valueBufferSize(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferSize * sizeof(T) : 0),
 	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))) {
-		impl::assert_impl([&]() { return valid(); },
-		                  "tx::HashSetOverlay::HashSetOverlay: Invalid object.");
+		impl::assert_impl(
+		    [&] { return valid(); },
+		    [&] {
+			    if (!tx::isPowTwo(bufferSize)) {
+				    return std::format(
+				        "Bad construction. Argument `bufferSize` have to be power of 2. bufferSize = {}",
+				        bufferSize);
+			    } else if (valueBufferSize != bufferSize) {
+				    return std::format(
+				        "Bad construction. Argument `valueBufferSize` must equal `bufferSize`. valueBufferSize = {}, bufferSize = {}",
+				        valueBufferSize, bufferSize);
+			    } else {
+				    return std::format(
+				        "Bad construction. Invalid pointers provided. bufferPtr = {}; valueBufferPtr = {}; statePtr = {}",
+				        static_cast<const void*>(bufferPtr),
+				        static_cast<const void*>(valueBufferPtr),
+				        static_cast<const void*>(statePtr));
+			    }
+		    });
 		std::uninitialized_value_construct(
 		    reinterpret_cast<Entry_impl*>(bufferPtr),
 		    reinterpret_cast<Entry_impl*>(bufferPtr + bufferSize));
@@ -122,7 +127,7 @@ public:
 		} else {
 			entry.value = m_state->entryCount;
 			std::construct_at(
-			    reinterpret_cast<T*>(m_value + m_state->entryCount * sizeof(T)),
+			    m_value + m_state->entryCount,
 			    std::forward<V>(val));
 		}
 		m_state->entryCount++;
@@ -159,7 +164,7 @@ private:
 
 	u8* m_data;
 	[[no_unique_address]] std::conditional_t<
-	    !Trivial, u8*, tx::Nothing> m_value;
+	    !Trivial, T*, tx::Nothing> m_value;
 	u32 m_dataBufferSize;
 	[[no_unique_address]] std::conditional_t<
 	    !Trivial, u32, tx::Nothing> m_valueBufferSize;
@@ -181,7 +186,7 @@ private:
 	    requires(!Trivial)
 	{
 		tx::const_propagate<Self, T>* ptr = self.m_value;
-		return *impl::at<T>(ptr + index * sizeof(T));
+		return *(ptr + index);
 	}
 
 	u32 getEntryCapacity_impl() const { return m_dataBufferSize / sizeof(Entry_impl); }
@@ -190,7 +195,9 @@ private:
 	// ################ Helpers ################
 
 	template <class Self>
-	decltype(auto) getValue_impl(this Self&& self, Entry_impl& entry) {
+	decltype(auto) getValue_impl(
+	    this Self&& self,
+	    tx::const_propagate<Self, Entry_impl>& entry) {
 		if constexpr (Trivial) {
 			return entry.value;
 		} else {
@@ -309,7 +316,7 @@ private:
 		u32 dist = 0;
 
 		while (slotOccupied_impl(index)) {
-			Entry_impl& entry = dataAt_impl(index);
+			const Entry_impl& entry = dataAt_impl(index);
 
 			if (entry.hash == phash && m_equal(val, getValue_impl(entry)))
 				return index;
