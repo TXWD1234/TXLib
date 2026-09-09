@@ -7,7 +7,6 @@
 #include "tx/exception.hpp"
 #include <algorithm>
 #include <iterator>
-#include <cstring>
 #include <memory>
 #include <ranges>
 #include <span>
@@ -44,22 +43,69 @@ public:
 
 public:
 	// Because internal implementation, the total available capacity of meta
-	// is one less then the capacity provided, meaning that the actual count of
+	// is one less then the capacity provided, meaning the actual count of
 	// maximum partitions is `metaSize - 1`, therefore allocate
 	// `desired_size + 1` meta buffer to meet expected buffer size.
-	PackedPartedArrayOverlay(T* data, u32 size, u32* metaData, u32 metaSize, StateStorage* statePtr)
-	    : m_data(data), m_capacity(size),
-	      m_meta(metaData), m_metaCapacity(metaSize),
-	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))) {
+	PackedPartedArrayOverlay(
+	    T* dataBufferPtr, u32 dataBufferSize,
+	    u32* metaBufferPtr, u32 metaBufferSize,
+	    StateStorage* statePtr)
+	    : PackedPartedArrayOverlay<T>(
+	          statePtr, dataBufferPtr, dataBufferSize, metaBufferPtr, metaBufferSize) {
 		m_meta[0] = 0;
+		std::construct_at(m_state);
 	}
-	PackedPartedArrayOverlay() = default;
+	PackedPartedArrayOverlay(
+	    std::span<T> dataBuffer, std::span<u32> metaBuffer, StateStorage* statePtr)
+	    : PackedPartedArrayOverlay(dataBuffer.data(), dataBuffer.size(),
+	                               metaBuffer.data(), metaBuffer.size(),
+	                               statePtr) {}
+	/**
+	 * Default Constructor that produces an object in null state
+	 */
+	PackedPartedArrayOverlay()
+	    : m_data(nullptr), m_meta(nullptr), m_state(nullptr),
+	      m_capacity(0), m_metaCapacity(0) {}
+	~PackedPartedArrayOverlay() = default;
+
+	PackedPartedArrayOverlay(const PackedPartedArrayOverlay&) = default;
+	PackedPartedArrayOverlay& operator=(const PackedPartedArrayOverlay&) = default;
+	PackedPartedArrayOverlay(PackedPartedArrayOverlay&& other) = default;
+	PackedPartedArrayOverlay& operator=(PackedPartedArrayOverlay&& other) = default;
+
+	static PackedPartedArrayOverlay<T> fromExistingState(
+	    T* dataBufferPtr, u32 dataBufferSize,
+	    u32* metaBufferPtr, u32 metaBufferSize,
+	    StateStorage* statePtr) {
+		PackedPartedArrayOverlay<T> obj(
+		    statePtr, dataBufferPtr, dataBufferSize, metaBufferPtr, metaBufferSize);
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
+	}
+	static PackedPartedArrayOverlay<T> fromExistingState(
+	    std::span<T> dataBuffer, std::span<u32> metaBuffer,
+	    StateStorage* statePtr) {
+		PackedPartedArrayOverlay<T> obj(
+		    statePtr,
+		    dataBuffer.data(), dataBuffer.size(),
+		    metaBuffer.data(), metaBuffer.size());
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
+	}
+
+	bool valid() const {
+		return m_data && m_meta && m_capacity && m_metaCapacity && m_state;
+	}
+
+public:
+	// ################ Partition Proxies ################
 
 	using ConstPartition = std::span<const T>;
 	using Partition = std::span<T>;
 
 	// BackPartition is a handle to the current back partition, and any
 	// operation changing the partition structure invalidates its old meaning.
+	// It always points to the last partition.
 	struct BackPartition : std::ranges::view_interface<BackPartition> {
 		friend PackedPartedArrayOverlay<T>;
 
@@ -72,6 +118,14 @@ public:
 		 * the assumption that the object of this class will always be mutable.
 		 */
 
+		/**
+		 * Since BackPartition can only be constructed by factory function
+		 * provided by PackedPartedArrayOverlay, given it's only construct is
+		 * private, and m_parent is never mutated during the lifetime of
+		 * BackPartition, it is safe to assume that m_parent is always a valid
+		 * pointer during the lifetime of BackPartition.
+		 */
+
 	public:
 		// default constructor is delibrately removed. only copy constructors
 		// are available, and only way to obtain a object of this class is by
@@ -81,7 +135,7 @@ public:
 		// ================ Viewers ================
 
 		std::span<T> span() const {
-			if (!m_parent) return {};
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
 			IndexRange range = range_impl();
 			return std::span<T>(m_parent->m_data + range.offset, range.size);
 		}
@@ -89,44 +143,53 @@ public:
 
 		std::span<T> first(u32 count) const { return span().first(count); }
 		std::span<T> last(u32 count) const { return span().last(count); }
-		std::span<T> subspan(u32 offset, u32 count = InvalidU32) const {
-			return span().subspan(offset, count);
-		}
+		std::span<T> subspan(u32 offset, u32 count = InvalidU32)
+		    const { return span().subspan(offset, count); }
 
 		iterator begin() const { return span().begin(); }
 		iterator end() const { return span().end(); }
 
-		u32 capacity() const { return m_parent->capacity_elements() - range_impl().offset; }
+		u32 capacity() const {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
+			return m_parent->capacity_elements() - range_impl().offset;
+		}
 
 		// ================ Modifiers ================
 
 		template <class... Args>
-		void emplace_back(Args&&... args) { std::construct_at(push_impl(), std::forward<Args>(args)...); }
+		void emplace_back(Args&&... args) {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
+			impl::assert_impl(impl::assert::bad_expansion(this->size(), this->capacity()));
+			std::construct_at(push_impl(), std::forward<Args>(args)...);
+		}
 
 		void push_back(const T& val) { emplace_back(val); }
 		void push_back(T&& val) { emplace_back(std::move(val)); }
 
-		iterator push_back(std::span<const T> data) {
-			u32 originalEnd = range_impl().end();
-			std::uninitialized_copy(data.begin(), data.end(), push_impl(data.size()));
-			return begin() + originalEnd;
-		}
 		template <std::random_access_iterator It>
 		iterator push_back(It first, It last) {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
+			u32 count = static_cast<u32>(std::distance(first, last));
+			impl::assert_impl(impl::assert::bad_expansion(
+			    this->size(), this->capacity(), count));
 			u32 originalEnd = range_impl().end();
-			std::uninitialized_copy(first, last, push_impl(static_cast<u32>(std::distance(first, last))));
+			std::uninitialized_copy(first, last, push_impl(count));
 			return begin() + originalEnd;
+		}
+		iterator push_back(std::span<const T> data) {
+			return push_back(data.begin(), data.end());
 		}
 
 		void pop_back() {
-			impl::assert_impl([&]() { return this->size() > 0; },
-			                  "tx::PackedPartedArrayOverlay::BackPartition::pop_back(): Called on empty partition.");
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
+			impl::assert_impl(impl::assert::buffer_not_empty(this->size()));
 			u32 head = m_parent->m_state->metaSize - 1;
 			m_parent->m_meta[head]--;
 			std::destroy_at(m_parent->m_data + m_parent->m_meta[head]);
 		}
 
 		void clear() {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
 			IndexRange range = range_impl();
 			if (range.size == 0) return;
 
@@ -136,10 +199,8 @@ public:
 			m_parent->m_meta[m_parent->m_state->metaSize - 1] = range.offset;
 		}
 
-		iterator erase(const_iterator pos) {
-			return erase(pos, pos + 1);
-		}
 		iterator erase(const_iterator first, const_iterator last) {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
 			u32 eraseOffset = itIndex_impl(first);
 			u32 eraseCount = static_cast<u32>(std::distance(first, last));
 
@@ -147,8 +208,8 @@ public:
 				return begin() + eraseOffset;
 
 			IndexRange range = range_impl();
-			impl::assert_impl([&]() { return eraseOffset + eraseCount <= range.size; },
-			                  "tx::PackedPartedArrayOverlay::BackPartition::erase(): Subscript out of range.");
+			impl::assert_impl(impl::assert::out_of_range(
+			    eraseOffset + eraseCount - 1, range.size));
 
 			T* partBegin = m_parent->m_data + range.offset;
 			T* partEnd = m_parent->m_data + range.end();
@@ -161,14 +222,19 @@ public:
 
 			return begin() + eraseOffset;
 		}
+		iterator erase(const_iterator pos) {
+			return erase(pos, pos + 1);
+		}
 
 		template <class... Args>
 		iterator emplace(const_iterator pos, Args&&... args) {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
 			if (pos == this->cend()) {
 				u32 originalEnd = range_impl().end();
 				emplace_back(std::forward<Args>(args)...);
 				return begin() + originalEnd;
 			}
+			impl::assert_impl(impl::assert::bad_expansion(this->size(), this->capacity()));
 			T temp(std::forward<Args>(args)...);
 			u32 index = itIndex_impl(pos);
 			*makeSpace_impl(index).first = std::move(temp);
@@ -184,10 +250,13 @@ public:
 
 		template <std::random_access_iterator InputIt>
 		iterator insert(const_iterator pos, InputIt first, InputIt last) {
+			impl::assert_impl(impl::assert::overlay_object_valid(m_parent));
 			if (pos == this->cend()) return push_back(first, last);
 			u32 index = itIndex_impl(pos);
 			u32 count = static_cast<u32>(std::distance(first, last));
 			if (count == 0) return begin() + index;
+			impl::assert_impl(impl::assert::bad_expansion(
+			    this->size(), this->capacity(), count));
 
 			auto [ptr, uninitMemSize] = makeSpace_impl(index, count);
 			std::copy_n(first, count - uninitMemSize, ptr);
@@ -196,7 +265,7 @@ public:
 		}
 
 	private:
-		PackedPartedArrayOverlay<T>* m_parent = nullptr;
+		PackedPartedArrayOverlay<T>* m_parent;
 
 		IndexRange range_impl() const {
 			u32 head = m_parent->m_state->metaSize - 1;
@@ -242,9 +311,18 @@ public:
 
 	// ################ Viewers ################
 
-	u32 size_elements() const { return m_meta[m_state->metaSize - 1]; }
-	u32 size_partitions() const { return m_state->metaSize - 1; }
-	u32 size_meta() const { return m_state->metaSize; }
+	u32 size_elements() const {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return m_meta[m_state->metaSize - 1];
+	}
+	u32 size_partitions() const {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return m_state->metaSize - 1;
+	}
+	u32 size_meta() const {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return m_state->metaSize;
+	}
 	u32 capacity_elements() const { return m_capacity; }
 	u32 capacity_partitions() const { return m_metaCapacity - 1; }
 	u32 capacity_meta() const { return m_metaCapacity; }
@@ -257,51 +335,54 @@ public:
 	// user don't suppose to access m_meta buffer directly
 
 	ConstPartition front() const {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		return at_impl(0);
 	}
 	Partition front() {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArray::front(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		return at_impl(0);
 	}
 	ConstPartition back() const {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		return at_impl(m_state->metaSize - 2);
 	}
 	Partition back() {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArray::back(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		return at_impl(m_state->metaSize - 2);
 	}
 
 	// explicitly request an expandable partition
 	BackPartition backPartition() {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArray::backPartition(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		return BackPartition(this);
 	}
 
 	ConstPartition operator[](u32 index) const {
-		impl::assert_impl([&]() { return m_state->metaSize - 1 > index; },
-		                  "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::out_of_range(size_partitions(), index));
 		return at_impl(index);
 	}
 	Partition operator[](u32 index) {
-		impl::assert_impl([&]() { return m_state->metaSize - 1 > index; },
-		                  "tx::PackedPartedArray::operator[]: Subscript out of range.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::out_of_range(size_partitions(), index));
 		return at_impl(index);
 	}
 
 	// ################ Modifiers ################
 
 	BackPartition push_back() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::bad_expansion(m_state->metaSize, m_metaCapacity));
 		m_meta[m_state->metaSize] = m_meta[m_state->metaSize - 1];
 		m_state->metaSize++;
 		return BackPartition(this);
 	}
+	// forwarding the arguments to BackPartition::push_back()
 	template <class... Args>
 	    requires requires(BackPartition& p, Args&&... args) {
 		    p.push_back(std::forward<Args>(args)...);
@@ -312,12 +393,13 @@ public:
 	}
 
 	void pop_back() {
-		impl::assert_impl([&]() { return m_state->metaSize >= 2; },
-		                  "tx::PackedPartedArrayOverlay::pop_back(): Call on empty object.");
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::buffer_not_empty(size_partitions()));
 		std::destroy(m_data + m_meta[m_state->metaSize - 2], m_data + m_meta[m_state->metaSize - 1]);
 		m_state->metaSize--;
 	}
 	void clear() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		std::destroy(m_data, m_data + m_meta[m_state->metaSize - 1]);
 		m_state->metaSize = 1;
 		m_meta[0] = 0;
@@ -327,58 +409,44 @@ public:
 	// every other overlays that share the same buffers.
 	// This is the point of no return.
 	void destruct() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		std::destroy_at(m_state);
-	}
-
-	// ################ Relocation ################
-
-	// includes copy
-	void relocateData(T* newData, u32 newCapacity) {
-		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
-		                  "tx::PackedPartedArrayOverlay::relocateData(): new buffer too small.");
-
-		if constexpr (std::is_trivially_copyable_v<T>) {
-			std::memcpy(newData, m_data, size_elements() * sizeof(T));
-		} else {
-			std::uninitialized_move(m_data, m_data + m_meta[m_state->metaSize - 1], newData);
-			std::destroy(m_data, m_data + m_meta[m_state->metaSize - 1]);
-		}
-
-		m_data = newData;
-		m_capacity = newCapacity;
-	}
-	// includes copy
-	void relocateMeta(u32* newMeta, u32 newMetaCapacity) {
-		impl::assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
-		                  "tx::PackedPartedArrayOverlay::relocateMeta(): new buffer too small.");
-
-		std::copy(m_meta, m_meta + m_state->metaSize, newMeta);
-
-		m_meta = newMeta;
-		m_metaCapacity = newMetaCapacity;
-	}
-
-	// excludes copy
-	void rebindData(T* newData, u32 newCapacity) {
-		impl::assert_impl([&]() { return newCapacity >= size_elements(); },
-		                  "tx::PackedPartedArrayOverlay::rebindData(): new buffer too small.");
-		m_data = newData;
-		m_capacity = newCapacity;
-	}
-	// excludes copy
-	void rebindMeta(u32* newMeta, u32 newMetaCapacity) {
-		impl::assert_impl([&]() { return newMetaCapacity >= m_state->metaSize; },
-		                  "tx::PackedPartedArrayOverlay::rebindMeta(): new buffer too small.");
-		m_meta = newMeta;
-		m_metaCapacity = newMetaCapacity;
 	}
 
 private:
 	T* m_data = nullptr;
-	u32 m_capacity = 0;
 	u32* m_meta = nullptr;
-	u32 m_metaCapacity = 0;
 	State_impl* m_state = nullptr;
+	u32 m_capacity = 0;
+	u32 m_metaCapacity = 0;
+
+private:
+	// ################ Helpers ################
+
+	PackedPartedArrayOverlay(
+	    StateStorage* statePtr,
+	    T* dataBufferPtr, u32 dataBufferSize,
+	    u32* metaBufferPtr, u32 metaBufferSize)
+	    : m_data(dataBufferPtr), m_meta(metaBufferPtr),
+	      m_state(reinterpret_cast<State_impl*>(statePtr)),
+	      m_capacity(dataBufferSize), m_metaCapacity(metaBufferSize) {
+		impl::assert_impl(
+		    [this] { return this->valid(); },
+		    [=] {
+			    return std::format(
+			        "Bad construction. Invalid pointer or size provided."
+			        " dataBufferPtr = {};"
+			        " metaBufferPtr = {};"
+			        " statePtr = {};"
+			        " dataBufferSize = {};"
+			        " metaBufferSize = {}",
+			        static_cast<const void*>(dataBufferPtr),
+			        static_cast<const void*>(metaBufferPtr),
+			        static_cast<const void*>(statePtr),
+			        dataBufferSize,
+			        metaBufferSize);
+		    });
+	}
 
 	/**
 	 * Each element of m_meta is the `offset` / begin of a partition.
@@ -386,7 +454,6 @@ private:
 	 * elements in the buffer. It also represents the end of the last partition.
 	 * Therefore, the range of every partition can be calculated with the same
 	 * algorithm (at_impl) without edge cases.
-	 * 
 	 */
 
 	Partition at_impl(u32 index) const {
@@ -402,6 +469,7 @@ class PackedPartedArrayOverlayInlined : public PackedPartedArrayOverlay<T> {
 public:
 	PackedPartedArrayOverlayInlined(T* data, u32 size, u32* metaData, u32 metaSize)
 	    : PackedPartedArrayOverlay<T>(data, size, metaData, metaSize, &m_metaStorage) {}
+	~PackedPartedArrayOverlayInlined() { this->destruct(); }
 	typename PackedPartedArrayOverlay<T>::StateStorage m_metaStorage;
 	PackedPartedArrayOverlayInlined(const PackedPartedArrayOverlayInlined&) = delete;
 	PackedPartedArrayOverlayInlined& operator=(const PackedPartedArrayOverlayInlined&) = delete;

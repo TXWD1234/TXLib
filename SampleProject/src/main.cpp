@@ -1,9 +1,11 @@
 #include "Project.hpp"
 #include "impl/hash_set.hpp"
+#include "impl/numeric_utils.hpp"
 #include "impl/ring_buffer.hpp"
 #include "tx/exception.hpp"
 #include "tx/json.h"
 #include <algorithm>
+#include <concepts>
 #include <random>
 #include <string>
 #include <string_view>
@@ -490,7 +492,61 @@ struct Word {
 	std::string chn = "";
 };
 
+template <std::invocable<int, int> Func>
+void idk(Func&& func, int n) {
+	for (int c = 1; c < n; c++) {
+		int left = 2 * n + c - c * c;
+		int f = left / (c * 2);
+		if (f * c * 2 == left && f > 0) {
+			func(c, f);
+		}
+	}
+}
+
 int main() {
+
+	std::cout << "Hello"
+	             " World";
+
+	return 0;
+
+	int i = 3;
+	while (true) {
+		float doubled = (double)(i * i * i) / 3.0 * 2.0;
+		if (tx::isInt(std::sqrt(doubled))) {
+			std::print("i = {}, i^3 = {}, sqrt(i^3/3*2) = {}, ans = {}",
+			           i, i * i * i, sqrt(doubled),
+			           doubled / 2.0);
+			cin.get();
+		}
+		i += 3;
+	}
+
+	return 0;
+
+	int result = 0;
+	int resultCount = 0;
+	for (int i = 0; i < 1000000; i++) {
+		int count = 0;
+		idk([&](int c, int f) {
+			count++;
+		},
+		    i);
+		if (count > resultCount) {
+			result = i;
+			resultCount = count;
+		}
+	}
+
+
+	std::print("result = {}; resultCount = {}\n", result, resultCount);
+	idk([](int c, int f) {
+		std::print("c: {}, f: {}\n", c, f);
+	},
+	    result);
+
+
+	return 0;
 
 	tx::u32 count;
 	std::cout << "请输入本次学习的单词数量：\n";
@@ -540,7 +596,6 @@ int main() {
 
 
 
-
 	return 0;
 
 	//tx::impl::assert_impl(tx::impl::preset_out_of_range(0, 0));
@@ -556,9 +611,9 @@ int main() {
 
 	return 0;
 
-	tx::JsonDocument a;
-	tx::JsonParser parser("");
-	parser.parse();
+	//tx::JsonDocument a;
+	//tx::JsonParser parser("");
+	//parser.parse();
 
 
 	std::cout << "AVLTree Test Suite\n";
