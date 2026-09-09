@@ -11,6 +11,7 @@
 #include <memory>
 #include <string_view>
 #include <charconv>
+#include <cstring>
 
 namespace tx {
 
@@ -627,8 +628,7 @@ private:
 
 	void tokenize_impl() {
 		m_stringPool = tx::PackedPartedArrayOverlay<u8>(
-		    m_result,
-		    m_resultSize,
+		    m_result, m_resultSize,
 		    m_stringPoolMeta, m_str.size() / 3,
 		    &m_stringPoolStateStorage);
 
@@ -923,13 +923,17 @@ private:
 			    m_allocator64);
 			m_result = reinterpret_cast<u8*>(newResultPtr);
 			m_resultSize = targetSize64 * sizeof(u64);
-			m_stringPool.rebindData(m_result, m_stringPool.size_elements());
 		}
 	}
 	void compileStringPool_impl() {
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
-		m_stringPool.relocateMeta(stringPoolMetaPtr, m_stringPool.size_meta());
+		tx::uninitialized_relocate(
+		    m_stringPoolMeta, m_stringPoolMeta + m_stringPool.size_meta(), stringPoolMetaPtr);
+		m_stringPool = tx::PackedPartedArrayOverlay<u8>::fromExistingState(
+		    m_result, m_stringPool.size_elements(),
+		    stringPoolMetaPtr, m_stringPool.size_meta(),
+		    &m_stringPoolStateStorage);
 		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
 	}
 
