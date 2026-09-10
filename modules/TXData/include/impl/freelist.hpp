@@ -96,6 +96,12 @@ public:
 		m_state->freeHead = index;
 	}
 
+	void clear() {
+		m_state->freeHead = InvalidSize;
+		m_state->freeCount = SizeT{ 0 };
+		m_state->size = SizeT{ 0 };
+	}
+
 	SizeT size() const {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		return m_state->size - m_state->freeCount;

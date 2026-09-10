@@ -111,6 +111,10 @@
  * performed on one object are visible acorss every other alias objects of
  * that object.
  * 
+ * ### `destruct()`
+ * Public API for the user to destory the m_state, thus end the lifetime of the
+ * overlay object and all of it's alias objects.
+ * 
  * ## Null State
  * A default constructed overlay class is in null state.
  * The null state condition varies on data structures, but a value of `nullptr`

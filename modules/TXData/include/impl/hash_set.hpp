@@ -4,6 +4,7 @@
 #pragma once
 #include "impl/data_utils.hpp"
 #include "impl/numeric_utils.hpp"
+#include "impl/freelist.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
@@ -39,6 +40,12 @@ private:
 	struct State_impl {
 		u32 entryCount = 0;
 		bool distOverflowing = false;
+		[[no_unique_address]] std::conditional_t<
+		    !Trivial,
+		    typename tx::FreelistOverlay<T>::StateStorage,
+		    tx::Nothing> valueFreelistState;
+		[[no_unique_address]] mutable FuncHash hash;
+		[[no_unique_address]] mutable FuncEqual equal;
 	};
 
 	static constexpr f32 MaxLoadFactor = 0.8f;
@@ -87,7 +94,8 @@ public:
 	      m_value(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferPtr : nullptr),
 	      m_dataBufferSize(tx::isPowTwo(bufferSize) ? bufferSize * sizeof(Entry_impl) : 0),
 	      m_valueBufferSize(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferSize * sizeof(T) : 0),
-	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))) {
+	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))),
+	      m_valueFreelist(m_value, m_valueBufferSize, &m_state->valueFreelistState) {
 		impl::assert_impl(
 		    [&] { return valid(); },
 		    [&] {
@@ -112,6 +120,20 @@ public:
 		    reinterpret_cast<Entry_impl*>(bufferPtr + bufferSize));
 	}
 
+	bool valid() const
+	    requires Trivial
+	{ return m_state && m_data && m_dataBufferSize; }
+	bool valid() const
+	    requires(!Trivial)
+	{ return m_state && m_data && m_dataBufferSize && m_value && m_valueBufferSize; }
+
+	void destruct() {
+		if constexpr (!Trivial) {
+			m_valueFreelist.destruct();
+		}
+		std::destroy_at(m_state);
+	}
+
 public:
 	// ################ Public Interface ################
 
@@ -125,20 +147,37 @@ public:
 		if constexpr (Trivial) {
 			entry.value = std::forward<V>(val);
 		} else {
-			entry.value = m_state->entryCount;
+			// entry.value is the index in value buffer of this entry
+			entry.value = m_valueFreelist.allocate();
 			std::construct_at(
-			    m_value + m_state->entryCount,
+			    m_value + entry.value,
 			    std::forward<V>(val));
 		}
 		m_state->entryCount++;
 		return insert_impl(entry);
 	}
-	void erase() {
+	// @return the index of the erased object
+	u32 erase(u32 index) {
+		deleteEntry_impl(index);
+		dataAt_impl(erase_impl(index)).dist = (u8)0xFF;
+		return index;
 	}
 	bool exist(const T& val) const { return find_impl(val) != InvalidU32; }
 	u32 find(const T& val) const { return find_impl(val); }
 
-	void clear() {}
+	void clear() {
+		if constexpr (!Trivial) {
+			for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
+				if (slotOccupied_impl(i)) std::destroy_at(m_value + dataAt_impl(i).value);
+			}
+			m_valueFreelist.clear();
+		}
+		for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
+			dataAt_impl(i).dist = (u8)0xFF;
+		}
+		m_state->entryCount = 0;
+		m_state->distOverflowing = false;
+	}
 
 	u32 size() { return m_state->entryCount; }
 	u32 capacity() { return getEntryCapacity_impl() * MaxLoadFactor; }
@@ -152,13 +191,6 @@ public:
 		return self.getValue_impl(self.dataAt_impl(index));
 	}
 
-	bool valid() const
-	    requires Trivial
-	{ return m_state && m_data && m_dataBufferSize; }
-	bool valid() const
-	    requires(!Trivial)
-	{ return m_state && m_data && m_dataBufferSize && m_value && m_valueBufferSize; }
-
 private:
 	// ################ Runtime Data ################
 
@@ -169,9 +201,8 @@ private:
 	[[no_unique_address]] std::conditional_t<
 	    !Trivial, u32, tx::Nothing> m_valueBufferSize;
 	State_impl* m_state;
-
-	[[no_unique_address]] mutable FuncHash m_hash;
-	[[no_unique_address]] mutable FuncEqual m_equal;
+	[[no_unique_address]] std::conditional_t<
+	    !Trivial, tx::FreelistOverlay<T>, tx::Nothing> m_valueFreelist;
 
 private:
 	// ################ Memory Management ################
@@ -189,7 +220,9 @@ private:
 		return *(ptr + index);
 	}
 
-	u32 getEntryCapacity_impl() const { return m_dataBufferSize / sizeof(Entry_impl); }
+	u32 getEntryCapacity_impl() const {
+		return m_dataBufferSize / sizeof(Entry_impl);
+	}
 
 private:
 	// ################ Helpers ################
@@ -213,17 +246,21 @@ private:
 	bool slotOccupied_impl(u32 index) const {
 		return dataAt_impl(index).dist != (u8)0xFF;
 	}
-	u32 advanceIndex_impl(u32 index) const {
+	u32 wrapIndex_impl(u32 index) const {
 		return impl::findPowTwoWrappedPhysIndex(
-		    index + 1, getEntryCapacity_impl());
+		    index, getEntryCapacity_impl());
 	}
 
 	// @param index the entry to be deleted
 	void deleteEntry_impl(u32 index) {
-		dataAt_impl(index).dist = (u8)0xFF;
-		// no need for further clearing becuase it's going to be overwritten
-		// later anyways
+		// didn't set dist to 0xFF here because it belongs to logic, not state
+		// managing. Also no changes to the rest of the Entry_impl because all
+		// those are going to be overwritten later anyways
 		if constexpr (!Trivial) {
+			// clean up for non trivial T
+			u32 valueIndex = dataAt_impl(index).value;
+			std::destroy_at(m_value + valueIndex);
+			m_valueFreelist.free(valueIndex);
 		}
 		m_state->entryCount--;
 	}
@@ -237,13 +274,13 @@ private:
 	u32 insert_impl(Entry_impl& entry) {
 		entry.dist = 0;
 
-		size_t hash = m_hash(getValue_impl(entry));
+		size_t hash = m_state->hash(getValue_impl(entry));
 		entry.hash = compact_impl(hash);
 		u32 index = clamp_impl(hash);
 
 		while (slotOccupied_impl(index)) {
 			collide_impl(index, entry);
-			index = advanceIndex_impl(index);
+			index = wrapIndex_impl(index + 1);
 		}
 		dataAt_impl(index) = entry;
 		/**
@@ -310,7 +347,7 @@ private:
 	// @return the index of the entry of the targeting value in m_data;
 	//         InvalidU32 if not found
 	u32 find_impl(const T& val) const {
-		size_t hash = m_hash(val);
+		size_t hash = m_state->hash(val);
 		size_t phash = compact_impl(hash);
 		u32 index = clamp_impl(hash);
 		u32 dist = 0;
@@ -318,13 +355,13 @@ private:
 		while (slotOccupied_impl(index)) {
 			const Entry_impl& entry = dataAt_impl(index);
 
-			if (entry.hash == phash && m_equal(val, getValue_impl(entry)))
+			if (entry.hash == phash && m_state->equal(val, getValue_impl(entry)))
 				return index;
 
 			// RobinHood Abortion Check
 			if (checkAbort_impl(dist, entry.dist)) return InvalidU32;
 
-			index = advanceIndex_impl(index);
+			index = wrapIndex_impl(index + 1);
 			dist++;
 		}
 		return InvalidU32;
@@ -335,8 +372,23 @@ private:
 		return distEntry < distLookup;
 	}
 
+	// RobinHood: Post deletion move
 	// @param index the erased
-	void erase_impl(u32 index) {
+	// @return the final entry to be set to 0xFF
+	u32 erase_impl(u32 index) {
+		// Phase 1: find the end
+		u32 end = wrapIndex_impl(index + 1);
+		while (slotOccupied_impl(end) &&
+		       dataAt_impl(end).dist) { end = wrapIndex_impl(end + 1); }
+
+		// Phase 2: move
+		for (u32 i = wrapIndex_impl(index + 1);
+		     i != end;
+		     i = wrapIndex_impl(i + 1)) {
+			dataAt_impl(i).dist--;
+			dataAt_impl(wrapIndex_impl(i - 1)) = dataAt_impl(i);
+		}
+		return end;
 	}
 };
 } // namespace tx
