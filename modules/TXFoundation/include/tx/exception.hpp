@@ -8,7 +8,6 @@
 #include <source_location>
 #include <stdexcept>
 #include <string_view>
-#include <string>
 #include <format>
 
 namespace tx {
@@ -112,20 +111,20 @@ namespace assert {
 inline auto out_of_range(u32 size, u32 index) {
 	return AssertPreset{
 		[=] { return index < size; },
-		[=] { return std::format("Index out of range. index = {}; size = {}", index, size); }
+		[=] { return std::format("Bad access. Index out of range. index = {}; size = {}", index, size); }
 	};
 }
 inline auto buffer_not_empty(u32 size) {
 	return AssertPreset{
 		[=] { return size; },
-		[=] { return "Buffer is empty."; }
+		[=] { return "Bad access. Buffer is empty."; }
 	};
 }
 inline auto bad_expansion(u32 size, u32 capacity, u32 expansionCount = 1) {
 	return AssertPreset{
 		[=] { return size + expansionCount <= capacity; },
 		[=] { return std::format(
-		          "Size overflows buffer capacity. size = {}; capacity = {}; expansionCount = {}",
+		          "Bad expansion. Size overflows buffer capacity. size = {}; capacity = {}; expansionCount = {}",
 		          size, capacity, expansionCount); }
 	};
 }

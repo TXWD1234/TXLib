@@ -54,18 +54,223 @@ private:
 public:
 	// ################ Object Lifetime ################
 
+	using value_type = T;
+
 	using EntryStorage = impl::Storage<Entry_impl>;
 	using StateStorage = impl::Storage<State_impl>;
 	// storage object of the value T if it's none trivial
 	using ValueStorage = std::conditional_t<Trivial, void, T>;
 
 	HashSetOverlay(
+	    EntryStorage* bufferPtr, u32 bufferSize, StateStorage* statePtr)
+	    requires Trivial
+	    : HashSetOverlay<T>(statePtr, bufferPtr, bufferSize) {
+		std::construct_at(m_state);
+	}
+	HashSetOverlay(std::span<EntryStorage> buffer, StateStorage* statePtr)
+	    requires Trivial
+	    : HashSetOverlay<T>(buffer.data(), buffer.size(), statePtr) {}
+	HashSetOverlay()
+	    requires Trivial
+	    : m_data(nullptr), m_dataBufferSize(0), m_state(nullptr) {}
+
+	HashSetOverlay(
 	    EntryStorage* bufferPtr, u32 bufferSize,
+	    ValueStorage* valueBufferPtr, u32 valueBufferSize,
 	    StateStorage* statePtr)
+	    requires(!Trivial)
+	    : HashSetOverlay<T>(statePtr,
+	                        bufferPtr, bufferSize,
+	                        valueBufferPtr, valueBufferSize) {
+		std::construct_at(m_state);
+		initFreelist_impl();
+	}
+	HashSetOverlay(
+	    std::span<EntryStorage> buffer, std::span<ValueStorage> valueBuffer,
+	    StateStorage* statePtr)
+	    requires(!Trivial)
+	    : HashSetOverlay<T>(
+	          buffer.data(), buffer.size(),
+	          valueBuffer.data(), valueBuffer.size(),
+	          statePtr) {}
+	HashSetOverlay()
+	    requires(!Trivial)
+	    : m_data(nullptr), m_value(nullptr),
+	      m_dataBufferSize(0), m_valueBufferSize(0),
+	      m_state(nullptr) {}
+
+	~HashSetOverlay() {}
+
+	HashSetOverlay(const HashSetOverlay&) = default;
+	HashSetOverlay& operator=(const HashSetOverlay&) = default;
+	HashSetOverlay(HashSetOverlay&& other) = default;
+	HashSetOverlay& operator=(HashSetOverlay&& other) = default;
+
+	// Construct a new object, but preserve the state in StateStorage
+	// There must be a live internal state object in StateStorage. It should be
+	// from another overlay object
+	static HashSetOverlay<T> fromExistingState(
+	    EntryStorage* bufferPtr, u32 bufferSize, StateStorage* statePtr)
+	    requires Trivial
+	{
+		HashSetOverlay<T> obj(statePtr, bufferPtr, bufferSize);
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
+	}
+	static HashSetOverlay<T> fromExistingState(
+	    std::span<EntryStorage> buffer, StateStorage* statePtr)
+	    requires Trivial
+	{
+		HashSetOverlay<T> obj(statePtr, buffer.data(), buffer.size());
+		obj.m_state = std::launder(obj.m_state);
+		return obj;
+	}
+	static HashSetOverlay<T> fromExistingState(
+	    EntryStorage* bufferPtr, u32 bufferSize,
+	    ValueStorage* valueBufferPtr, u32 valueBufferSize,
+	    StateStorage* statePtr)
+	    requires(!Trivial)
+	{
+		HashSetOverlay<T> obj(statePtr,
+		                      bufferPtr, bufferSize,
+		                      valueBufferPtr, valueBufferSize);
+		obj.m_state = std::launder(obj.m_state);
+		obj.initFreelistExisting_impl();
+		return obj;
+	}
+	static HashSetOverlay<T> fromExistingState(
+	    std::span<EntryStorage> buffer, std::span<ValueStorage> valueBuffer,
+	    StateStorage* statePtr)
+	    requires(!Trivial)
+	{
+		return fromExistingState(
+		    buffer.data(), buffer.size(),
+		    valueBuffer.data(), valueBuffer.size(),
+		    statePtr);
+	}
+
+	bool valid() const
+	    requires Trivial
+	{ return m_state && m_data && m_dataBufferSize; }
+	bool valid() const
+	    requires(!Trivial)
+	{ return m_state && m_data && m_dataBufferSize && m_value && m_valueBufferSize; }
+
+	void destruct() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		if constexpr (!Trivial) {
+			m_valueFreelist.destruct();
+		}
+		std::destroy_at(m_state);
+	}
+
+public:
+	// ################ Public Interface ################
+
+	// @return the handle of the inserted entry. It will be invalidated after
+	//         any modification
+	template <class V>
+	    requires std::constructible_from<T, V&&>
+	u32 insert(V&& val) {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(
+		    [this] { return !this->full(); },
+		    [this] {
+			    return std::format(
+			        "Bad expension. {}.",
+			        this->m_state->distOverflowing ?
+			            "RobinHood: Entry distance overflowing." :
+			            std::format("Size overflows buffer capacity."
+			                        " size = {}; capacity = {}; expansionCount = 1",
+			                        this->size(), this->capacity()));
+		    });
+		Entry_impl entry;
+		if constexpr (Trivial) {
+			entry.value = std::forward<V>(val);
+		} else {
+			// entry.value is the index in value buffer of this entry
+			entry.value = m_valueFreelist.allocate();
+			std::construct_at(
+			    m_value + entry.value,
+			    std::forward<V>(val));
+		}
+		m_state->entryCount++;
+		return insert_impl(entry);
+	}
+	// @return the index of the erased object
+	u32 erase(u32 index) {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		impl::assert_impl(impl::assert::out_of_range(getEntryCapacity_impl(), index));
+		impl::assert_impl(
+		    [this, index] { return this->slotOccupied_impl(index); },
+		    [index] { return std::format(
+			              "Bad access. Entry does not exist. index = {}", index); });
+		deleteEntry_impl(index);
+		dataAt_impl(erase_impl(index)).dist = (u8)0xFF;
+		return index;
+	}
+	bool exist(const T& val) const {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return find_impl(val) != InvalidU32;
+	}
+	u32 find(const T& val) const {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return find_impl(val);
+	}
+
+	void clear() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		if constexpr (!Trivial) {
+			for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
+				if (slotOccupied_impl(i)) std::destroy_at(m_value + dataAt_impl(i).value);
+			}
+			m_valueFreelist.clear();
+		}
+		for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
+			dataAt_impl(i).dist = (u8)0xFF;
+		}
+		m_state->entryCount = 0;
+		m_state->distOverflowing = false;
+	}
+
+	u32 size() {
+		impl::assert_impl(impl::assert::overlay_object_valid(this));
+		return m_state->entryCount;
+	}
+	u32 capacity() { return getEntryCapacity_impl() * MaxLoadFactor; }
+	bool empty() { return !size(); }
+	bool full() { return size() >= capacity() || m_state->distOverflowing; }
+
+	template <class Self>
+	decltype(auto) at(this Self&& self, u32 index) {
+		impl::assert_impl(impl::assert::overlay_object_valid(&self));
+		impl::assert_impl(impl::assert::out_of_range(self.getEntryCapacity_impl(), index));
+		return self.getValue_impl(self.dataAt_impl(index));
+	}
+
+private:
+	// ################ Runtime Data ################
+
+	u8* m_data;
+	[[no_unique_address]] std::conditional_t<
+	    !Trivial, T*, tx::Nothing> m_value;
+	u32 m_dataBufferSize;
+	[[no_unique_address]] std::conditional_t<
+	    !Trivial, u32, tx::Nothing> m_valueBufferSize;
+	State_impl* m_state;
+	[[no_unique_address]] std::conditional_t<
+	    !Trivial, tx::FreelistOverlay<T>, tx::Nothing> m_valueFreelist;
+
+private:
+	// ################ Construction Helpers ################
+
+	HashSetOverlay(
+	    StateStorage* statePtr,
+	    EntryStorage* bufferPtr, u32 bufferSize)
 	    requires Trivial
 	    : m_data(tx::isPowTwo(bufferSize) ? reinterpret_cast<u8*>(bufferPtr) : nullptr),
 	      m_dataBufferSize(tx::isPowTwo(bufferSize) ? bufferSize * sizeof(Entry_impl) : 0),
-	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))) {
+	      m_state(reinterpret_cast<State_impl*>(statePtr)) {
 		impl::assert_impl(
 		    [&] { return valid(); },
 		    [&] {
@@ -84,18 +289,16 @@ public:
 		    reinterpret_cast<Entry_impl*>(bufferPtr),
 		    reinterpret_cast<Entry_impl*>(bufferPtr + bufferSize));
 	}
-
 	HashSetOverlay(
+	    StateStorage* statePtr,
 	    EntryStorage* bufferPtr, u32 bufferSize,
-	    ValueStorage* valueBufferPtr, u32 valueBufferSize,
-	    StateStorage* statePtr)
+	    ValueStorage* valueBufferPtr, u32 valueBufferSize)
 	    requires(!Trivial)
 	    : m_data(tx::isPowTwo(bufferSize) ? reinterpret_cast<u8*>(bufferPtr) : nullptr),
 	      m_value(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferPtr : nullptr),
 	      m_dataBufferSize(tx::isPowTwo(bufferSize) ? bufferSize * sizeof(Entry_impl) : 0),
 	      m_valueBufferSize(tx::isPowTwo(bufferSize) && (valueBufferSize == bufferSize) ? valueBufferSize * sizeof(T) : 0),
-	      m_state(std::construct_at(reinterpret_cast<State_impl*>(statePtr))),
-	      m_valueFreelist(m_value, m_valueBufferSize, &m_state->valueFreelistState) {
+	      m_state(reinterpret_cast<State_impl*>(statePtr)) {
 		impl::assert_impl(
 		    [&] { return valid(); },
 		    [&] {
@@ -120,89 +323,18 @@ public:
 		    reinterpret_cast<Entry_impl*>(bufferPtr + bufferSize));
 	}
 
-	bool valid() const
-	    requires Trivial
-	{ return m_state && m_data && m_dataBufferSize; }
-	bool valid() const
+	void initFreelist_impl()
 	    requires(!Trivial)
-	{ return m_state && m_data && m_dataBufferSize && m_value && m_valueBufferSize; }
-
-	void destruct() {
-		if constexpr (!Trivial) {
-			m_valueFreelist.destruct();
-		}
-		std::destroy_at(m_state);
+	{
+		m_valueFreelist = tx::FreelistOverlay<T>(
+		    m_value, m_valueBufferSize, &m_state->valueFreelistState);
 	}
-
-public:
-	// ################ Public Interface ################
-
-	// @return the handle of the inserted entry. It will be invalidated after
-	//         any modification
-	template <class V>
-	    requires std::constructible_from<T, V&&>
-	u32 insert(V&& val) {
-		if (full()) return InvalidU32;
-		Entry_impl entry;
-		if constexpr (Trivial) {
-			entry.value = std::forward<V>(val);
-		} else {
-			// entry.value is the index in value buffer of this entry
-			entry.value = m_valueFreelist.allocate();
-			std::construct_at(
-			    m_value + entry.value,
-			    std::forward<V>(val));
-		}
-		m_state->entryCount++;
-		return insert_impl(entry);
+	void initFreelistExisting_impl()
+	    requires(!Trivial)
+	{
+		m_valueFreelist = tx::FreelistOverlay<T>::fromExistingState(
+		    m_value, m_valueBufferSize, &m_state->valueFreelistState);
 	}
-	// @return the index of the erased object
-	u32 erase(u32 index) {
-		deleteEntry_impl(index);
-		dataAt_impl(erase_impl(index)).dist = (u8)0xFF;
-		return index;
-	}
-	bool exist(const T& val) const { return find_impl(val) != InvalidU32; }
-	u32 find(const T& val) const { return find_impl(val); }
-
-	void clear() {
-		if constexpr (!Trivial) {
-			for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
-				if (slotOccupied_impl(i)) std::destroy_at(m_value + dataAt_impl(i).value);
-			}
-			m_valueFreelist.clear();
-		}
-		for (u32 i = 0; i < getEntryCapacity_impl(); i++) {
-			dataAt_impl(i).dist = (u8)0xFF;
-		}
-		m_state->entryCount = 0;
-		m_state->distOverflowing = false;
-	}
-
-	u32 size() { return m_state->entryCount; }
-	u32 capacity() { return getEntryCapacity_impl() * MaxLoadFactor; }
-	bool empty() { return !size(); }
-	bool full() { return size() >= capacity() || m_state->distOverflowing; }
-
-	template <class Self>
-	decltype(auto) at(this Self&& self, u32 index) {
-		impl::assert_impl([&]() { return index < self.getEntryCapacity_impl(); },
-		                  "tx::HashSetOverlay::at(): Invalid argument. Index out of range.");
-		return self.getValue_impl(self.dataAt_impl(index));
-	}
-
-private:
-	// ################ Runtime Data ################
-
-	u8* m_data;
-	[[no_unique_address]] std::conditional_t<
-	    !Trivial, T*, tx::Nothing> m_value;
-	u32 m_dataBufferSize;
-	[[no_unique_address]] std::conditional_t<
-	    !Trivial, u32, tx::Nothing> m_valueBufferSize;
-	State_impl* m_state;
-	[[no_unique_address]] std::conditional_t<
-	    !Trivial, tx::FreelistOverlay<T>, tx::Nothing> m_valueFreelist;
 
 private:
 	// ################ Memory Management ################
@@ -392,3 +524,7 @@ private:
 	}
 };
 } // namespace tx
+
+/**
+ * Question: why is m_data u8* instead of Entry_impl*?
+ */

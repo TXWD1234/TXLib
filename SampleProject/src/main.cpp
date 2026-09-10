@@ -505,6 +505,16 @@ void idk(Func&& func, int n) {
 
 int main() {
 
+	tx::HashSetOverlay<std::string>::StateStorage asdfghjk{};
+	tx::HashSetOverlay<std::string> set =
+	    tx::HashSetOverlay<std::string>::fromExistingState(
+	        std::span<tx::HashSetOverlay<std::string>::EntryStorage>(),
+	        std::span<tx::HashSetOverlay<std::string>::ValueStorage>(),
+	        &asdfghjk);
+	set.erase(0);
+
+	return 0;
+
 	std::cout << "Hello"
 	             " World";
 
