@@ -5,6 +5,7 @@
 #include "tx/exception.hpp"
 #include "tx/json.h"
 #include <algorithm>
+#include <cmath>
 #include <concepts>
 #include <random>
 #include <string>
@@ -505,6 +506,10 @@ void idk(Func&& func, int n) {
 
 int main() {
 
+
+
+	return 0;
+
 	tx::HashSetOverlay<std::string>::StateStorage asdfghjk{};
 	tx::HashSetOverlay<std::string> set =
 	    tx::HashSetOverlay<std::string>::fromExistingState(
@@ -621,9 +626,9 @@ int main() {
 
 	return 0;
 
-	//tx::JsonDocument a;
-	//tx::JsonParser parser("");
-	//parser.parse();
+	tx::JsonDocument bvcbm;
+	tx::JsonParser parser("");
+	parser.parse();
 
 
 	std::cout << "AVLTree Test Suite\n";

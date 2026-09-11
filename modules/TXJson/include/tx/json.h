@@ -144,37 +144,36 @@ private:
 	/**
 	 * Rebind to u64 for u64 alignment
 	 */
-	using alloc64_t = typename std::allocator_traits<Allocator>::template rebind_alloc<u64>;
+	using alloc64_t = typename std::allocator_traits<Allocator>::
+	    template rebind_alloc<u64>;
 	using alloc64_traits = std::allocator_traits<alloc64_t>;
-	using alloc32_t = typename std::allocator_traits<Allocator>::template rebind_alloc<u32>;
+	using alloc32_t = typename std::allocator_traits<Allocator>::
+	    template rebind_alloc<u32>;
 	using alloc32_traits = std::allocator_traits<alloc32_t>;
 
-	[[no_unique_address]] alloc64_t m_allocator64;
-	[[no_unique_address]] alloc32_t m_allocator32;
+	[[no_unique_address]] Allocator m_allocator;
 
-public:
-	JsonParser(std::string_view str) : m_str(str) {}
+private:
+	// ################ Interface ################
 
-	JsonDocument parse() {
+	JsonParser(std::string_view str)
+	    : m_str(str) { alloc_impl(); }
+	~JsonParser() { dealloc_impl(); }
+
+	JsonDocument run() {
 		parse_impl();
 		JsonDocument result;
 		result.m_data = m_result;
 		result.m_size = m_resultSize;
 		result.m_root = m_connState.rootIndex;
-		clearState_impl();
 		return result;
 	}
 
-private:
-	// ################ Lifetime ################
+public:
+	// ################ Public Interface ################
 
-	void clearState_impl() {
-		dealloc_impl();
-		m_result = nullptr;
-		m_token = nullptr;
-		m_resultSize = 0;
-		m_tokenSize = 0;
-		m_connState.rootIndex = 0;
+	static JsonDocument parse(std::string_view str) {
+		return JsonParser<Allocator>(str).run();
 	}
 
 private:
@@ -191,6 +190,7 @@ private:
 	u32 m_tokenSize = 0;
 
 	u32* m_stringPoolMeta;
+	u32 m_stringPoolMetaSize;
 	tx::PackedPartedArrayOverlay<u8> m_stringPool;
 	tx::PackedPartedArrayOverlay<u8>::StateStorage m_stringPoolStateStorage;
 
@@ -210,21 +210,22 @@ private:
 	void alloc_impl() {
 		m_resultSize = tx::divCeil(m_str.size(), sizeof(u64));
 		m_tokenSize = m_resultSize;
+		m_stringPoolMetaSize = m_str.size() / 3;
 
 		m_result = reinterpret_cast<u8*>(alloc64_traits::allocate(
-		    m_allocator64, m_resultSize));
+		    alloc64_t(m_allocator), m_resultSize));
 		m_token = reinterpret_cast<u8*>(alloc64_traits::allocate(
-		    m_allocator64, m_tokenSize));
+		    alloc64_t(m_allocator), m_tokenSize));
 		// divide by 3 here for worse case: {"":"","":""}
 		m_stringPoolMeta = alloc32_traits::allocate(
-		    m_allocator32, m_str.size() / 3);
+		    alloc32_t(m_allocator), m_stringPoolMetaSize);
 
 		m_resultSize *= sizeof(u64);
 		m_tokenSize = m_resultSize;
 	}
 	void dealloc_impl() {
-		alloc64_traits::deallocate(m_allocator64, reinterpret_cast<u64*>(m_token), m_tokenSize / sizeof(u64));
-		alloc32_traits::deallocate(m_allocator32, reinterpret_cast<u32*>(m_stringPoolMeta), m_str.size() / 3);
+		alloc64_traits::deallocate(alloc64_t(m_allocator), reinterpret_cast<u64*>(m_token), m_tokenSize / sizeof(u64));
+		alloc32_traits::deallocate(alloc32_t(m_allocator), reinterpret_cast<u32*>(m_stringPoolMeta), m_stringPoolMetaSize);
 	}
 
 private:
@@ -248,7 +249,6 @@ private:
 	// ################ Logic Implementation ################
 
 	void parse_impl() {
-		alloc_impl();
 		tokenize_impl();
 		compile_impl();
 	}
@@ -629,7 +629,7 @@ private:
 	void tokenize_impl() {
 		m_stringPool = tx::PackedPartedArrayOverlay<u8>(
 		    m_result, m_resultSize,
-		    m_stringPoolMeta, m_str.size() / 3,
+		    m_stringPoolMeta, m_stringPoolMetaSize,
 		    &m_stringPoolStateStorage);
 
 		auto [token, tokenEnd, tokenBufferSize, record] =
@@ -920,7 +920,7 @@ private:
 			    tx::divCeil(stringPoolDataSize, (u32)sizeof(u64)),
 			    targetSize64,
 			    m_resultSize / sizeof(u64),
-			    m_allocator64);
+			    alloc64_t(m_allocator));
 			m_result = reinterpret_cast<u8*>(newResultPtr);
 			m_resultSize = targetSize64 * sizeof(u64);
 		}
