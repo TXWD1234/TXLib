@@ -7,6 +7,13 @@ CompileFlags:
     - -std=c++23
     - -Wall
     - -Wextra
+InlayHints:
+  Enabled: Yes
+  DeducedTypes: No       # Stops crashes on decltype(auto) / auto returns
+  ParameterNames: No     # Stops off-by-one / null-deref on explicit object params
+  Designators: Yes
+  BlockEnd: Yes
+  DefaultArguments: Yes
 ---
 If:
   PathMatch: .*\.(c|cpp)

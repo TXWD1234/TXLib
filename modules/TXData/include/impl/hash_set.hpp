@@ -261,7 +261,7 @@ public:
 	bool full() { return size() >= capacity() || m_state->distOverflowing; }
 
 	template <class Self>
-	decltype(auto) at(this Self&& self, u32 index) {
+	tx::const_propagate<Self, T>& at(this Self&& self, u32 index) {
 		impl::assert_impl(impl::assert::overlay_object_valid(&self));
 		impl::assert_impl(impl::assert::out_of_range(self.getEntryCapacity_impl(), index));
 		return self.getValue_impl(self.dataAt_impl(index));
@@ -364,12 +364,12 @@ private:
 	// ################ Memory Management ################
 
 	template <class Self>
-	decltype(auto) dataAt_impl(this Self&& self, u32 index) {
+	tx::const_propagate<Self, Entry_impl>& dataAt_impl(this Self&& self, u32 index) {
 		tx::const_propagate<Self, u8>* ptr = self.m_data;
 		return *impl::at<Entry_impl>(ptr + index * sizeof(Entry_impl));
 	}
 	template <class Self>
-	decltype(auto) valueAt_impl(this Self&& self, u32 index)
+	tx::const_propagate<Self, T>& valueAt_impl(this Self&& self, u32 index)
 	    requires(!Trivial)
 	{
 		tx::const_propagate<Self, T>* ptr = self.m_value;
@@ -384,7 +384,7 @@ private:
 	// ################ Helpers ################
 
 	template <class Self>
-	decltype(auto) getValue_impl(
+	tx::const_propagate<Self, T>& getValue_impl(
 	    this Self&& self,
 	    tx::const_propagate<Self, Entry_impl>& entry) {
 		if constexpr (Trivial) {
