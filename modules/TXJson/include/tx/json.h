@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/data_utils.hpp"
+#include "impl/hash_set.hpp"
 #include "impl/numeric_utils.hpp"
 #include "impl/packed_parted_array.hpp"
 #include "impl/value_group.hpp"
@@ -238,6 +239,13 @@ private:
 		return (index + 7) & ~(u32)0b111;
 	}
 
+	static std::string_view stringPoolExtract_impl(
+	    const tx::PackedPartedArrayOverlay<u8> stringPool, u32 index) {
+		auto span = stringPool[index];
+		return std::string_view(
+		    reinterpret_cast<const char*>(span.data()), span.size());
+	}
+
 private:
 	using ValueType_impl = JsonDocument::ValueType_impl;
 	using ValueU32_impl = JsonDocument::ValueU32_impl;
@@ -277,12 +285,25 @@ private:
 		 */
 	public:
 		Tokenizer_impl(JsonParser<Allocator>* parent)
-		    : m_str(parent->m_str),
+		    : m_parent(parent),
+		      m_str(parent->m_str),
 		      m_stringPool(parent->m_stringPool),
 		      m_token(parent->m_token),
 		      m_tokenSize(parent->m_tokenSize),
-		      m_state(parent->m_str.data(), parent->m_token) {
+		      m_state(parent->m_str.data(), parent->m_token, {}),
+		      m_interningBuffer(
+		          allocEntry_traits::allocate(allocEntry_t(parent->m_allocator),
+		                                      parent->m_stringPoolMetaSize)),
+		      m_interningTable(m_interningBuffer, parent->m_stringPoolMetaSize,
+		                       &m_state.interningTableState,
+		                       InterningTableHash{ m_stringPool },
+		                       InterningTableEqual{ m_stringPool }) {}
+		~Tokenizer_impl() {
+			allocEntry_traits::deallocate(
+			    allocEntry_t(m_parent->m_allocator), m_interningBuffer,
+			    m_parent->m_stringPoolMetaSize);
 		}
+
 
 		struct TokenizerResult {
 			u8* token;
@@ -304,6 +325,8 @@ private:
 	private:
 		// ================ Meta & State ================
 
+		JsonParser<Allocator>* m_parent;
+
 		std::string_view m_str;
 
 		tx::PackedPartedArrayOverlay<u8> m_stringPool;
@@ -313,9 +336,47 @@ private:
 		struct State_impl {
 			const char* str = nullptr; // cursor ptr in m_str (document string)
 			u8* token = nullptr; // cursor ptr in m_token (token buffer)
+			tx::HashSetOverlay<u32>::StateStorage interningTableState;
+			bool dedupEnabled = true;
 		} m_state;
 
 		TokenizerRecord m_record;
+
+		// dedup
+
+		using allocEntry_t = typename std::allocator_traits<Allocator>::
+		    template rebind_alloc<tx::HashSetOverlay<u32>::EntryStorage>;
+		using allocEntry_traits = std::allocator_traits<allocEntry_t>;
+
+		tx::HashSetOverlay<u32>::EntryStorage* m_interningBuffer;
+
+		struct InterningTableHash {
+			const tx::PackedPartedArrayOverlay<u8> m_stringPool;
+
+			size_t operator()(u32 val) const {
+				return std::hash<std::string_view>{}(
+				    stringPoolExtract_impl(m_stringPool, val));
+			}
+			size_t operator()(std::string_view str) const {
+				return std::hash<std::string_view>{}(str);
+			}
+		};
+		struct InterningTableEqual {
+			const tx::PackedPartedArrayOverlay<u8> m_stringPool;
+
+			bool operator()(u32 a, u32 b) const {
+				return a == b;
+			}
+			bool operator()(u32 val, std::string_view str) const {
+				return stringPoolExtract_impl(m_stringPool, val) == str;
+			}
+		};
+
+		tx::HashSetOverlay<
+		    u32,
+		    InterningTableHash,
+		    InterningTableEqual>
+		    m_interningTable;
 
 	private:
 		// ================ Token Managing ================
@@ -430,6 +491,11 @@ private:
 			}
 		};
 
+		/**
+		 * Deduplication Optimization
+		 * 
+		 */
+
 		// @return id in string pool
 		u32 parseString_impl() {
 			m_state.str =
@@ -437,6 +503,23 @@ private:
 			        m_str.substr(strIndex_impl()),
 			        m_stringPool.push_back())
 			        .run();
+			u32 stringPoolId = m_stringPool.size_partitions() - 1;
+
+			// dedup
+			if (!m_state.dedupEnabled)
+				return stringPoolId;
+
+			u32 strInterningIndex = m_interningTable.find(
+			    stringPoolExtract_impl(m_stringPool, stringPoolId));
+			if (strInterningIndex != tx::InvalidU32) {
+				// duplication
+				m_stringPool.pop_back();
+				return m_interningTable.at(strInterningIndex);
+			} else {
+				m_interningTable.insert(stringPoolId);
+				if (m_interningTable.full()) m_state.dedupEnabled = false;
+			}
+
 			return m_stringPool.size_partitions() - 1;
 		}
 
@@ -949,6 +1032,12 @@ private:
 
 
 } // namespace tx
+
+/**
+ * TODO:
+ * Use PackedPartedArrayOverlayInlined and HashSet
+ */
+
 
 /**
  * Todo:
