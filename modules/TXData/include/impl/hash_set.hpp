@@ -17,8 +17,8 @@
 namespace tx {
 template <
     class T,
-    tx::invocable_r<size_t, T> FuncHash = std::hash<T>,
-    tx::invocable_r<bool, T, T> FuncEqual = std::equal_to<T>>
+    tx::invocable_r<size_t, const T&> FuncHash = std::hash<T>,
+    tx::invocable_r<bool, const T&, const T&> FuncEqual = std::equal_to<T>>
 class HashSetOverlay {
 private:
 	// ################ Traits & Policy ################
@@ -51,6 +51,13 @@ private:
 	static constexpr f32 MaxLoadFactor = 0.8f;
 	static constexpr u8 MaxDistVal = (u8)(0xFF - 1);
 
+	template <class U>
+	static constexpr bool value_acceptable =
+	    tx::invocable_r<FuncHash, size_t, const U&> &&
+	    (tx::invocable_r<FuncEqual, bool, const T&, const U&> ||
+	     tx::invocable_r<FuncEqual, bool, const U&, const T&>);
+
+
 public:
 	// ################ Object Lifetime ################
 
@@ -62,14 +69,19 @@ public:
 	using ValueStorage = std::conditional_t<Trivial, void, T>;
 
 	HashSetOverlay(
-	    EntryStorage* bufferPtr, u32 bufferSize, StateStorage* statePtr)
+	    EntryStorage* bufferPtr, u32 bufferSize, StateStorage* statePtr,
+	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires Trivial
 	    : HashSetOverlay<T>(statePtr, bufferPtr, bufferSize) {
 		std::construct_at(m_state);
+		initFunctor_impl(funcHash, funcEqual);
 	}
-	HashSetOverlay(std::span<EntryStorage> buffer, StateStorage* statePtr)
+	HashSetOverlay(
+	    std::span<EntryStorage> buffer, StateStorage* statePtr,
+	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires Trivial
-	    : HashSetOverlay<T>(buffer.data(), buffer.size(), statePtr) {}
+	    : HashSetOverlay<T>(buffer.data(), buffer.size(), statePtr,
+	                        funcHash, funcEqual) {}
 	HashSetOverlay()
 	    requires Trivial
 	    : m_data(nullptr), m_dataBufferSize(0), m_state(nullptr) {}
@@ -77,22 +89,25 @@ public:
 	HashSetOverlay(
 	    EntryStorage* bufferPtr, u32 bufferSize,
 	    ValueStorage* valueBufferPtr, u32 valueBufferSize,
-	    StateStorage* statePtr)
+	    StateStorage* statePtr,
+	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires(!Trivial)
 	    : HashSetOverlay<T>(statePtr,
 	                        bufferPtr, bufferSize,
 	                        valueBufferPtr, valueBufferSize) {
 		std::construct_at(m_state);
+		initFunctor_impl(funcHash, funcEqual);
 		initFreelist_impl();
 	}
 	HashSetOverlay(
 	    std::span<EntryStorage> buffer, std::span<ValueStorage> valueBuffer,
-	    StateStorage* statePtr)
+	    StateStorage* statePtr,
+	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires(!Trivial)
 	    : HashSetOverlay<T>(
 	          buffer.data(), buffer.size(),
 	          valueBuffer.data(), valueBuffer.size(),
-	          statePtr) {}
+	          statePtr, funcHash, funcEqual) {}
 	HashSetOverlay()
 	    requires(!Trivial)
 	    : m_data(nullptr), m_value(nullptr),
@@ -209,13 +224,17 @@ public:
 		dataAt_impl(erase_impl(index)).dist = (u8)0xFF;
 		return index;
 	}
-	bool exist(const T& val) const {
-		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		return find_impl(val) != InvalidU32;
-	}
-	u32 find(const T& val) const {
+
+	template <class U>
+	    requires value_acceptable<U>
+	u32 find(const U& val) const {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		return find_impl(val);
+	}
+	template <class U>
+	    requires value_acceptable<U>
+	bool exist(const U& val) const {
+		return find(val) != InvalidU32;
 	}
 
 	void clear() {
@@ -334,6 +353,11 @@ private:
 	{
 		m_valueFreelist = tx::FreelistOverlay<T>::fromExistingState(
 		    m_value, m_valueBufferSize, &m_state->valueFreelistState);
+	}
+
+	void initFunctor_impl(FuncHash funcHash, FuncEqual funcEqual) {
+		m_state->hash = funcHash;
+		m_state->equal = funcEqual;
 	}
 
 private:
@@ -478,7 +502,9 @@ private:
 
 	// @return the index of the entry of the targeting value in m_data;
 	//         InvalidU32 if not found
-	u32 find_impl(const T& val) const {
+	template <class U>
+	    requires value_acceptable<U>
+	u32 find_impl(const U& val) const {
 		size_t hash = m_state->hash(val);
 		size_t phash = compact_impl(hash);
 		u32 index = clamp_impl(hash);
@@ -487,8 +513,11 @@ private:
 		while (slotOccupied_impl(index)) {
 			const Entry_impl& entry = dataAt_impl(index);
 
-			if (entry.hash == phash && m_state->equal(val, getValue_impl(entry)))
-				return index;
+			if constexpr (tx::invocable_r<FuncEqual, bool, const T&, const U&>) {
+				if (entry.hash == phash && m_state->equal(getValue_impl(entry), val)) return index;
+			} else {
+				if (entry.hash == phash && m_state->equal(val, getValue_impl(entry))) return index;
+			}
 
 			// RobinHood Abortion Check
 			if (checkAbort_impl(dist, entry.dist)) return InvalidU32;
@@ -524,7 +553,3 @@ private:
 	}
 };
 } // namespace tx
-
-/**
- * Question: why is m_data u8* instead of Entry_impl*?
- */

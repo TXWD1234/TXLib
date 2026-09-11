@@ -22,7 +22,7 @@ constexpr float INV_TWO_PI = 0.1591549f; // 1 / PI * 2
 constexpr float HALF_PI    = 1.5707963f; // PI / 2
 constexpr float ONE_DEGREE = 0.0174532f; // PI / 180
 constexpr float ONE_OF_255 = 0.0039215f; // 1 / 255
-constexpr float EPSILON    = 1e-6f; // 1 / 255
+constexpr float EPSILON    = 1e-6f;      // 1 / 255
 // clang-format on
 
 template <class T>
