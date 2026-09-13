@@ -51,6 +51,11 @@ concept any_of = (std::same_as<T, Ts> || ...);
 template <class T>
 concept numeric = (std::integral<T> || std::floating_point<T>) && !std::same_as<T, bool>;
 
+// byte_like
+template <typename T>
+concept byte_like = sizeof(T) == 1 &&
+                    (std::integral<T> || std::same_as<T, std::byte>);
+
 // allocator
 template <class Alloc>
 concept allocator = requires(Alloc a, std::size_t n) {

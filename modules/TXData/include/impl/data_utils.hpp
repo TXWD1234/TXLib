@@ -7,6 +7,7 @@
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
 #include <memory>
+#include <cstring>
 #include <numeric>
 
 namespace tx {
@@ -24,17 +25,46 @@ constexpr inline u32 nextAlign(u32 index) {
 	return (index + alignof(T) - 1) & ~(u32)(alignof(T) - 1);
 }
 
+namespace impl {
 template <class T>
-inline T* allocate(u32 size) {
-	if (size == 0) return nullptr;
-	return static_cast<T*>(::operator new(
-	    size * sizeof(T), std::align_val_t{ alignof(T) }));
-}
-template <class T>
-inline void free(T* ptr) {
-	if (!ptr) return;
-	::operator delete(ptr, std::align_val_t{ alignof(T) });
-}
+struct alignas(T) Storage {
+	std::byte data[sizeof(T)];
+};
+template <std::size_t Size>
+struct alignas(Size) StorageSized {
+	std::byte data[Size];
+};
+} // namespace impl
+
+template <typename Allocator, size_t Alignment>
+struct aligned_allocator_traits : std::allocator_traits<Allocator> {
+	static_assert(tx::isPowTwo(Alignment),
+	              "tx::aligned_allocator_traits: Bad instantiation. "
+	              "Template parameter `Alignment` must be a power of 2.");
+
+private:
+	using storage_t = impl::StorageSized<Alignment>;
+	using alloc_t = typename std::allocator_traits<Allocator>::
+	    template rebind_alloc<storage_t>;
+	using traits = std::allocator_traits<alloc_t>;
+
+public:
+	template <tx::byte_like T = u8>
+	[[nodiscard]] static T* allocate(Allocator& alloc, std::size_t bytes) {
+		alloc_t aligned_alloc(alloc);
+		return reinterpret_cast<T*>(traits::allocate(
+		    aligned_alloc, tx::divCeil(bytes, Alignment)));
+	}
+
+	template <tx::byte_like T = u8>
+	static void deallocate(Allocator& alloc, T* ptr, std::size_t bytes) noexcept {
+		alloc_t aligned_alloc(alloc);
+		traits::deallocate(
+		    aligned_alloc,
+		    reinterpret_cast<storage_t*>(ptr),
+		    tx::divCeil(bytes, Alignment));
+	}
+};
 
 template <class T, tx::allocator Allocator = std::allocator<T>>
 inline void resize(
@@ -107,10 +137,5 @@ inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 	                  "Invalid parameter value: size is not power of 2.");
 	return index & (size - (T)1);
 }
-
-template <class T>
-struct alignas(T) Storage {
-	std::byte data[sizeof(T)];
-};
 } // namespace impl
 } // namespace tx
