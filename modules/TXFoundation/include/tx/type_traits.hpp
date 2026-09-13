@@ -35,6 +35,9 @@ using const_propagate = std::conditional_t<
 // **************** Concepts ****************
 // ================ ######## ================
 
+template <class T, template <class...> class Trait, class... Args>
+concept satisfies = Trait<T, Args...>::value;
+
 // is instantiatin of
 template <typename T, template <typename...> class Template>
 struct is_instantiation_of : std::false_type {};
@@ -80,14 +83,13 @@ concept allocator_trait =
         typename Traits::allocator_type& alloc,
         typename Traits::size_type n,
         typename Traits::pointer ptr) {
-	    { Traits::allocate(alloc, n) } -> std::same_as<typename Traits::pointer>;
+	    { Traits::allocate(alloc, n) } -> tx::satisfies<std::is_pointer>;
 	    Traits::deallocate(alloc, ptr, n);
     };
 
 // transparent
 template <typename T>
 concept transparent = requires { typename T::is_transparent; };
-
 
 
 // std add on
