@@ -36,7 +36,7 @@ struct alignas(Size) StorageSized {
 };
 } // namespace impl
 
-template <typename Allocator, size_t Alignment>
+template <class Allocator, size_t Alignment>
 struct aligned_allocator_traits : std::allocator_traits<Allocator> {
 	static_assert(tx::isPowTwo(Alignment),
 	              "tx::aligned_allocator_traits: Bad instantiation. "
@@ -47,6 +47,12 @@ private:
 	using alloc_t = typename std::allocator_traits<Allocator>::
 	    template rebind_alloc<storage_t>;
 	using traits = std::allocator_traits<alloc_t>;
+
+public:
+	template <typename U>
+	using rebind_traits = aligned_allocator_traits<
+	    typename std::allocator_traits<Allocator>::template rebind_alloc<U>,
+	    Alignment>;
 
 public:
 	template <tx::byte_like T = u8>
@@ -66,27 +72,43 @@ public:
 	}
 };
 
-template <class T, tx::allocator Allocator = std::allocator<T>>
-inline void resize(
+template <class T,
+          tx::invocable_r<T*, u32> AllocFunc,
+          std::invocable<T*, u32> DeallocFunc>
+inline T* resize(
     T*& data, u32 currentSize,
-    u32 targetSize, u32 currentCapacity = InvalidU32,
-    const Allocator& alloc = Allocator()) {
-	using alloc_t = typename std::allocator_traits<Allocator>::template rebind_alloc<T>;
-	using alloc_traits = std::allocator_traits<alloc_t>;
+    u32 targetCapacity, u32 currentCapacity,
+    AllocFunc&& allocFunc, DeallocFunc&& deallocFunc) {
+	if (targetCapacity < currentSize) return data;
 
-	if (currentCapacity == InvalidU32) currentCapacity = currentSize;
-	if (targetSize < currentSize) return;
-
-	alloc_t allocator(alloc);
-	T* newData = alloc_traits::allocate(allocator, targetSize);
+	T* newData = allocFunc(targetCapacity);
 
 	if (data) {
 		std::uninitialized_move(data, data + currentSize, newData);
 		std::destroy(data, data + currentSize);
-		alloc_traits::deallocate(allocator, data, currentCapacity);
+		deallocFunc(data, currentCapacity);
 	}
 
 	data = newData;
+	return data;
+}
+
+template <class T,
+          tx::allocator Allocator = std::allocator<T>,
+          class AllocatorTrait = std::allocator_traits<Allocator>>
+    requires tx::allocator_trait<AllocatorTrait>
+inline T* resize(
+    T*& data, u32 currentSize,
+    u32 targetSize, u32 currentCapacity,
+    Allocator alloc = Allocator()) {
+	using alloc_t = typename AllocatorTrait::template rebind_alloc<T>;
+	using alloc_traits = typename AllocatorTrait::template rebind_traits<T>;
+	alloc_t bound_alloc = alloc_t(alloc);
+
+	return resize(
+	    data, currentSize, targetSize, currentCapacity,
+	    [&](u32 size) { return alloc_traits::allocate(bound_alloc, size); },
+	    [&](T* ptr, u32 size) { alloc_traits::deallocate(bound_alloc, ptr, size); });
 }
 
 struct IndexRange {

@@ -63,10 +63,26 @@ concept allocator = requires(Alloc a, std::size_t n) {
 	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
 	{ a.deallocate(a.allocate(n), n) } -> std::same_as<void>;
 };
-template <class Alloc, u32 Alignment>
-concept aligned_allocator =
-    allocator<Alloc> &&
-    (Alloc::Alignment >= Alignment || alignof(typename Alloc::value_type) >= Alignment);
+// instantiated allocator_trait
+// The value type of the Traits is not checked, only the validity of it being
+// an allocator traits
+template <class Traits>
+concept allocator_trait =
+    requires {
+	typename Traits::allocator_type;
+	typename Traits::value_type;
+	typename Traits::pointer;
+
+	// using std::uint32_t here as dummy rebinding type
+	typename Traits::template rebind_alloc<std::uint32_t>;
+	typename Traits::template rebind_traits<std::uint32_t>; } &&
+    requires(
+        typename Traits::allocator_type& alloc,
+        typename Traits::size_type n,
+        typename Traits::pointer ptr) {
+	    { Traits::allocate(alloc, n) } -> std::same_as<typename Traits::pointer>;
+	    Traits::deallocate(alloc, ptr, n);
+    };
 
 // transparent
 template <typename T>
