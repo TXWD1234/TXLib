@@ -145,12 +145,8 @@ private:
 	/**
 	 * Rebind to u64 for u64 alignment
 	 */
-	using alloc64_t = typename std::allocator_traits<Allocator>::
-	    template rebind_alloc<u64>;
-	using alloc64_traits = std::allocator_traits<alloc64_t>;
-	using alloc32_t = typename std::allocator_traits<Allocator>::
-	    template rebind_alloc<u32>;
-	using alloc32_traits = std::allocator_traits<alloc32_t>;
+	using alloc32_traits = tx::typed_allocator_traits<Allocator, u32>;
+	using alloc64bytes_traits = tx::aligned_allocator_traits<Allocator, alignof(u64)>;
 
 	[[no_unique_address]] Allocator m_allocator;
 
@@ -209,31 +205,27 @@ private:
 	// ################ Memory Management ################
 
 	void alloc_impl() {
-		m_resultSize = tx::divCeil(m_str.size(), sizeof(u64));
+		m_resultSize = m_str.size();
 		m_tokenSize = m_resultSize;
+		// divide m_str by 3 here for worse case: {"":"","":""}
 		m_stringPoolMetaSize = m_str.size() / 3;
 
-		m_result = reinterpret_cast<u8*>(alloc64_traits::allocate(
-		    alloc64_t(m_allocator), m_resultSize));
-		m_token = reinterpret_cast<u8*>(alloc64_traits::allocate(
-		    alloc64_t(m_allocator), m_tokenSize));
-		// divide by 3 here for worse case: {"":"","":""}
+		m_result = alloc64bytes_traits::allocate(m_allocator, m_resultSize);
+		m_token = alloc64bytes_traits::allocate(m_allocator, m_tokenSize);
 		m_stringPoolMeta = alloc32_traits::allocate(
-		    alloc32_t(m_allocator), m_stringPoolMetaSize);
-
-		m_resultSize *= sizeof(u64);
-		m_tokenSize = m_resultSize;
+		    m_allocator, m_stringPoolMetaSize);
 	}
 	void dealloc_impl() {
-		alloc64_traits::deallocate(alloc64_t(m_allocator), reinterpret_cast<u64*>(m_token), m_tokenSize / sizeof(u64));
-		alloc32_traits::deallocate(alloc32_t(m_allocator), reinterpret_cast<u32*>(m_stringPoolMeta), m_stringPoolMetaSize);
+		alloc64bytes_traits::deallocate(m_allocator, m_token, m_tokenSize);
+		alloc32_traits::deallocate(m_allocator, m_stringPoolMeta, m_stringPoolMetaSize);
 	}
 
 private:
 	// ################ Static Helpers ################
 
 	static u8* next64_impl(u8* ptr) {
-		return reinterpret_cast<u8*>((reinterpret_cast<uintptr_t>(ptr) + 7) & ~(uintptr_t)0b111);
+		return reinterpret_cast<u8*>(
+		    (reinterpret_cast<uintptr_t>(ptr) + 7) & ~(uintptr_t)0b111);
 	}
 	static u32 next64_impl(u32 index) {
 		return (index + 7) & ~(u32)0b111;
@@ -292,7 +284,7 @@ private:
 		      m_tokenSize(parent->m_tokenSize),
 		      m_state(parent->m_str.data(), parent->m_token, {}),
 		      m_interningBuffer(
-		          allocEntry_traits::allocate(allocEntry_t(parent->m_allocator),
+		          allocEntry_traits::allocate(parent->m_allocator,
 		                                      parent->m_stringPoolMetaSize)),
 		      m_interningTable(m_interningBuffer, parent->m_stringPoolMetaSize,
 		                       &m_state.interningTableState,
@@ -300,7 +292,7 @@ private:
 		                       InterningTableEqual{ m_stringPool }) {}
 		~Tokenizer_impl() {
 			allocEntry_traits::deallocate(
-			    allocEntry_t(m_parent->m_allocator), m_interningBuffer,
+			    m_parent->m_allocator, m_interningBuffer,
 			    m_parent->m_stringPoolMetaSize);
 		}
 
@@ -344,9 +336,8 @@ private:
 
 		// dedup
 
-		using allocEntry_t = typename std::allocator_traits<Allocator>::
-		    template rebind_alloc<tx::HashSetOverlay<u32>::EntryStorage>;
-		using allocEntry_traits = std::allocator_traits<allocEntry_t>;
+		using allocEntry_traits = tx::typed_allocator_traits<
+		    Allocator, typename tx::HashSetOverlay<u32>::EntryStorage>;
 
 		tx::HashSetOverlay<u32>::EntryStorage* m_interningBuffer;
 
@@ -492,8 +483,18 @@ private:
 		};
 
 		/**
-		 * Deduplication Optimization
+		 * Deduplication (dedup) Optimization
+		 * During parsing, when a encountering a string that had previously
+		 * existed, instead of pushing a duplicate in string pool, the previous
+		 * string will be used. An interning table (tx::HashSetOverlay) is used
+		 * to dynamicly track the string ID in the string pool. The string pool
+		 * ID of the corresponding string is assigned to the string entry's
+		 * when the string it holds is found existing.
 		 * 
+		 * The bail-out policy
+		 * When the interning table is full, the entire optimization will be
+		 * disabled. Most likely this will not happen in normal cases, but only
+		 * pathlogical worse cases which there's no major benefit handling.
 		 */
 
 		// @return id in string pool
@@ -1045,7 +1046,4 @@ private:
  * - add resize in tokenizer
  * - value root instead of object root
  * - escape character parser
- * - string pool optmizations
- *   - SSO inlining
- *   - deduplication
  */
