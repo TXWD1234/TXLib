@@ -374,12 +374,25 @@ private:
 		// prefix: token
 
 		// assume it's always aligned.
-		// alignment need to be manually solve beforehand
+		// alignment need to be manually solved beforehand
 		template <class T>
 		T* tokenPush_impl() {
+			// resizing on overflow
+			if (u32 tokenIndex = m_state.token - m_token;
+			    tokenIndex + sizeof(T) > m_tokenSize) [[unlikely]] {
+				u32 newSize = m_tokenSize * 2; // should i do a "smarter" policy
+				// here? like calculate the ratio of the current buffer size and
+				// the consumed m_str?
+				tx::resize<u8, Allocator, alloc64bytes_traits>(
+				    m_token, tokenIndex, newSize, m_tokenSize, m_parent->m_allocator);
+
+				m_tokenSize = newSize;
+				m_state.token = m_token + tokenIndex;
+			}
+
 			u8* oldToken = m_state.token;
 			m_state.token += sizeof(T);
-			// <-------------------------------------------- DevNote: resize on overflow
+
 			return std::construct_at(
 			    reinterpret_cast<T*>(oldToken));
 		}
@@ -869,12 +882,21 @@ private:
 			                           tokenConsume_impl<ValueU32_impl>())
 			                           ->val;
 			u8* metaHead = resultAdvance_impl<ValueEntry_impl>(entryCount);
+			u8* metaBegin = metaHead;
 
 			for (u32 i = 0; i < entryCount; i++) {
 				compileEntry_impl(resultPushAt_impl<ValueEntry_impl>(metaHead));
 			}
 
-			// sorting <-----------------------------------------------------------------------------------
+			// sorting
+			std::sort(
+			    impl::at<ValueEntry_impl>(metaBegin),
+			    impl::at<ValueEntry_impl>(metaHead),
+			    [&](const ValueEntry_impl& a, const ValueEntry_impl& b) {
+				    return std::less<std::string_view>{}(
+				        stringPoolExtract_impl(m_source.stringPool, a.key.val),
+				        stringPoolExtract_impl(m_source.stringPool, b.key.val));
+			    });
 		}
 
 		// IState: m_source.token at object root
@@ -997,16 +1019,13 @@ private:
 
 		if (targetSize > m_resultSize) {
 			// realloc
-			u64* newResultPtr = reinterpret_cast<u64*>(m_result);
-			u32 targetSize64 = tx::divCeil(targetSize, (u32)sizeof(u64));
-			tx::resize(
-			    newResultPtr,
-			    tx::divCeil(stringPoolDataSize, (u32)sizeof(u64)),
-			    targetSize64,
-			    m_resultSize / sizeof(u64),
-			    alloc64_t(m_allocator));
-			m_result = reinterpret_cast<u8*>(newResultPtr);
-			m_resultSize = targetSize64 * sizeof(u64);
+			tx::resize<u8, Allocator, alloc64bytes_traits>(
+			    m_result,
+			    stringPoolDataSize,
+			    targetSize,
+			    m_resultSize,
+			    m_allocator);
+			m_resultSize = targetSize;
 		}
 	}
 	void compileStringPool_impl() {
