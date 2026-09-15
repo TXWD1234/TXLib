@@ -2,6 +2,7 @@
 // Module: TXData
 
 #pragma once
+#include "impl/data_foundation.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/numeric_utils.hpp"
 #include "tx/exception.hpp"
@@ -371,39 +372,39 @@ protected:
 	}
 };
 
-// template <class T, u32 size>
-//     requires(size > 0 && (size & (size - 1)) == 0)
-// class RingBuffer : public RingBufferOverlay<T> {
-// public:
-// 	RingBuffer()
-// 	    : RingBufferOverlay<T>(
-// 	          allocate<T>(size), size) {}
-// 	~RingBuffer() {
-// 		if (!this->isNull_impl()) {
-// 			this->destruct_impl(); // destroy live elements before freeing
-// 			free(this->data());
-// 		}
-// 	}
+template <class T, u32 size>
+    requires(size > 0 && (size & (size - 1)) == 0)
+class RingBuffer : public RingBufferOverlay<T> {
+public:
+	RingBuffer()
+	    : RingBufferOverlay<T>(
+	          allocate<T>(size), size) {}
+	~RingBuffer() {
+		if (!this->isNull_impl()) {
+			this->destruct_impl(); // destroy live elements before freeing
+			free(this->data());
+		}
+	}
 
-// 	RingBuffer(const RingBuffer<T, size>& other)
-// 	    : RingBufferOverlay<T>(
-// 	          allocate<T>(other.capacity()), other.capacity()) {
-// 		copy_impl(other);
-// 	}
-// 	RingBuffer(RingBuffer<T, size>&& other) : RingBufferOverlay<T>(other) {
-// 		// just use the copy constructor of RingBufferOverlay - shallow copy
-// 		other.null_impl();
-// 	}
-// 	RingBuffer& operator=(RingBuffer<T, size> other) {
-// 		this->swap_impl(other);
-// 		return *this;
-// 	}
+	RingBuffer(const RingBuffer<T, size>& other)
+	    : RingBufferOverlay<T>(
+	          allocate<T>(other.capacity()), other.capacity()) {
+		copy_impl(other);
+	}
+	RingBuffer(RingBuffer<T, size>&& other) : RingBufferOverlay<T>(other) {
+		// just use the copy constructor of RingBufferOverlay - shallow copy
+		other.null_impl();
+	}
+	RingBuffer& operator=(RingBuffer<T, size> other) {
+		this->swap_impl(other);
+		return *this;
+	}
 
-// private:
-// 	// cannot be swap_impl because ambiguity with base's swap_impl
-// 	// this function exists for potential future expansion
-// 	void swap(RingBuffer<T, size>& other) {
-// 		swap_impl(other);
-// 	}
-// };
+private:
+	// cannot be swap_impl because ambiguity with base's swap_impl
+	// this function exists for potential future expansion
+	void swap(RingBuffer<T, size>& other) {
+		swap_impl(other);
+	}
+};
 } // namespace tx

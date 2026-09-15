@@ -2,6 +2,7 @@
 // Module: TXData
 
 #pragma once
+#include "impl/data_foundation.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/numeric_utils.hpp"
 #include "impl/freelist.hpp"

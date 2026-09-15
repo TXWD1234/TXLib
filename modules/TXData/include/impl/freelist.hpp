@@ -2,7 +2,7 @@
 // Module: TXData
 
 #pragma once
-#include "impl/data_utils.hpp"
+#include "impl/data_foundation.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include <memory>

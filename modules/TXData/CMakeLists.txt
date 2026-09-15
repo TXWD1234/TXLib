@@ -19,6 +19,9 @@ tx_txlib_module(
 		"ring_buffer.hpp"
 		"hash_set.hpp"
 		"freelist.hpp"
+		"data_foundation.hpp"
+		"allocator.hpp"
+		"overlay.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )

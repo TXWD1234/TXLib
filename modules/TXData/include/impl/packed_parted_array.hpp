@@ -2,8 +2,9 @@
 // Module: TXData
 
 #pragma once
-#include "tx/basic_types.hpp"
+#include "impl/data_foundation.hpp"
 #include "impl/data_utils.hpp"
+#include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include <algorithm>
 #include <iterator>
