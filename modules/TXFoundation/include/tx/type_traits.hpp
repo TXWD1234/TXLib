@@ -6,6 +6,7 @@
 #include <type_traits>
 #include <concepts>
 #include <iterator>
+#include <tuple>
 
 namespace tx {
 
@@ -19,17 +20,80 @@ enumval(T in) noexcept {
 template <class>
 inline constexpr bool false_v = false;
 
-// Conditional Presence
-class Nothing {};
 
 // ================ ########### ================
 // **************** Type Traits ****************
 // ================ ########### ================
 
+// Conditional Presence
+class Nothing {};
+
 // propagate constness from type From to type To
 template <class From, class To>
 using const_propagate = std::conditional_t<
     std::is_const_v<std::remove_reference_t<From>>, const To, To>;
+
+// ################ Type List ################
+/**
+ * Key Insights:
+ * - **A type_list is still a type.**
+ * - There can be multiple variadic template lists in partial specialization's
+ *   template
+ */
+
+template <class... Args>
+struct type_list_t {
+	using type_list_tag = void;
+	template <template <class...> class Template>
+	using apply = Template<Args...>;
+};
+// type_list
+template <class T>
+concept type_list = requires { typename T::type_list_tag; };
+
+template <tx::type_list, class...>
+struct type_list_append;
+template <class... Args, class... T>
+struct type_list_append<type_list_t<Args...>, T...> {
+	using type = type_list_t<Args..., T...>;
+};
+template <tx::type_list, class...>
+struct type_list_append_front;
+template <class... Args, class... T>
+struct type_list_append_front<type_list_t<Args...>, T...> {
+	using type = type_list_t<T..., Args...>;
+};
+
+template <tx::type_list>
+struct type_list_flatten;
+template <>
+struct type_list_flatten<type_list_t<>> {
+	using type = type_list_t<>;
+};
+template <class... Args>
+struct type_list_flatten<type_list_t<type_list_t<Args...>>> {
+	using type = type_list_t<Args...>;
+};
+template <class... Args, tx::type_list... Others>
+struct type_list_flatten<type_list_t<type_list_t<Args...>, Others...>> {
+	using type = typename type_list_append_front<
+	    typename type_list_flatten<type_list_t<Others...>>::type, Args...>::type;
+};
+
+template <tx::type_list... Lists>
+struct type_list_combine {
+	using type = typename type_list_flatten<type_list_t<Lists...>>::type;
+};
+
+template <tx::type_list List, class... T>
+using type_list_append_t = typename type_list_append<List, T...>::type;
+template <tx::type_list List, class... T>
+using type_list_append_front_t = typename type_list_append_front<List, T...>::type;
+template <tx::type_list List>
+using type_list_flatten_t = typename type_list_flatten<List>::type;
+template <tx::type_list... Lists>
+using type_list_combine_t = typename type_list_combine<Lists...>::type;
+
 
 // ================ ######## ================
 // **************** Concepts ****************
@@ -90,7 +154,6 @@ concept allocator_trait =
 // transparent
 template <typename T>
 concept transparent = requires { typename T::is_transparent; };
-
 
 // std add on
 
