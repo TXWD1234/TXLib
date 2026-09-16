@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/numeric_utils.hpp"
+#include "impl/allocator.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
