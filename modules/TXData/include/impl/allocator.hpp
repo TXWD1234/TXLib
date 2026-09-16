@@ -8,11 +8,45 @@
 #include "impl/numeric_utils.hpp"
 
 namespace tx {
+// ################ Allocator Associated Concepts ################
+
+// allocator
+template <class Alloc>
+concept allocator = requires(
+    Alloc a, std::size_t n, typename Alloc::value_type* ptr) {
+	typename Alloc::value_type;
+	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
+	{ a.deallocate(ptr, n) } -> std::same_as<void>;
+};
+// instantiated allocator_trait
+// The value type of the Traits is not checked, only the validity of it being
+// an allocator traits
+template <class Traits>
+concept allocator_trait =
+    requires {
+	typename Traits::allocator_type;
+	typename Traits::value_type;
+	typename Traits::pointer;
+
+	// using std::uint32_t here as dummy rebinding type
+	typename Traits::template rebind_alloc<std::uint32_t>;
+	typename Traits::template rebind_traits<std::uint32_t>; } &&
+    requires(
+        typename Traits::allocator_type& alloc,
+        typename Traits::size_type n,
+        typename Traits::pointer ptr) {
+	    { Traits::allocate(alloc, n) } -> tx::satisfies<std::is_pointer>;
+	    Traits::deallocate(alloc, ptr, n);
+    };
+
+// ################ Implementation Utilities ################
 namespace impl {
 template <tx::allocator Allocator, class T>
 using rebind_alloc = typename std::allocator_traits<Allocator>::
     template rebind_alloc<T>;
 }
+
+// ################ Custom Allocator Traits ################
 
 // @param Allocator can just be an arbitrary allocator instance. The type of it does
 // not matter since it's going to be rebinded anyways.

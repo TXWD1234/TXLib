@@ -154,34 +154,6 @@ template <typename T>
 concept byte_like = sizeof(T) == 1 &&
                     (std::integral<T> || std::same_as<T, std::byte>);
 
-// allocator
-template <class Alloc>
-concept allocator = requires(Alloc a, std::size_t n) {
-	typename Alloc::value_type;
-	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
-	{ a.deallocate(a.allocate(n), n) } -> std::same_as<void>;
-};
-// instantiated allocator_trait
-// The value type of the Traits is not checked, only the validity of it being
-// an allocator traits
-template <class Traits>
-concept allocator_trait =
-    requires {
-	typename Traits::allocator_type;
-	typename Traits::value_type;
-	typename Traits::pointer;
-
-	// using std::uint32_t here as dummy rebinding type
-	typename Traits::template rebind_alloc<std::uint32_t>;
-	typename Traits::template rebind_traits<std::uint32_t>; } &&
-    requires(
-        typename Traits::allocator_type& alloc,
-        typename Traits::size_type n,
-        typename Traits::pointer ptr) {
-	    { Traits::allocate(alloc, n) } -> tx::satisfies<std::is_pointer>;
-	    Traits::deallocate(alloc, ptr, n);
-    };
-
 // transparent
 template <typename T>
 concept transparent = requires { typename T::is_transparent; };
