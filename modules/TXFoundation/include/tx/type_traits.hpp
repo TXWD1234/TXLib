@@ -153,6 +153,27 @@ struct type_list_back {
 template <tx::type_list List>
 using type_list_back_t = typename type_list_back<List>::type;
 
+template <std::size_t Index, class... Args>
+    requires(Index < sizeof...(Args))
+constexpr decltype(auto) arg_list_at(Args&&... args) {
+	return std::get<Index>(std::forward_as_tuple(std::forward<Args>(args)...));
+}
+template <class... Args>
+constexpr decltype(auto) arg_list_front(Args&&... args) {
+	return arg_list_at<0>(std::forward<Args>(args)...);
+}
+template <class... Args>
+constexpr decltype(auto) arg_list_back(Args&&... args) {
+	return arg_list_at<sizeof...(Args) - 1>(std::forward<Args>(args)...);
+}
+
+
+
+
+
+
+
+
 
 // ================ ######## ================
 // **************** Concepts ****************
