@@ -7,6 +7,7 @@
 #include <concepts>
 #include <iterator>
 #include <tuple>
+#include <utility>
 
 namespace tx {
 
@@ -57,6 +58,18 @@ template <class... Args>
 struct type_list_count<type_list_t<Args...>> {
 	static constexpr size_t value = sizeof...(Args);
 };
+template <tx::type_list List>
+constexpr size_t type_list_count_v = type_list_count<List>::value;
+
+template <tx::type_list List>
+    requires(type_list_count<List>::value > 0)
+struct type_list_front;
+template <class T, class... Args>
+struct type_list_front<type_list_t<T, Args...>> {
+	using type = T;
+};
+template <tx::type_list List>
+using type_list_front_t = typename type_list_front<List>::type;
 
 template <tx::type_list, class...>
 struct type_list_append;
@@ -70,6 +83,10 @@ template <class... Args, class... Ts>
 struct type_list_append_front<type_list_t<Args...>, Ts...> {
 	using type = type_list_t<Ts..., Args...>;
 };
+template <tx::type_list List, class... Ts>
+using type_list_append_t = typename type_list_append<List, Ts...>::type;
+template <tx::type_list List, class... Ts>
+using type_list_append_front_t = typename type_list_append_front<List, Ts...>::type;
 
 template <tx::type_list>
 struct type_list_flatten;
@@ -86,11 +103,15 @@ struct type_list_flatten<type_list_t<type_list_t<Args...>, Others...>> {
 	using type = typename type_list_append_front<
 	    typename type_list_flatten<type_list_t<Others...>>::type, Args...>::type;
 };
+template <tx::type_list List>
+using type_list_flatten_t = typename type_list_flatten<List>::type;
 
 template <tx::type_list... Lists>
 struct type_list_combine {
 	using type = typename type_list_flatten<type_list_t<Lists...>>::type;
 };
+template <tx::type_list... Lists>
+using type_list_combine_t = typename type_list_combine<Lists...>::type;
 
 template <tx::type_list List, size_t Begin, size_t End>
     requires(Begin <= End && End <= type_list_count<List>::value)
@@ -110,20 +131,27 @@ template <class... Args>
 struct type_list_sublist<type_list_t<Args...>, 0, 0> {
 	using type = type_list_t<>;
 };
-
-template <tx::type_list List>
-constexpr size_t type_list_count_v = type_list_count<List>::value;
-
-template <tx::type_list List, class... Ts>
-using type_list_append_t = typename type_list_append<List, Ts...>::type;
-template <tx::type_list List, class... Ts>
-using type_list_append_front_t = typename type_list_append_front<List, Ts...>::type;
-template <tx::type_list List>
-using type_list_flatten_t = typename type_list_flatten<List>::type;
-template <tx::type_list... Lists>
-using type_list_combine_t = typename type_list_combine<Lists...>::type;
 template <tx::type_list List, size_t Begin, size_t End>
 using type_list_sublist_t = typename type_list_sublist<List, Begin, End>::type;
+
+template <tx::type_list List, size_t Index>
+    requires(Index < type_list_count<List>::value)
+struct type_list_at {
+	using type = typename type_list_front<
+	    typename type_list_sublist<
+	        List, Index, Index + 1>::type>::type;
+};
+template <tx::type_list List, size_t Index>
+using type_list_at_t = typename type_list_at<List, Index>::type;
+
+template <tx::type_list List>
+    requires(type_list_count<List>::value > 0)
+struct type_list_back {
+	using type = typename type_list_at<
+	    List, type_list_count<List>::value - 1>::type;
+};
+template <tx::type_list List>
+using type_list_back_t = typename type_list_back<List>::type;
 
 
 // ================ ######## ================
@@ -147,7 +175,8 @@ concept any_of = (std::same_as<T, Ts> || ...);
 
 // numeric
 template <class T>
-concept numeric = (std::integral<T> || std::floating_point<T>) && !std::same_as<T, bool>;
+concept numeric = (std::integral<T> || std::floating_point<T>) &&
+                  !std::same_as<T, bool>;
 
 // byte_like
 template <typename T>
