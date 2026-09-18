@@ -74,6 +74,52 @@ struct json_enum_type<JsonTypes::Null> {
 template <JsonTypes Type>
 using json_enum_type_t = typename json_enum_type<Type>::type;
 
+// ################ Implementation Utilities ################
+namespace impl::json {
+// ================ Value Struct ================
+// all value structs have sizeof(u32)
+
+struct ValueU32_impl {
+	JsonTypes type : 3;
+	u32 val : 29 = 0;
+};
+struct ValueNull_impl {
+	JsonTypes type : 3 = JsonTypes::Null;
+	u32 : 29;
+};
+struct ValueBoolean_impl {
+	JsonTypes type : 3 = JsonTypes::Boolean;
+	bool val : 1;
+	u32 : 28;
+};
+
+// Json Object Entry
+struct ValueEntry_impl {
+	/**
+		 * key:   .type = String; .val = string id of the key in StringPool
+		 * value: .type = type of entry; .val = data of entry / absolute index
+		 *                                      from root to the data of entry
+		 * For value.val, it will be the data of entry when .type is:
+		 *   String / Boolean / Null
+		 *                it will be the index of the data when .type is:
+		 *   Object / Array / Int / Float
+		 * The index of data  is relative to the root address of the [Document]
+		 * partition in the JsonDocument arena.
+		 */
+	ValueU32_impl key, value;
+};
+
+inline std::string_view stringPoolExtract_impl(
+    u8* result, u32 index) {
+	return std::string_view(
+	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index)),
+	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index + 1)));
+}
+} // namespace impl::json
+
+
+// ################ Implementation ################
+
 class JsonDocument {
 	template <tx::allocator>
 	friend class JsonParser;
@@ -86,42 +132,6 @@ class JsonDocument {
 	 * Itself does not contain logic, nor memory management. It is only
 	 * responsible of displaying the data to user. 
 	 */
-private:
-	// ################ Assets ################
-
-	// ================ Value Struct ================
-	// all value structs have sizeof(u32)
-
-	struct ValueU32_impl {
-		JsonTypes type : 3;
-		u32 val : 29 = 0;
-	};
-	struct ValueNull_impl {
-		JsonTypes type : 3 = JsonTypes::Null;
-		u32 : 29;
-	};
-	struct ValueBoolean_impl {
-		JsonTypes type : 3 = JsonTypes::Boolean;
-		bool val : 1;
-		u32 : 28;
-	};
-
-	// Json Object Entry
-	struct ValueEntry_impl {
-		/**
-		 * key:   .type = String; .val = string id of the key in StringPool
-		 * value: .type = type of entry; .val = data of entry / absolute index
-		 *                                      from root to the data of entry
-		 * For value.val, it will be the data of entry when .type is:
-		 *   String / Boolean / Null
-		 *                it will be the index of the data when .type is:
-		 *   Object / Array / Int / Float
-		 * The index of data  is relative to the root address of the [Document]
-		 * partition in the JsonDocument arena.
-		 */
-		ValueU32_impl key, value;
-	};
-
 
 public:
 	JsonObject root();
@@ -161,6 +171,12 @@ class JsonValue : private impl::JsonValueStorage {
 	friend JsonObject;
 	friend JsonArray;
 
+private:
+	using ValueU32_impl = impl::json::ValueU32_impl;
+	using ValueNull_impl = impl::json::ValueNull_impl;
+	using ValueBoolean_impl = impl::json::ValueBoolean_impl;
+	using ValueEntry_impl = impl::json::ValueEntry_impl;
+
 public:
 	template <JsonTypes Type>
 	std::expected<json_enum_type_t<Type>, JsonTypes> get() {
@@ -188,12 +204,12 @@ private:
 	// ================ Memory Accessing ================
 
 	JsonTypes getType_impl() {
-		return impl::as<JsonDocument::ValueNull_impl>(
+		return impl::as<ValueNull_impl>(
 		           this->m_data + this->m_index)
 		    .type;
 	}
 	u32 getU32_impl() {
-		return impl::at<JsonDocument::ValueU32_impl>(
+		return impl::at<ValueU32_impl>(
 		           this->m_data + this->m_index)
 		    ->val;
 	}
@@ -306,6 +322,9 @@ private:
 		u8* tokenEnd;
 		TokenizerRecord record;
 
+		// pre-compilation process to compiler
+		u32 stringPoolMetaOffset;
+
 		// compiler to product
 		u32 rootIndex = 0;
 	} m_connState;
@@ -346,19 +365,6 @@ private:
 		return std::string_view(
 		    reinterpret_cast<const char*>(span.data()), span.size());
 	}
-	static std::string_view stringPoolExtract_impl(
-	    u8* data, u32* meta, u32 index) {
-		return std::string_view(
-		    reinterpret_cast<const char*>(data + meta[index]),
-		    reinterpret_cast<const char*>(data + meta[index + 1]));
-	}
-
-private:
-	using JsonTypes_impl = JsonTypes;
-	using ValueU32_impl = JsonDocument::ValueU32_impl;
-	using ValueNull_impl = JsonDocument::ValueNull_impl;
-	using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
-
 
 private:
 	// ################ Logic Implementation ################
@@ -430,6 +436,38 @@ private:
 		}
 
 	private:
+		// ================ Dedup Optimization ================
+
+		struct InterningTableHash {
+			tx::PackedPartedArrayOverlay<u8> m_stringPool;
+
+			size_t operator()(u32 val) const {
+				return std::hash<std::string_view>{}(
+				    stringPoolExtract_impl(m_stringPool, val));
+			}
+			size_t operator()(std::string_view str) const {
+				return std::hash<std::string_view>{}(str);
+			}
+		};
+		struct InterningTableEqual {
+			tx::PackedPartedArrayOverlay<u8> m_stringPool;
+
+			bool operator()(u32 a, u32 b) const {
+				return a == b;
+			}
+			bool operator()(u32 val, std::string_view str) const {
+				return stringPoolExtract_impl(m_stringPool, val) == str;
+			}
+		};
+
+		using InterningTable = tx::HashSetOverlay<
+		    u32,
+		    InterningTableHash,
+		    InterningTableEqual>;
+		using allocEntry_traits = tx::typed_allocator_traits<
+		    Allocator, typename InterningTable::EntryStorage>;
+
+	private:
 		// ================ Meta & State ================
 
 		JsonParser<Allocator>* m_parent;
@@ -443,46 +481,21 @@ private:
 		struct State_impl {
 			const char* str = nullptr; // cursor ptr in m_str (document string)
 			u8* token = nullptr; // cursor ptr in m_token (token buffer)
-			tx::HashSetOverlay<u32>::StateStorage interningTableState;
+			typename InterningTable::StateStorage interningTableState;
 			bool dedupEnabled = true;
 		} m_state;
 
 		TokenizerRecord m_record;
 
-		// dedup
+		typename InterningTable::EntryStorage* m_interningBuffer;
 
-		using allocEntry_traits = tx::typed_allocator_traits<
-		    Allocator, typename tx::HashSetOverlay<u32>::EntryStorage>;
+		InterningTable m_interningTable;
 
-		tx::HashSetOverlay<u32>::EntryStorage* m_interningBuffer;
-
-		struct InterningTableHash {
-			const tx::PackedPartedArrayOverlay<u8> m_stringPool;
-
-			size_t operator()(u32 val) const {
-				return std::hash<std::string_view>{}(
-				    stringPoolExtract_impl(m_stringPool, val));
-			}
-			size_t operator()(std::string_view str) const {
-				return std::hash<std::string_view>{}(str);
-			}
-		};
-		struct InterningTableEqual {
-			const tx::PackedPartedArrayOverlay<u8> m_stringPool;
-
-			bool operator()(u32 a, u32 b) const {
-				return a == b;
-			}
-			bool operator()(u32 val, std::string_view str) const {
-				return stringPoolExtract_impl(m_stringPool, val) == str;
-			}
-		};
-
-		tx::HashSetOverlay<
-		    u32,
-		    InterningTableHash,
-		    InterningTableEqual>
-		    m_interningTable;
+	private:
+		using ValueU32_impl = impl::json::ValueU32_impl;
+		using ValueNull_impl = impl::json::ValueNull_impl;
+		using ValueBoolean_impl = impl::json::ValueBoolean_impl;
+		using ValueEntry_impl = impl::json::ValueEntry_impl;
 
 	private:
 		// ================ Token Managing ================
@@ -664,7 +677,7 @@ private:
 		// @param root object root variable, recording the number of entries
 		// master function for json object
 		void parseObject_impl(ValueU32_impl& root) {
-			root.type = JsonTypes_impl::Object;
+			root.type = JsonTypes::Object;
 			skipWhiteSpace_impl();
 			if (cur() == '}') {
 				m_state.str++;
@@ -704,7 +717,7 @@ private:
 		// @param root array root variable, recording the number of entries
 		// master function for json array
 		void parseArray_impl(ValueU32_impl& root) {
-			root.type = JsonTypes_impl::Array;
+			root.type = JsonTypes::Array;
 
 			skipWhiteSpace_impl();
 			if (cur() == ']') {
@@ -793,7 +806,7 @@ private:
 		}
 
 		void parseValueString_impl(ValueU32_impl& root) {
-			root.type = JsonTypes_impl::String;
+			root.type = JsonTypes::String;
 			root.val = parseString_impl();
 		}
 		void parseValueNumber_impl(ValueNull_impl& root) {
@@ -801,7 +814,7 @@ private:
 
 			bool isFloating = parseValueNumberTestType_impl();
 			if (isFloating) {
-				root.type = JsonTypes_impl::Float;
+				root.type = JsonTypes::Float;
 
 				auto [ptr, ec] = std::from_chars(
 				    m_state.str,
@@ -809,7 +822,7 @@ private:
 				    *tokenPush_impl<f64>());
 				m_state.str = ptr;
 			} else {
-				root.type = JsonTypes_impl::Int;
+				root.type = JsonTypes::Int;
 
 				auto [ptr, ec] = std::from_chars(
 				    m_state.str,
@@ -887,7 +900,7 @@ private:
 		    : m_source(
 		          parent->m_token,
 		          parent->m_connState.tokenEnd,
-		          parent->m_stringPool),
+		          parent->m_connState.stringPoolMetaOffset),
 		      m_state(parent->m_result + parent->m_connState.rootIndex),
 		      m_result(parent->m_result) {}
 
@@ -902,7 +915,7 @@ private:
 		struct {
 			const u8* token;
 			const u8* tokenEnd;
-			tx::PackedPartedArrayOverlay<u8> stringPool;
+			u32 stringPoolMetaOffset;
 		} m_source;
 
 		struct {
@@ -912,11 +925,10 @@ private:
 		u8* m_result;
 
 	private:
-		using JsonTypes_impl = JsonTypes;
-		using ValueU32_impl = JsonDocument::ValueU32_impl;
-		using ValueNull_impl = JsonDocument::ValueNull_impl;
-		using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
-		using ValueEntry_impl = JsonDocument::ValueEntry_impl;
+		using ValueU32_impl = impl::json::ValueU32_impl;
+		using ValueNull_impl = impl::json::ValueNull_impl;
+		using ValueBoolean_impl = impl::json::ValueBoolean_impl;
+		using ValueEntry_impl = impl::json::ValueEntry_impl;
 
 	private:
 		// ================ Helper Functions ================
@@ -969,8 +981,13 @@ private:
 		// 	return *impl::at<T>(ptr);
 		// }
 
-		u32 resultIndex(u8* ptr) {
+		u32 resultIndex_impl(u8* ptr) {
 			return static_cast<u32>(ptr - m_result);
+		}
+		// turn string pool id (from tokenizer) to physical offset in m_result
+		// unit: index: u32 / string pool id -> ret: u8
+		u32 stringPoolIndex_impl(u32 index) {
+			return index * sizeof(u32) + m_source.stringPoolMetaOffset;
 		}
 
 	private:
@@ -1008,8 +1025,8 @@ private:
 			    impl::at<ValueEntry_impl>(metaHead),
 			    [&](const ValueEntry_impl& a, const ValueEntry_impl& b) {
 				    return std::less<std::string_view>{}(
-				        stringPoolExtract_impl(m_source.stringPool, a.key.val),
-				        stringPoolExtract_impl(m_source.stringPool, b.key.val));
+				        impl::json::stringPoolExtract_impl(m_result, a.key.val),
+				        impl::json::stringPoolExtract_impl(m_result, b.key.val));
 			    });
 		}
 
@@ -1030,6 +1047,7 @@ private:
 		// @param meta meta data object at object root for this entry
 		void compileEntry_impl(ValueEntry_impl& meta) {
 			meta.key = tokenConsume_impl<ValueU32_impl>();
+			meta.key.val = stringPoolIndex_impl(meta.key.val);
 			compileValue_impl(meta.value);
 		}
 		// IOState: Regular
@@ -1040,11 +1058,11 @@ private:
 			root.type = header.type;
 
 			switch (header.type) {
-			case JsonTypes_impl::Null:
+			case JsonTypes::Null:
 				m_source.token += sizeof(ValueNull_impl);
 				break;
-			case JsonTypes_impl::Int:
-			case JsonTypes_impl::Float: { // same operation for both
+			case JsonTypes::Int:
+			case JsonTypes::Float: { // same operation for both
 				m_source.token += sizeof(ValueNull_impl);
 
 				u8* aligned = next64_impl(m_state.result);
@@ -1055,9 +1073,9 @@ private:
 				m_source.token = tokenAligned + sizeof(i64);
 				m_state.result = aligned + sizeof(i64);
 
-				root.val = resultIndex(aligned);
+				root.val = resultIndex_impl(aligned);
 			} break;
-			case JsonTypes_impl::Boolean:
+			case JsonTypes::Boolean:
 				/**
 				 * This is kind of an inconsistency: the tokenizer enforce
 				 * boolean to be an unique type, but here just uses the u32 to
@@ -1068,10 +1086,10 @@ private:
 				 */
 				root.val = tokenConsume_impl<ValueBoolean_impl>().val;
 				break;
-			case JsonTypes_impl::String:
-				root.val = tokenConsume_impl<ValueU32_impl>().val;
+			case JsonTypes::String:
+				root.val = stringPoolIndex_impl(tokenConsume_impl<ValueU32_impl>().val);
 				break;
-			case JsonTypes_impl::Object:
+			case JsonTypes::Object:
 				/**
 				 * If an object / array is empty, it will not have an object in
 				 * [data] partition of it's parent, but instead have a value of
@@ -1081,16 +1099,16 @@ private:
 					root.val = 0;
 					m_source.token += sizeof(ValueU32_impl);
 				} else {
-					root.val = resultIndex(m_state.result);
+					root.val = resultIndex_impl(m_state.result);
 					compileObject_impl();
 				}
 				break;
-			case JsonTypes_impl::Array:
+			case JsonTypes::Array:
 				if (tokenRead_impl<ValueU32_impl>().val == 0) {
 					root.val = 0;
 					m_source.token += sizeof(ValueU32_impl);
 				} else {
-					root.val = resultIndex(m_state.result);
+					root.val = resultIndex_impl(m_state.result);
 					compileArray_impl();
 				}
 				break;
@@ -1147,11 +1165,14 @@ private:
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
 		tx::uninitialized_relocate(
 		    m_stringPoolMeta, m_stringPoolMeta + m_stringPool.size_meta(), stringPoolMetaPtr);
+		// potentially obsolete since compiler don't need a string pool object
+		// anymore
 		m_stringPool = tx::PackedPartedArrayOverlay<u8>::fromExistingState(
 		    m_result, m_stringPool.size_elements(),
 		    stringPoolMetaPtr, m_stringPool.size_meta(),
 		    &m_stringPoolStateStorage);
 		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
+		m_connState.stringPoolMetaOffset = stringPoolDataSize;
 	}
 
 	void compile_impl() {

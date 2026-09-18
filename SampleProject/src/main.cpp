@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <concepts>
+#include <memory>
 #include <random>
 #include <string>
 #include <string_view>
@@ -506,6 +507,7 @@ void idk(Func&& func, int n) {
 
 int main() {
 
+	tx::JsonParser<std::allocator<int>>::parse("hello");
 
 
 	return 0;
@@ -626,9 +628,6 @@ int main() {
 
 	return 0;
 
-	tx::JsonDocument bvcbm;
-	tx::JsonParser parser("");
-	parser.parse();
 
 
 	std::cout << "AVLTree Test Suite\n";

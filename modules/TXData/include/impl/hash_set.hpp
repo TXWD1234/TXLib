@@ -73,7 +73,7 @@ public:
 	    EntryStorage* bufferPtr, u32 bufferSize, StateStorage* statePtr,
 	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires Trivial
-	    : HashSetOverlay<T>(statePtr, bufferPtr, bufferSize) {
+	    : HashSetOverlay(statePtr, bufferPtr, bufferSize) {
 		std::construct_at(m_state);
 		initFunctor_impl(funcHash, funcEqual);
 	}
@@ -81,8 +81,8 @@ public:
 	    std::span<EntryStorage> buffer, StateStorage* statePtr,
 	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires Trivial
-	    : HashSetOverlay<T>(buffer.data(), buffer.size(), statePtr,
-	                        funcHash, funcEqual) {}
+	    : HashSetOverlay(buffer.data(), buffer.size(), statePtr,
+	                     funcHash, funcEqual) {}
 	HashSetOverlay()
 	    requires Trivial
 	    : m_data(nullptr), m_dataBufferSize(0), m_state(nullptr) {}
@@ -93,9 +93,9 @@ public:
 	    StateStorage* statePtr,
 	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires(!Trivial)
-	    : HashSetOverlay<T>(statePtr,
-	                        bufferPtr, bufferSize,
-	                        valueBufferPtr, valueBufferSize) {
+	    : HashSetOverlay(statePtr,
+	                     bufferPtr, bufferSize,
+	                     valueBufferPtr, valueBufferSize) {
 		std::construct_at(m_state);
 		initFunctor_impl(funcHash, funcEqual);
 		initFreelist_impl();
@@ -105,7 +105,7 @@ public:
 	    StateStorage* statePtr,
 	    FuncHash funcHash = FuncHash{}, FuncEqual funcEqual = FuncEqual{})
 	    requires(!Trivial)
-	    : HashSetOverlay<T>(
+	    : HashSetOverlay(
 	          buffer.data(), buffer.size(),
 	          valueBuffer.data(), valueBuffer.size(),
 	          statePtr, funcHash, funcEqual) {}
