@@ -9,20 +9,75 @@
 #include "impl/value_group.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
+#include <cstddef>
 #include <memory>
 #include <string_view>
 #include <charconv>
 #include <cstring>
+#include <expected>
 
 namespace tx {
 
+// ################ Types ################
 
+// clang-format off
+
+// ================ Value Type Enum ================
+enum class JsonTypes : u32 {
+	Object  = 0b000,
+	Array   = 0b001,
+	String  = 0b010,
+	Int     = 0b011, // actually is i64 (long long)
+	Float   = 0b100, // actually is f64 (double)
+	Boolean = 0b101,
+	Null    = 0b110,
+};
+// clang-format on
+
+class JsonValue;
 class JsonObject;
 class JsonArray;
+
+// ================ Type Traits ================
+
+template <JsonTypes>
+struct json_enum_type;
+template <>
+struct json_enum_type<JsonTypes::Object> {
+	using type = JsonObject;
+};
+template <>
+struct json_enum_type<JsonTypes::Array> {
+	using type = JsonArray;
+};
+template <>
+struct json_enum_type<JsonTypes::String> {
+	using type = std::string_view;
+};
+template <>
+struct json_enum_type<JsonTypes::Int> {
+	using type = i64;
+};
+template <>
+struct json_enum_type<JsonTypes::Float> {
+	using type = f64;
+};
+template <>
+struct json_enum_type<JsonTypes::Boolean> {
+	using type = bool;
+};
+template <>
+struct json_enum_type<JsonTypes::Null> {
+	using type = std::nullptr_t;
+};
+
+template <JsonTypes Type>
+using json_enum_type_t = typename json_enum_type<Type>::type;
 
 class JsonDocument {
 	template <tx::allocator>
 	friend class JsonParser;
+	friend JsonValue;
 	friend JsonObject;
 	friend JsonArray;
 
@@ -34,33 +89,19 @@ class JsonDocument {
 private:
 	// ################ Assets ################
 
-	// clang-format off
-
-	// ================ Value Type Enum ================
-	enum class ValueType_impl : u32 {
-		Object  = 0b0,
-		Array   = 0b1,
-		String  = 0b10,
-		Int     = 0b11,  // actually is i64 (long long)
-		Float   = 0b100, // actually is f64 (double)
-		Boolean = 0b101,
-		Null    = 0b110,
-	};
-	// clang-format on
-
 	// ================ Value Struct ================
 	// all value structs have sizeof(u32)
 
 	struct ValueU32_impl {
-		ValueType_impl type : 3;
+		JsonTypes type : 3;
 		u32 val : 29 = 0;
 	};
 	struct ValueNull_impl {
-		ValueType_impl type : 3 = ValueType_impl::Null;
+		JsonTypes type : 3 = JsonTypes::Null;
 		u32 : 29;
 	};
 	struct ValueBoolean_impl {
-		ValueType_impl type : 3 = ValueType_impl::Boolean;
+		JsonTypes type : 3 = JsonTypes::Boolean;
 		bool val : 1;
 		u32 : 28;
 	};
@@ -105,8 +146,74 @@ private:
 // ################ Proxy Classes ################
 // For user's viewing purposes
 
+namespace impl {
+struct JsonValueStorage {
+protected:
+	u8* m_data = nullptr;
+	u32 m_index = InvalidU32;
+	JsonValueStorage(u8* data, u32 index) : m_data(data), m_index(index) {}
+};
+} // namespace impl
+
+
+class JsonValue : private impl::JsonValueStorage {
+	friend JsonDocument;
+	friend JsonObject;
+	friend JsonArray;
+
+public:
+	template <JsonTypes Type>
+	std::expected<json_enum_type_t<Type>, JsonTypes> get() {
+		JsonTypes type = getType_impl();
+		if (type != Type)
+			return std::unexpected(type);
+	}
+
+private:
+	JsonValue(u8* data, u32 index) : impl::JsonValueStorage(data, index) {}
+
+	/**
+	 * The root of a JsonValue is the indexing object of the value, but not the
+	 * value itself.
+	 * The reason for this is because the indexing object stores the type
+	 * information. 
+	 */
+
+	// ================ Type Dispatch ================
+
+	template <class T, std::invocable<const T&> Func>
+	void visit_impl(Func&& f) {
+	}
+
+	// ================ Memory Accessing ================
+
+	JsonTypes getType_impl() {
+		return impl::as<JsonDocument::ValueNull_impl>(
+		           this->m_data + this->m_index)
+		    .type;
+	}
+	u32 getU32_impl() {
+		return impl::at<JsonDocument::ValueU32_impl>(
+		           this->m_data + this->m_index)
+		    ->val;
+	}
+
+	JsonObject getObject_impl();
+	JsonArray getArray_impl();
+	std::string_view getString_impl() {
+	}
+	i64 getInt_impl() {
+	}
+	f64 getFloat_impl() {
+	}
+	bool getBoolean_impl() {
+	}
+	std::nullptr_t getNull_impl() { return std::nullptr_t{}; }
+};
+
 class JsonObject {
 	friend JsonDocument;
+	friend JsonValue;
 
 public:
 private:
@@ -119,6 +226,7 @@ private:
 
 class JsonArray {
 	friend JsonDocument;
+	friend JsonValue;
 
 public:
 private:
@@ -128,6 +236,7 @@ private:
 private:
 	JsonArray(JsonDocument* doc, u32 index) : m_doc(doc), m_index(index) {}
 };
+
 
 
 inline JsonObject JsonDocument::root() {
@@ -237,9 +346,15 @@ private:
 		return std::string_view(
 		    reinterpret_cast<const char*>(span.data()), span.size());
 	}
+	static std::string_view stringPoolExtract_impl(
+	    u8* data, u32* meta, u32 index) {
+		return std::string_view(
+		    reinterpret_cast<const char*>(data + meta[index]),
+		    reinterpret_cast<const char*>(data + meta[index + 1]));
+	}
 
 private:
-	using ValueType_impl = JsonDocument::ValueType_impl;
+	using JsonTypes_impl = JsonTypes;
 	using ValueU32_impl = JsonDocument::ValueU32_impl;
 	using ValueNull_impl = JsonDocument::ValueNull_impl;
 	using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
@@ -549,8 +664,7 @@ private:
 		// @param root object root variable, recording the number of entries
 		// master function for json object
 		void parseObject_impl(ValueU32_impl& root) {
-			root.type = ValueType_impl::Object;
-
+			root.type = JsonTypes_impl::Object;
 			skipWhiteSpace_impl();
 			if (cur() == '}') {
 				m_state.str++;
@@ -590,7 +704,7 @@ private:
 		// @param root array root variable, recording the number of entries
 		// master function for json array
 		void parseArray_impl(ValueU32_impl& root) {
-			root.type = ValueType_impl::Array;
+			root.type = JsonTypes_impl::Array;
 
 			skipWhiteSpace_impl();
 			if (cur() == ']') {
@@ -679,7 +793,7 @@ private:
 		}
 
 		void parseValueString_impl(ValueU32_impl& root) {
-			root.type = ValueType_impl::String;
+			root.type = JsonTypes_impl::String;
 			root.val = parseString_impl();
 		}
 		void parseValueNumber_impl(ValueNull_impl& root) {
@@ -687,7 +801,7 @@ private:
 
 			bool isFloating = parseValueNumberTestType_impl();
 			if (isFloating) {
-				root.type = ValueType_impl::Float;
+				root.type = JsonTypes_impl::Float;
 
 				auto [ptr, ec] = std::from_chars(
 				    m_state.str,
@@ -695,7 +809,7 @@ private:
 				    *tokenPush_impl<f64>());
 				m_state.str = ptr;
 			} else {
-				root.type = ValueType_impl::Int;
+				root.type = JsonTypes_impl::Int;
 
 				auto [ptr, ec] = std::from_chars(
 				    m_state.str,
@@ -775,7 +889,7 @@ private:
 		          parent->m_connState.tokenEnd,
 		          parent->m_stringPool),
 		      m_state(parent->m_result + parent->m_connState.rootIndex),
-		      m_resultRoot(m_state.result) {}
+		      m_result(parent->m_result) {}
 
 		struct CompilerResult {};
 
@@ -795,10 +909,10 @@ private:
 			u8* result;
 		} m_state;
 
-		u8* m_resultRoot;
+		u8* m_result;
 
 	private:
-		using ValueType_impl = JsonDocument::ValueType_impl;
+		using JsonTypes_impl = JsonTypes;
 		using ValueU32_impl = JsonDocument::ValueU32_impl;
 		using ValueNull_impl = JsonDocument::ValueNull_impl;
 		using ValueBoolean_impl = JsonDocument::ValueBoolean_impl;
@@ -856,7 +970,7 @@ private:
 		// }
 
 		u32 resultIndex(u8* ptr) {
-			return static_cast<u32>(ptr - m_resultRoot);
+			return static_cast<u32>(ptr - m_result);
 		}
 
 	private:
@@ -926,11 +1040,11 @@ private:
 			root.type = header.type;
 
 			switch (header.type) {
-			case ValueType_impl::Null:
+			case JsonTypes_impl::Null:
 				m_source.token += sizeof(ValueNull_impl);
 				break;
-			case ValueType_impl::Int:
-			case ValueType_impl::Float: { // same operation for both
+			case JsonTypes_impl::Int:
+			case JsonTypes_impl::Float: { // same operation for both
 				m_source.token += sizeof(ValueNull_impl);
 
 				u8* aligned = next64_impl(m_state.result);
@@ -943,7 +1057,7 @@ private:
 
 				root.val = resultIndex(aligned);
 			} break;
-			case ValueType_impl::Boolean:
+			case JsonTypes_impl::Boolean:
 				/**
 				 * This is kind of an inconsistency: the tokenizer enforce
 				 * boolean to be an unique type, but here just uses the u32 to
@@ -954,10 +1068,10 @@ private:
 				 */
 				root.val = tokenConsume_impl<ValueBoolean_impl>().val;
 				break;
-			case ValueType_impl::String:
+			case JsonTypes_impl::String:
 				root.val = tokenConsume_impl<ValueU32_impl>().val;
 				break;
-			case ValueType_impl::Object:
+			case JsonTypes_impl::Object:
 				/**
 				 * If an object / array is empty, it will not have an object in
 				 * [data] partition of it's parent, but instead have a value of
@@ -971,7 +1085,7 @@ private:
 					compileObject_impl();
 				}
 				break;
-			case ValueType_impl::Array:
+			case JsonTypes_impl::Array:
 				if (tokenRead_impl<ValueU32_impl>().val == 0) {
 					root.val = 0;
 					m_source.token += sizeof(ValueU32_impl);
@@ -1061,8 +1175,6 @@ private:
 
 /**
  * Todo:
- * - add sort in compiler
- * - add resize in tokenizer
  * - value root instead of object root
  * - escape character parser
  */

@@ -101,13 +101,23 @@ ForwardIt uninitialized_relocate(InputIt first, InputIt last, ForwardIt destFirs
 
 // ################ TXData Implementation Utilities ################
 namespace impl {
+// std::launder(reinterpret_cast<T*>(ptr))
 template <class T>
 inline T* at(u8* ptr) {
 	return std::launder(reinterpret_cast<T*>(ptr));
 }
+// std::launder(reinterpret_cast<const T*>(ptr))
 template <class T>
 inline const T* at(const u8* ptr) {
 	return std::launder(reinterpret_cast<const T*>(ptr));
+}
+// std::bit_cast but for raw pointers
+// memcpy(&ret, ptr, sizeof(T))
+template <class T>
+inline T as(const u8* ptr) {
+	T ret;
+	std::memcpy(&ret, ptr, sizeof(T));
+	return ret;
 }
 
 constexpr u32 ByteSize = 8;
