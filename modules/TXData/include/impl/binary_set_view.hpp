@@ -8,20 +8,10 @@
 #include <span>
 #include <algorithm>
 #include <type_traits>
-#include <concepts>
 
 #include <vector> // DevNote: replace with tx::BasicStorage
 
 namespace tx {
-
-// DevNote: move to data_utils.hpp
-template <class T, std::invocable<T, T> CompareFunc>
-inline bool isSame(const T& a, const T& b, CompareFunc&& cmp) {
-	return !cmp(a, b) && !cmp(b, a);
-}
-
-
-
 
 /**
  * An semi-overlay class that is design to be light weight, and for user to

@@ -54,6 +54,27 @@ inline T* resize(
 	    [&](T* ptr, u32 size) { alloc_traits::deallocate(bound_alloc, ptr, size); });
 }
 
+namespace impl {
+// DevNote: move to data_utils.hpp
+template <class T, std::invocable<T, T> CompareFunc>
+inline bool isSame(const T& a, const T& b, CompareFunc&& cmp) {
+	return !cmp(a, b) && !cmp(b, a);
+}
+} // namespace impl
+
+// buffer must be sorted
+// not found returns 0xFFFFFFFF
+template <class T, tx::invocable_r<bool, T, T> CompareFunc>
+inline u32 binarySearch(
+    const T& val,
+    T* bufferPtr, u32 bufferSize,
+    CompareFunc&& cmp = CompareFunc{}) {
+	auto it = std::lower_bound(bufferPtr, bufferPtr + bufferSize, val, cmp);
+	if (it != bufferPtr + bufferSize && impl::isSame(*it, val, cmp))
+		return findIteratorIndex(bufferPtr, it);
+	return InvalidU32;
+}
+
 constexpr size_t CacheLineSize = 64;
 
 template <class T>
