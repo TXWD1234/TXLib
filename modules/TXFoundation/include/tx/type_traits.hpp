@@ -27,7 +27,8 @@ inline constexpr bool false_v = false;
 // ================ ########### ================
 
 // Conditional Presence
-class Nothing {};
+class Nothing {
+};
 
 // propagate constness from type From to type To
 template <class From, class To>
@@ -45,8 +46,24 @@ using const_propagate = std::conditional_t<
 template <class... Args>
 struct type_list_t {
 	using type_list_tag = void;
+	/**
+	 * Usage:
+	 * typename List::template apply_t<Template>
+	 */
 	template <template <class...> class Template>
-	using apply = Template<Args...>;
+	using apply_t = Template<Args...>;
+	// *I've seen the future, and the future is lambda!*
+	/**
+	 * Usage:
+	 * List::apply([]<class... Args>(tx::type_list_t<Args...>) { ... })
+	 * 
+	 * Doing this is also valid:
+	 * []<class... Args>(tx::type_list_t<Args...>) { ... } (List{})
+	 */
+	template <class Func>
+	static constexpr decltype(auto) apply(Func f) {
+		return f(type_list_t{});
+	}
 };
 // type_list
 template <class T>
@@ -230,35 +247,35 @@ concept type_list_satisfy_any =
 // infrastructure for invocable_multi
 namespace impl {
 template <class Func>
-constexpr auto test_invocable =
-    []<class... Args>(tx::type_list_t<Args...>) {
+using test_invocable =
+    decltype([]<class... Args>(tx::type_list_t<Args...>) {
 	    return std::invocable<Func, Args...>;
-    };
+    });
 template <class Func>
-constexpr auto test_invocable_r =
-    []<class Ret, class... Args>(tx::type_list_t<Ret, Args...>) {
+using test_invocable_r =
+    decltype([]<class Ret, class... Args>(tx::type_list_t<Ret, Args...>) {
 	    return tx::invocable_r<Func, Ret, Args...>;
-    };
+    });
 } // namespace impl
 
 // invocable with multiple argument lists
 template <class Func, class... ArgLists>
 concept invocable_multi_and =
-    type_list_satisfy_all<decltype(impl::test_invocable<Func>), ArgLists...>;
+    type_list_satisfy_all<impl::test_invocable<Func>, ArgLists...>;
 // invocable with multiple argument lists
 template <class Func, class... ArgLists>
 concept invocable_multi_or =
-    type_list_satisfy_any<decltype(impl::test_invocable<Func>), ArgLists...>;
+    type_list_satisfy_any<impl::test_invocable<Func>, ArgLists...>;
 // invocable_r with multiple argument lists
 // return type is the first type in ArgList
 template <class Func, class... ArgLists>
 concept invocable_r_multi_and =
-    type_list_satisfy_all<decltype(impl::test_invocable_r<Func>), ArgLists...>;
+    type_list_satisfy_all<impl::test_invocable_r<Func>, ArgLists...>;
 // invocable_r with multiple argument lists
 // return type is the first type in ArgList
 template <class Func, class... ArgLists>
 concept invocable_r_multi_or =
-    type_list_satisfy_any<decltype(impl::test_invocable_r<Func>), ArgLists...>;
+    type_list_satisfy_any<impl::test_invocable_r<Func>, ArgLists...>;
 
 // iterator with value type
 template <class It, class T>
