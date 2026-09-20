@@ -5,7 +5,6 @@
 #include "impl/allocator.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/hash_set.hpp"
-#include "impl/numeric_utils.hpp"
 #include "impl/packed_parted_array.hpp"
 #include "impl/value_group.hpp"
 #include "tx/basic_types.hpp"
@@ -155,7 +154,10 @@ class JsonDocument {
 public:
 	template <tx::allocator Allocator = std::allocator<u8>>
 	JsonDocument(std::string_view jsonString, Allocator alloc = Allocator{});
-	~JsonDocument() { m_deallocFunc(); }
+	~JsonDocument() {
+		if (m_deallocFunc)
+			m_deallocFunc();
+	}
 
 	JsonDocument(JsonDocument&& other)
 	    : m_data(other.m_data), m_root(other.m_root),
@@ -164,9 +166,11 @@ public:
 		other.m_root = InvalidU32;
 	}
 	JsonDocument& operator=(JsonDocument&& other) {
-		m_deallocFunc();
+		if (&other == this) return *this;
+		if (m_deallocFunc) m_deallocFunc();
 		m_data = other.m_data;
 		m_root = other.m_root;
+		m_deallocFunc = std::move(other.m_deallocFunc);
 		other.m_data = nullptr;
 		other.m_root = InvalidU32;
 		return *this;
@@ -513,6 +517,10 @@ private:
 private:
 	// ################ Static Helpers ################
 
+	static const u8* next64_impl(const u8* ptr) {
+		return reinterpret_cast<const u8*>(
+		    (reinterpret_cast<uintptr_t>(ptr) + 7) & ~(uintptr_t)0b111);
+	}
 	static u8* next64_impl(u8* ptr) {
 		return reinterpret_cast<u8*>(
 		    (reinterpret_cast<uintptr_t>(ptr) + 7) & ~(uintptr_t)0b111);
@@ -688,7 +696,7 @@ private:
 		}
 
 		void tokenAlign64_impl() {
-			m_state.token = next64_impl(m_state.token);
+			m_state.token = JsonParser::next64_impl(m_state.token);
 		}
 
 	private:
@@ -1062,13 +1070,22 @@ private:
 		    : m_source(
 		          parent->m_token,
 		          parent->m_connState.tokenEnd,
-		          parent->m_connState.stringPoolMetaOffset),
+		          parent->m_connState.stringPoolMetaOffset,
+		          parent->m_connState.rootIndex - sizeof(ValueU32_impl)),
 		      m_state(parent->m_result + parent->m_connState.rootIndex),
 		      m_result(parent->m_result) {}
 
+		// apparently there's nothing I need to extract from the process of
+		// compilation right now, so it's empty for now
 		struct CompilerResult {};
 
 		CompilerResult run() {
+			// make empty sentinel
+			resultPush_impl<ValueU32_impl>()->val = 0;
+
+			// start compilation
+			compileObject_impl();
+			return CompilerResult{};
 		}
 
 	private:
@@ -1078,6 +1095,7 @@ private:
 			const u8* token;
 			const u8* tokenEnd;
 			u32 stringPoolMetaOffset;
+			u32 emptySentinelAddress;
 		} m_source;
 
 		struct {
@@ -1100,7 +1118,7 @@ private:
 		// but removed the resizing branch (therefore cannot be generalized)
 
 		// assume it's always aligned.
-		// alignment need to be manually solve beforehand
+		// alignment need to be manually solved beforehand
 		template <class T, class... Args>
 		T* resultPush_impl(Args&&... args) {
 			u8* old = m_state.result;
@@ -1178,7 +1196,7 @@ private:
 			u8* metaBegin = metaHead;
 
 			for (u32 i = 0; i < entryCount; i++) {
-				compileEntry_impl(resultPushAt_impl<ValueEntry_impl>(metaHead));
+				compileEntry_impl(*resultPushAt_impl<ValueEntry_impl>(metaHead));
 			}
 
 			// sorting
@@ -1201,7 +1219,7 @@ private:
 			u8* metaHead = resultAdvance_impl<ValueU32_impl>(entryCount);
 
 			for (u32 i = 0; i < entryCount; i++) {
-				compileValue_impl(resultPushAt_impl<ValueU32_impl>(metaHead));
+				compileValue_impl(*resultPushAt_impl<ValueU32_impl>(metaHead));
 			}
 		}
 
@@ -1258,7 +1276,7 @@ private:
 				 * 0 in it's meta entry, seeing that root can never have parent
 				 */
 				if (tokenRead_impl<ValueU32_impl>().val == 0) {
-					root.val = 0;
+					root.val = m_source.emptySentinelAddress;
 					m_source.token += sizeof(ValueU32_impl);
 				} else {
 					root.val = resultIndex_impl(m_state.result);
@@ -1267,7 +1285,7 @@ private:
 				break;
 			case JsonTypes::Array:
 				if (tokenRead_impl<ValueU32_impl>().val == 0) {
-					root.val = 0;
+					root.val = m_source.emptySentinelAddress;
 					m_source.token += sizeof(ValueU32_impl);
 				} else {
 					root.val = resultIndex_impl(m_state.result);
@@ -1309,7 +1327,9 @@ private:
 		    stringPoolDataSize +
 		    stringPoolMetaSize +
 		    tokenDataSize -
-		    subSize + addSize;
+		    subSize + addSize
+		    // for the empty sentinel index object `ValueU32_impl`
+		    + 4;
 
 		if (targetSize > m_resultSize) {
 			// realloc
@@ -1324,20 +1344,26 @@ private:
 	}
 	void compileStringPool_impl() {
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
+		m_connState.rootIndex =
+		    stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32) +
+		    // for the empty sentinel
+		    sizeof(impl::json::ValueU32_impl);
+		m_connState.stringPoolMetaOffset = stringPoolDataSize;
+
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
 		tx::uninitialized_relocate(
 		    m_stringPoolMeta, m_stringPoolMeta + m_stringPool.size_meta(), stringPoolMetaPtr);
-		// potentially obsolete since compiler don't need a string pool object
-		// anymore
-		m_stringPool = tx::PackedPartedArrayOverlay<u8>::fromExistingState(
-		    m_result, m_stringPool.size_elements(),
-		    stringPoolMetaPtr, m_stringPool.size_meta(),
-		    &m_stringPoolStateStorage);
-		m_connState.rootIndex = stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
-		m_connState.stringPoolMetaOffset = stringPoolDataSize;
+		// m_stringPool = tx::PackedPartedArrayOverlay<u8>::fromExistingState(
+		//     m_result, m_stringPool.size_elements(),
+		//     stringPoolMetaPtr, m_stringPool.size_meta(),
+		//     &m_stringPoolStateStorage);
+		m_stringPool.destruct();
 	}
 
 	void compile_impl() {
+		// from now the stringPool enters a dangling state. But since
+		// practically nothing is using it anymore anyways, it's staled and
+		// dead from now. Just don't touch it.
 		compileRealloc_impl();
 		compileStringPool_impl();
 		Compiler_impl{ this }.run();
