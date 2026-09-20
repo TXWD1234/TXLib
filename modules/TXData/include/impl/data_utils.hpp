@@ -54,21 +54,31 @@ inline T* resize(
 	    [&](T* ptr, u32 size) { alloc_traits::deallocate(bound_alloc, ptr, size); });
 }
 
+template <std::input_iterator It>
+inline u32 findIteratorIndex(It begin, It it) {
+	return static_cast<u32>(std::distance(begin, it));
+}
+
 namespace impl {
-// DevNote: move to data_utils.hpp
-template <class T, std::invocable<T, T> CompareFunc>
-inline bool isSame(const T& a, const T& b, CompareFunc&& cmp) {
+template <class CompFunc, class AT, class BT>
+concept comparison_func =
+    tx::invocable_r<CompFunc, bool, const BT&, const AT&> &&
+    tx::invocable_r<CompFunc, bool, const AT&, const BT&>;
+
+template <class AT, class BT, comparison_func<AT, BT> CompFunc>
+inline bool isSame(const AT& a, const BT& b, CompFunc&& cmp) {
 	return !cmp(a, b) && !cmp(b, a);
 }
 } // namespace impl
 
 // buffer must be sorted
 // not found returns 0xFFFFFFFF
-template <class T, tx::invocable_r<bool, T, T> CompareFunc>
-inline u32 binarySearch(
+template <class T, class BT,
+          impl::comparison_func<T, BT> CompFunc = std::less<>>
+u32 binarySearch(
     const T& val,
-    T* bufferPtr, u32 bufferSize,
-    CompareFunc&& cmp = CompareFunc{}) {
+    BT* bufferPtr, u32 bufferSize,
+    CompFunc&& cmp = CompFunc{}) {
 	auto it = std::lower_bound(bufferPtr, bufferPtr + bufferSize, val, cmp);
 	if (it != bufferPtr + bufferSize && impl::isSame(*it, val, cmp))
 		return findIteratorIndex(bufferPtr, it);
@@ -83,11 +93,6 @@ struct alignas(CacheLineSize) alignas(T) CacheLineStorage {
 	    std::lcm(sizeof(T), CacheLineSize) / sizeof(T);
 	std::byte data[ElementCount * sizeof(T)];
 };
-
-template <std::input_iterator It>
-inline u32 findIteratorIndex(It begin, It it) {
-	return static_cast<u32>(std::distance(begin, it));
-}
 
 template <class T>
 constexpr inline u8* nextAlign(u8* ptr) {

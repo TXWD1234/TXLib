@@ -2,6 +2,7 @@
 // Module: TXJson
 
 #pragma once
+#include "impl/allocator.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/hash_set.hpp"
 #include "impl/numeric_utils.hpp"
@@ -141,9 +142,9 @@ inline std::string_view stringPoolExtract_impl(
 class JsonDocument {
 	template <tx::allocator>
 	friend class JsonParser;
-	friend JsonValue;
-	friend JsonObject;
-	friend JsonArray;
+	friend class JsonValue;
+	friend class JsonObject;
+	friend class JsonArray;
 
 	/**
 	 * This is the result of parsing produced by JsonParser.
@@ -152,13 +153,40 @@ class JsonDocument {
 	 */
 
 public:
-	JsonObject root();
+	template <tx::allocator Allocator = std::allocator<u8>>
+	JsonDocument(std::string_view jsonString, Allocator alloc = Allocator{});
+	~JsonDocument() { m_deallocFunc(); }
+
+	JsonDocument(JsonDocument&& other)
+	    : m_data(other.m_data), m_root(other.m_root),
+	      m_deallocFunc(other.m_deallocFunc) {
+		other.m_data = nullptr;
+		other.m_root = InvalidU32;
+	}
+	JsonDocument& operator=(JsonDocument&& other) {
+		m_deallocFunc();
+		m_data = other.m_data;
+		m_root = other.m_root;
+		other.m_data = nullptr;
+		other.m_root = InvalidU32;
+		return *this;
+	};
+	JsonDocument(const JsonDocument&) = delete;
+	JsonDocument& operator=(const JsonDocument&) = delete;
+
+public:
+	// ################ Public Interface ################
+
+	JsonObject root() const;
+
+	bool valid() const { return m_data && (m_root != InvalidU32); }
+
 
 
 private:
 	u8* m_data = nullptr;
-	u32 m_size = 0;
-	u32 m_root = 0;
+	u32 m_root = InvalidU32;
+	std::function<void()> m_deallocFunc;
 
 	/**
 	 * Structure of m_data
@@ -169,6 +197,12 @@ private:
 	 * Right after the string pool is the main content of the json document.
 	 * Each entry is packed tightly together in the order of their appearance.
 	 */
+
+	JsonDocument(
+	    u8* data, u32 root,
+	    std::function<void()> deallocFunc)
+	    : m_data(data), m_root(root),
+	      m_deallocFunc(deallocFunc) {}
 };
 
 // ################ Proxy Classes ################
@@ -176,6 +210,9 @@ private:
 
 namespace impl {
 struct JsonValueStorage {
+public:
+	bool valid() const { return m_data && (m_index != InvalidU32); }
+
 protected:
 	u8* m_data = nullptr;
 	u32 m_index = InvalidU32;
@@ -186,20 +223,19 @@ protected:
 		           m_data + m_index)
 		    ->val;
 	}
-};
-} // namespace impl
 
-
-class JsonValue : private impl::JsonValueStorage {
-	friend JsonDocument;
-	friend JsonObject;
-	friend JsonArray;
-
-private:
 	using ValueU32_impl = impl::json::ValueU32_impl;
 	using ValueNull_impl = impl::json::ValueNull_impl;
 	using ValueBoolean_impl = impl::json::ValueBoolean_impl;
 	using ValueEntry_impl = impl::json::ValueEntry_impl;
+};
+} // namespace impl
+
+
+class JsonValue : public impl::JsonValueStorage {
+	friend JsonDocument;
+	friend JsonObject;
+	friend JsonArray;
 
 public:
 	bool is(JsonTypes type) const { return getType_impl() == type; }
@@ -241,21 +277,89 @@ private:
 	json_enum_type_t<Type> getRaw_impl() const;
 };
 
-class JsonObject : private impl::JsonValueStorage {
+class JsonObject : public impl::JsonValueStorage {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
+	u32 size() const { return getU32_impl(); }
+	bool exist(std::string_view key) const {
+		return findEntry_impl(key) != InvalidU32;
+	}
+
+	/**
+	 * @return Invalid object if not found, no throw
+	 * Instead of the find() pattern, at() can be directly called, and validity
+	 * can be check with JsonValue.valid()
+	 */
+	JsonValue at(u32 index) const {
+		if (index >= getU32_impl())
+			return JsonValue(nullptr, InvalidU32);
+		return JsonValue{
+			m_data, static_cast<u32>(
+			            m_index + sizeof(ValueU32_impl) +
+			            sizeof(ValueEntry_impl) * index)
+		};
+	}
+	/**
+	 * @return Invalid object if not found, no throw
+	 * Instead of the find() pattern, at() can be directly called, and validity
+	 * can be check with JsonValue.valid()
+	 */
+	JsonValue at(std::string_view key) const {
+		return at(findEntry_impl(key));
+	}
+
+	JsonValue operator[](std::string_view key) const { return at(key); }
+
+	/**
+	 * Instead of the find() pattern, at() can be directly called, and validity
+	 * can be check with JsonValue.valid()
+	 * find() is still provided however in case you want an index for potential
+	 * usage
+	 * @return index of the entry. 0xFFFFFFFF is returned if not found
+	 */
+	u32 find(std::string_view key) const { return findEntry_impl(key); }
+
 private:
 	using impl::JsonValueStorage::JsonValueStorage;
+
+	std::string_view findStr_impl(std::string_view str) const { return str; }
+	std::string_view findStr_impl(ValueEntry_impl entry) const {
+		return impl::json::stringPoolExtract_impl(m_data, entry.key.val);
+	}
+
+	u32 findEntry_impl(std::string_view key) const {
+		return tx::binarySearch(
+		    key,
+		    impl::at<ValueEntry_impl>(
+		        m_data + m_index + sizeof(ValueU32_impl)),
+		    size(), [this](auto a, auto b) -> bool {
+			    return std::less<std::string_view>{}(
+			        findStr_impl(a), findStr_impl(b));
+		    });
+	}
 };
 
-class JsonArray : private impl::JsonValueStorage {
+class JsonArray : public impl::JsonValueStorage {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
-private:
+	u32 size() const { return getU32_impl(); }
+
+	JsonValue at(u32 index) const {
+		if (index >= getU32_impl())
+			return JsonValue(nullptr, InvalidU32);
+		return JsonValue(
+		    m_data,
+		    static_cast<u32>(
+		        m_index + sizeof(ValueU32_impl) +
+		        sizeof(ValueU32_impl) * index));
+	}
+
+	JsonValue operator[](u32 index) const { return at(index); }
+
 private:
 	using impl::JsonValueStorage::JsonValueStorage;
 };
@@ -309,9 +413,7 @@ inline decltype(auto) JsonValue::visit(Func&& f) const {
 	std::unreachable();
 }
 
-
-
-inline JsonObject JsonDocument::root() {
+inline JsonObject JsonDocument::root() const {
 	return JsonObject{ m_data, m_root };
 }
 
@@ -334,24 +436,28 @@ private:
 private:
 	// ################ Interface ################
 
-	JsonParser(std::string_view str)
-	    : m_str(str) { alloc_impl(); }
+	JsonParser(std::string_view str, Allocator alloc = Allocator{})
+	    : m_allocator(alloc), m_str(str) { alloc_impl(); }
 	~JsonParser() { dealloc_impl(); }
 
 	JsonDocument run() {
 		parse_impl();
-		JsonDocument result;
-		result.m_data = m_result;
-		result.m_size = m_resultSize;
-		result.m_root = m_connState.rootIndex;
-		return result;
+		return JsonDocument(
+		    m_result, m_connState.rootIndex,
+		    [m_allocator = m_allocator,
+		     m_result = m_result,
+		     m_resultSize = m_resultSize]() mutable {
+			    alloc64bytes_traits::deallocate(
+			        m_allocator, m_result, m_resultSize);
+		    });
 	}
 
 public:
 	// ################ Public Interface ################
 
-	static JsonDocument parse(std::string_view str) {
-		return JsonParser<Allocator>(str).run();
+	static JsonDocument parse(
+	    std::string_view str, Allocator alloc = Allocator{}) {
+		return JsonParser<Allocator>(str, alloc).run();
 	}
 
 private:
@@ -1237,6 +1343,11 @@ private:
 		Compiler_impl{ this }.run();
 	}
 };
+
+template <tx::allocator Allocator>
+JsonDocument::JsonDocument(
+    std::string_view jsonString, Allocator alloc)
+    : JsonDocument(JsonParser<Allocator>::parse(jsonString, alloc)) {}
 
 
 
