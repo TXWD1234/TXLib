@@ -61,7 +61,7 @@ struct type_list_t {
 	 * []<class... Args>(tx::type_list_t<Args...>) { ... } (List{})
 	 */
 	template <class Func>
-	static constexpr decltype(auto) apply(Func f) {
+	static constexpr decltype(auto) apply(Func&& f) {
 		return f(type_list_t{});
 	}
 };

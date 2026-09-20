@@ -76,6 +76,24 @@ using json_enum_type_t = typename json_enum_type<Type>::type;
 
 // ################ Implementation Utilities ################
 namespace impl::json {
+
+using type_list =
+    tx::type_list_t<
+        tx::type_list_t<json_enum_type_t<JsonTypes::Object>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::Array>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::String>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::Int>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::Float>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::Boolean>>,
+        tx::type_list_t<json_enum_type_t<JsonTypes::Null>>>;
+
+template <class Func>
+concept invocable = []<class... Args>(tx::type_list_t<Args...>) {
+	return tx::invocable_multi_or<Func, Args...>;
+}(type_list{});
+
+
+
 // ================ Value Struct ================
 // all value structs have sizeof(u32)
 
@@ -162,6 +180,12 @@ protected:
 	u8* m_data = nullptr;
 	u32 m_index = InvalidU32;
 	JsonValueStorage(u8* data, u32 index) : m_data(data), m_index(index) {}
+
+	u32 getU32_impl() const {
+		return impl::at<json::ValueU32_impl>(
+		           m_data + m_index)
+		    ->val;
+	}
 };
 } // namespace impl
 
@@ -178,15 +202,25 @@ private:
 	using ValueEntry_impl = impl::json::ValueEntry_impl;
 
 public:
+	bool is(JsonTypes type) const { return getType_impl() == type; }
+	JsonTypes type() const { return getType_impl(); }
+
 	template <JsonTypes Type>
-	std::expected<json_enum_type_t<Type>, JsonTypes> get() {
+	std::expected<json_enum_type_t<Type>, JsonTypes> get() const {
 		JsonTypes type = getType_impl();
-		if (type != Type)
-			return std::unexpected(type);
+		if (type != Type) return std::unexpected(type);
+		return getRaw_impl<Type>();
+	}
+	template <JsonTypes Type>
+	json_enum_type_t<Type> getUnchecked() const {
+		return getRaw_impl<Type>();
 	}
 
+	template <impl::json::invocable Func>
+	decltype(auto) visit(Func&& f) const;
+
 private:
-	JsonValue(u8* data, u32 index) : impl::JsonValueStorage(data, index) {}
+	using impl::JsonValueStorage::JsonValueStorage;
 
 	/**
 	 * The root of a JsonValue is the indexing object of the value, but not the
@@ -195,68 +229,90 @@ private:
 	 * information. 
 	 */
 
-	// ================ Type Dispatch ================
-
-	template <class T, std::invocable<const T&> Func>
-	void visit_impl(Func&& f) {
-	}
-
 	// ================ Memory Accessing ================
 
-	JsonTypes getType_impl() {
+	JsonTypes getType_impl() const {
 		return impl::as<ValueNull_impl>(
-		           this->m_data + this->m_index)
+		           m_data + m_index)
 		    .type;
 	}
-	u32 getU32_impl() {
-		return impl::at<ValueU32_impl>(
-		           this->m_data + this->m_index)
-		    ->val;
-	}
 
-	JsonObject getObject_impl();
-	JsonArray getArray_impl();
-	std::string_view getString_impl() {
-	}
-	i64 getInt_impl() {
-	}
-	f64 getFloat_impl() {
-	}
-	bool getBoolean_impl() {
-	}
-	std::nullptr_t getNull_impl() { return std::nullptr_t{}; }
+	template <JsonTypes Type>
+	json_enum_type_t<Type> getRaw_impl() const;
 };
 
-class JsonObject {
+class JsonObject : private impl::JsonValueStorage {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
 private:
-	JsonDocument* m_doc = nullptr;
-	u32 m_index = InvalidU32;
-
-private:
-	JsonObject(JsonDocument* doc, u32 index) : m_doc(doc), m_index(index) {}
+	using impl::JsonValueStorage::JsonValueStorage;
 };
 
-class JsonArray {
+class JsonArray : private impl::JsonValueStorage {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
 private:
-	JsonDocument* m_doc = nullptr;
-	u32 m_index = InvalidU32;
-
 private:
-	JsonArray(JsonDocument* doc, u32 index) : m_doc(doc), m_index(index) {}
+	using impl::JsonValueStorage::JsonValueStorage;
 };
+
+template <>
+inline JsonObject JsonValue::getRaw_impl<JsonTypes::Object>() const {
+	return JsonObject{ m_data, getU32_impl() };
+}
+template <>
+inline JsonArray JsonValue::getRaw_impl<JsonTypes::Array>() const {
+	return JsonArray{ m_data, getU32_impl() };
+}
+template <>
+inline std::string_view JsonValue::getRaw_impl<JsonTypes::String>() const {
+	return impl::json::stringPoolExtract_impl(
+	    m_data,
+	    getU32_impl());
+}
+template <>
+inline i64 JsonValue::getRaw_impl<JsonTypes::Int>() const {
+	return *impl::at<i64>(m_data + getU32_impl());
+}
+template <>
+inline f64 JsonValue::getRaw_impl<JsonTypes::Float>() const {
+	return *impl::at<f64>(m_data + getU32_impl());
+}
+template <>
+inline bool JsonValue::getRaw_impl<JsonTypes::Boolean>() const {
+	return impl::at<ValueU32_impl>(
+	           m_data + m_index)
+	    ->val;
+}
+template <>
+inline std::nullptr_t JsonValue::getRaw_impl<JsonTypes::Null>() const {
+	return std::nullptr_t{};
+}
+
+template <impl::json::invocable Func>
+inline decltype(auto) JsonValue::visit(Func&& f) const {
+	// clang-format off
+	switch (getType_impl()) {
+	case JsonTypes::Object : return std::forward<Func>(f)(getRaw_impl<JsonTypes::Object >()); break;
+	case JsonTypes::Array  : return std::forward<Func>(f)(getRaw_impl<JsonTypes::Array  >()); break;
+	case JsonTypes::String : return std::forward<Func>(f)(getRaw_impl<JsonTypes::String >()); break;
+	case JsonTypes::Int    : return std::forward<Func>(f)(getRaw_impl<JsonTypes::Int    >()); break;
+	case JsonTypes::Float  : return std::forward<Func>(f)(getRaw_impl<JsonTypes::Float  >()); break;
+	case JsonTypes::Boolean: return std::forward<Func>(f)(getRaw_impl<JsonTypes::Boolean>()); break;
+	case JsonTypes::Null   : return std::forward<Func>(f)(getRaw_impl<JsonTypes::Null   >()); break;
+	}
+	// clang-format on
+	std::unreachable();
+}
 
 
 
 inline JsonObject JsonDocument::root() {
-	return JsonObject{ this, m_root };
+	return JsonObject{ m_data, m_root };
 }
 
 
