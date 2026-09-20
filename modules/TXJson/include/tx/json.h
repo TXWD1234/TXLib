@@ -131,7 +131,7 @@ inline std::string_view stringPoolExtract_impl(
     u8* result, u32 index) {
 	return std::string_view(
 	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index)),
-	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index + 1)));
+	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index + sizeof(u32))));
 }
 } // namespace impl::json
 
@@ -155,15 +155,15 @@ public:
 	template <tx::allocator Allocator = std::allocator<u8>>
 	JsonDocument(std::string_view jsonString, Allocator alloc = Allocator{});
 	~JsonDocument() {
-		if (m_deallocFunc)
-			m_deallocFunc();
+		if (m_deallocFunc) m_deallocFunc();
 	}
 
 	JsonDocument(JsonDocument&& other)
 	    : m_data(other.m_data), m_root(other.m_root),
-	      m_deallocFunc(other.m_deallocFunc) {
+	      m_deallocFunc(std::move(other.m_deallocFunc)) {
 		other.m_data = nullptr;
 		other.m_root = InvalidU32;
+		other.m_deallocFunc = nullptr;
 	}
 	JsonDocument& operator=(JsonDocument&& other) {
 		if (&other == this) return *this;
@@ -173,6 +173,7 @@ public:
 		m_deallocFunc = std::move(other.m_deallocFunc);
 		other.m_data = nullptr;
 		other.m_root = InvalidU32;
+		other.m_deallocFunc = nullptr;
 		return *this;
 	};
 	JsonDocument(const JsonDocument&) = delete;
@@ -301,8 +302,12 @@ public:
 			return JsonValue(nullptr, InvalidU32);
 		return JsonValue{
 			m_data, static_cast<u32>(
-			            m_index + sizeof(ValueU32_impl) +
-			            sizeof(ValueEntry_impl) * index)
+			            m_index +
+			            // JsonObject object
+			            sizeof(ValueU32_impl) +
+			            sizeof(ValueEntry_impl) * index +
+			            // skip the first half (key) of ValueEntry_impl
+			            sizeof(ValueU32_impl))
 		};
 	}
 	/**
@@ -1071,7 +1076,7 @@ private:
 		          parent->m_token,
 		          parent->m_connState.tokenEnd,
 		          parent->m_connState.stringPoolMetaOffset,
-		          parent->m_connState.rootIndex - sizeof(ValueU32_impl)),
+		          parent->m_connState.rootIndex),
 		      m_state(parent->m_result + parent->m_connState.rootIndex),
 		      m_result(parent->m_result) {}
 
@@ -1345,9 +1350,7 @@ private:
 	void compileStringPool_impl() {
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		m_connState.rootIndex =
-		    stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32) +
-		    // for the empty sentinel
-		    sizeof(impl::json::ValueU32_impl);
+		    stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
 		m_connState.stringPoolMetaOffset = stringPoolDataSize;
 
 		u32* stringPoolMetaPtr = reinterpret_cast<u32*>(m_result + stringPoolDataSize);
@@ -1367,6 +1370,8 @@ private:
 		compileRealloc_impl();
 		compileStringPool_impl();
 		Compiler_impl{ this }.run();
+		// advance root index to skip the empty sentinel
+		m_connState.rootIndex += sizeof(impl::json::ValueU32_impl);
 	}
 };
 
