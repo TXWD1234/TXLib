@@ -67,7 +67,7 @@ constexpr inline bool isPowTwo(T val) {
 	return std::has_single_bit(val);
 }
 template <std::unsigned_integral T>
-constexpr inline bool nextPowTwo(T val) {
+constexpr inline T nextPowTwo(T val) {
 	return std::bit_ceil(val);
 }
 

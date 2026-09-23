@@ -7,6 +7,7 @@
 #include "impl/hash_set.hpp"
 #include "impl/packed_parted_array.hpp"
 #include "impl/value_group.hpp"
+#include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include <cstddef>
@@ -128,10 +129,10 @@ struct ValueEntry_impl {
 };
 
 inline std::string_view stringPoolExtract_impl(
-    u8* result, u32 index) {
+    u8* data, u32 index) {
 	return std::string_view(
-	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index)),
-	    reinterpret_cast<const char*>(result + *impl::at<u32>(result + index + sizeof(u32))));
+	    reinterpret_cast<const char*>(data + *impl::at<u32>(data + index)),
+	    reinterpret_cast<const char*>(data + *impl::at<u32>(data + index + sizeof(u32))));
 }
 } // namespace impl::json
 
@@ -213,20 +214,33 @@ private:
 // ################ Proxy Classes ################
 // For user's viewing purposes
 
-namespace impl {
-struct JsonValueStorage {
+namespace impl::json {
+inline u32 getU32(u8* data, u32 index) {
+	return impl::at<json::ValueU32_impl>(
+	           data + index)
+	    ->val;
+}
+
+/**
+ * A pointer in the document buffer
+ * Intended to be the base class of all proxy classes
+ */
+struct DocumentPointer {
 public:
 	bool valid() const { return m_data && (m_index != InvalidU32); }
+
+	bool operator==(const DocumentPointer& other) const {
+		return m_data == other.m_data && m_index == other.m_index;
+	}
+	bool operator!=(const DocumentPointer& other) const { return !((*this) == other); }
 
 protected:
 	u8* m_data = nullptr;
 	u32 m_index = InvalidU32;
-	JsonValueStorage(u8* data, u32 index) : m_data(data), m_index(index) {}
+	DocumentPointer(u8* data, u32 index) : m_data(data), m_index(index) {}
 
 	u32 getU32_impl() const {
-		return impl::at<json::ValueU32_impl>(
-		           m_data + m_index)
-		    ->val;
+		return getU32(m_data, m_index);
 	}
 
 	using ValueU32_impl = impl::json::ValueU32_impl;
@@ -234,10 +248,10 @@ protected:
 	using ValueBoolean_impl = impl::json::ValueBoolean_impl;
 	using ValueEntry_impl = impl::json::ValueEntry_impl;
 };
-} // namespace impl
+} // namespace impl::json
 
 
-class JsonValue : public impl::JsonValueStorage {
+class JsonValue : public impl::json::DocumentPointer {
 	friend JsonDocument;
 	friend JsonObject;
 	friend JsonArray;
@@ -261,7 +275,7 @@ public:
 	decltype(auto) visit(Func&& f) const;
 
 private:
-	using impl::JsonValueStorage::JsonValueStorage;
+	using impl::json::DocumentPointer::DocumentPointer;
 
 	/**
 	 * The root of a JsonValue is the indexing object of the value, but not the
@@ -282,12 +296,15 @@ private:
 	json_enum_type_t<Type> getRaw_impl() const;
 };
 
-class JsonObject : public impl::JsonValueStorage {
+class JsonObject : public impl::json::DocumentPointer {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
+	// ================ Public Interface ================
+
 	u32 size() const { return getU32_impl(); }
+	bool empty() const { return !size(); }
 	bool exist(std::string_view key) const {
 		return findEntry_impl(key) != InvalidU32;
 	}
@@ -301,13 +318,14 @@ public:
 		if (index >= getU32_impl())
 			return JsonValue(nullptr, InvalidU32);
 		return JsonValue{
-			m_data, static_cast<u32>(
-			            m_index +
-			            // JsonObject object
-			            sizeof(ValueU32_impl) +
-			            sizeof(ValueEntry_impl) * index +
-			            // skip the first half (key) of ValueEntry_impl
-			            sizeof(ValueU32_impl))
+			m_data,
+			static_cast<u32>(
+			    m_index +
+			    // JsonObject object
+			    sizeof(ValueU32_impl) +
+			    sizeof(ValueEntry_impl) * index +
+			    // skip the first half (key) of ValueEntry_impl
+			    sizeof(ValueU32_impl))
 		};
 	}
 	/**
@@ -330,8 +348,62 @@ public:
 	 */
 	u32 find(std::string_view key) const { return findEntry_impl(key); }
 
+	std::string_view keyAt(u32 index) const {
+		if (index >= getU32_impl())
+			return std::string_view{};
+		return impl::json::stringPoolExtract_impl(
+		    m_data,
+		    impl::at<ValueU32_impl>(
+		        m_data + static_cast<u32>(
+		                     m_index +
+		                     sizeof(ValueU32_impl) +
+		                     sizeof(ValueEntry_impl) * index))
+		        ->val);
+	}
+
+public:
+	// ================ Iterator ================
+
+	class iterator : impl::json::DocumentPointer {
+		friend JsonObject;
+
+	private:
+		using impl::json::DocumentPointer::DocumentPointer;
+		using Entry = std::pair<std::string_view, JsonValue>;
+
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = Entry;
+		using difference_type = std::ptrdiff_t;
+		using pointer = void;
+		using reference = Entry;
+
+	public:
+		Entry operator*() const {
+			return Entry{ impl::json::stringPoolExtract_impl(
+				              m_data, impl::json::getU32(m_data, m_index)),
+				          JsonValue(m_data, m_index + sizeof(ValueU32_impl)) };
+		}
+
+		iterator& operator++() {
+			m_index += sizeof(ValueEntry_impl);
+			return *this;
+		}
+		iterator operator++(int) {
+			iterator old = *this;
+			m_index += sizeof(ValueEntry_impl);
+			return old;
+		}
+	};
+
+	iterator begin() const { return iterator(
+		m_data, m_index + sizeof(ValueU32_impl)); }
+	iterator end() const { return iterator(
+		m_data, m_index + sizeof(ValueU32_impl) +
+		            getU32_impl() * sizeof(ValueEntry_impl)); }
+
 private:
-	using impl::JsonValueStorage::JsonValueStorage;
+	using impl::json::DocumentPointer::DocumentPointer;
 
 	std::string_view findStr_impl(std::string_view str) const { return str; }
 	std::string_view findStr_impl(ValueEntry_impl entry) const {
@@ -350,12 +422,13 @@ private:
 	}
 };
 
-class JsonArray : public impl::JsonValueStorage {
+class JsonArray : public impl::json::DocumentPointer {
 	friend JsonDocument;
 	friend JsonValue;
 
 public:
 	u32 size() const { return getU32_impl(); }
+	bool empty() const { return !size(); }
 
 	JsonValue at(u32 index) const {
 		if (index >= getU32_impl())
@@ -369,8 +442,47 @@ public:
 
 	JsonValue operator[](u32 index) const { return at(index); }
 
+public:
+	// ================ Iterator ================
+
+	class iterator : impl::json::DocumentPointer {
+		friend JsonArray;
+
+	private:
+		using impl::json::DocumentPointer::DocumentPointer;
+		using Entry = JsonValue;
+
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using value_type = Entry;
+		using difference_type = std::ptrdiff_t;
+		using pointer = void;
+		using reference = Entry;
+
+	public:
+		Entry operator*() const {
+			return JsonValue(m_data, m_index + sizeof(ValueU32_impl));
+		}
+
+		iterator& operator++() {
+			m_index += sizeof(ValueU32_impl);
+			return *this;
+		}
+		iterator operator++(int) {
+			iterator old = *this;
+			m_index += sizeof(ValueU32_impl);
+			return old;
+		}
+	};
+
+	iterator begin() const { return iterator(
+		m_data, m_index + sizeof(ValueU32_impl)); }
+	iterator end() const { return iterator(
+		m_data, m_index + sizeof(ValueU32_impl) +
+		            getU32_impl() * sizeof(ValueU32_impl)); }
+
 private:
-	using impl::JsonValueStorage::JsonValueStorage;
+	using impl::json::DocumentPointer::DocumentPointer;
 };
 
 template <>
@@ -580,9 +692,11 @@ private:
 		      m_tokenSize(parent->m_tokenSize),
 		      m_state(parent->m_str.data(), parent->m_token, {}),
 		      m_interningBuffer(
-		          allocEntry_traits::allocate(parent->m_allocator,
-		                                      parent->m_stringPoolMetaSize)),
-		      m_interningTable(m_interningBuffer, parent->m_stringPoolMetaSize,
+		          allocEntry_traits::allocate(
+		              parent->m_allocator,
+		              tx::nextPowTwo(parent->m_stringPoolMetaSize))),
+		      m_interningTable(m_interningBuffer,
+		                       tx::nextPowTwo(parent->m_stringPoolMetaSize),
 		                       &m_state.interningTableState,
 		                       InterningTableHash{ m_stringPool },
 		                       InterningTableEqual{ m_stringPool }) {}
@@ -724,6 +838,7 @@ private:
 		void stepCur_impl(char val) {
 			if (cur() != val) {
 				// DevNote: Error
+				impl::assert_impl([] { return false; }, "Error");
 			}
 			m_state.str++;
 		}
@@ -883,6 +998,7 @@ private:
 					break;
 				default:
 					// DevNote: Error
+					impl::assert_impl([] { return false; }, "Error");
 					break;
 				}
 			}
@@ -922,6 +1038,7 @@ private:
 					break;
 				default:
 					// DevNote: Error
+					impl::assert_impl([] { return false; }, "Error");
 					break;
 				}
 			}
@@ -950,7 +1067,9 @@ private:
 
 		// master function
 		void parseValue_impl() {
-			switch (cur()) {
+			char curr = *m_state.str;
+			m_state.str++;
+			switch (curr) {
 			case '[':
 				parseArray_impl(*tokenPush_impl<ValueU32_impl>());
 				break;
@@ -975,6 +1094,7 @@ private:
 					tokenPush_impl<ValueBoolean_impl>()->val = false;
 				} else {
 					// DevNote: Error
+					impl::assert_impl([] { return false; }, "Error");
 				}
 				m_record.bnnsc++;
 			}
@@ -1396,4 +1516,7 @@ JsonDocument::JsonDocument(
  * Todo:
  * - value root instead of object root
  * - escape character parser
+ * - Exception Refactor - throw-free
+ *   - DevNote: Error
+ *   - iterator bound check
  */
