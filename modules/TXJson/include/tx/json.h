@@ -274,6 +274,9 @@ public:
 	template <impl::json::invocable Func>
 	decltype(auto) visit(Func&& f) const;
 
+	JsonValue operator[](u32 index) const;
+	JsonValue operator[](std::string_view key) const;
+
 private:
 	using impl::json::DocumentPointer::DocumentPointer;
 
@@ -364,7 +367,7 @@ public:
 public:
 	// ================ Iterator ================
 
-	class iterator : impl::json::DocumentPointer {
+	class iterator : public impl::json::DocumentPointer {
 		friend JsonObject;
 
 	private:
@@ -445,7 +448,7 @@ public:
 public:
 	// ================ Iterator ================
 
-	class iterator : impl::json::DocumentPointer {
+	class iterator : public impl::json::DocumentPointer {
 		friend JsonArray;
 
 	private:
@@ -461,7 +464,7 @@ public:
 
 	public:
 		Entry operator*() const {
-			return JsonValue(m_data, m_index + sizeof(ValueU32_impl));
+			return JsonValue(m_data, m_index);
 		}
 
 		iterator& operator++() {
@@ -533,6 +536,22 @@ inline decltype(auto) JsonValue::visit(Func&& f) const {
 	// clang-format on
 	std::unreachable();
 }
+
+inline JsonValue JsonValue::operator[](std::string_view key) const {
+	auto object = get<JsonTypes::Object>();
+	if (object) {
+		return object->at(key);
+	} else
+		return JsonValue{ nullptr, InvalidU32 };
+}
+inline JsonValue JsonValue::operator[](u32 index) const {
+	auto array = get<JsonTypes::Array>();
+	if (array) {
+		return array->at(index);
+	} else
+		return JsonValue{ nullptr, InvalidU32 };
+}
+
 
 inline JsonObject JsonDocument::root() const {
 	return JsonObject{ m_data, m_root };
@@ -718,7 +737,7 @@ private:
 			skipWhiteSpace_impl();
 			stepCur_impl('{');
 			parseObject_impl(
-			    *tokenPush_impl<ValueU32_impl>());
+			    tokenIndex_impl(tokenPush_impl<ValueU32_impl>()));
 			return TokenizerResult{
 				m_token, m_state.token, m_tokenSize, m_record
 			};
@@ -816,6 +835,18 @@ private:
 
 		void tokenAlign64_impl() {
 			m_state.token = JsonParser::next64_impl(m_state.token);
+		}
+
+		template <class T>
+		u32 tokenIndex_impl(T* ptr) {
+			return static_cast<u32>(reinterpret_cast<u8*>(ptr) - m_token);
+		}
+		template <class T>
+		T& tokenAt_impl(u32 index) {
+			return *impl::at<T>(m_token + index);
+		}
+		ValueU32_impl& tokenU32At_impl(u32 index) {
+			return tokenAt_impl<ValueU32_impl>(index);
 		}
 
 	private:
@@ -966,15 +997,15 @@ private:
 		// OutputState: m_state.str one after `}`
 		// @param root object root variable, recording the number of entries
 		// master function for json object
-		void parseObject_impl(ValueU32_impl& root) {
-			root.type = JsonTypes::Object;
+		void parseObject_impl(u32 rootIndex) {
+			tokenU32At_impl(rootIndex).type = JsonTypes::Object;
 			skipWhiteSpace_impl();
 			if (cur() == '}') {
 				m_state.str++;
 				return;
 			}
 			stepCur_impl('"');
-			root.val++;
+			tokenU32At_impl(rootIndex).val++;
 			parseEntry_impl();
 			skipWhiteSpace_impl();
 
@@ -983,13 +1014,13 @@ private:
 				case '}':
 					// end of object
 					m_state.str++;
-					m_record.oaec += root.val;
+					m_record.oaec += tokenU32At_impl(rootIndex).val;
 					m_record.oac++;
 					return;
 				case ',':
 					// new entry
 					m_state.str++;
-					root.val++;
+					tokenU32At_impl(rootIndex).val++;
 
 					skipWhiteSpace_impl();
 					stepCur_impl('"');
@@ -1007,15 +1038,15 @@ private:
 		// OutputState: m_state.str one after `]`
 		// @param root array root variable, recording the number of entries
 		// master function for json array
-		void parseArray_impl(ValueU32_impl& root) {
-			root.type = JsonTypes::Array;
+		void parseArray_impl(u32 rootIndex) {
+			tokenU32At_impl(rootIndex).type = JsonTypes::Array;
 
 			skipWhiteSpace_impl();
 			if (cur() == ']') {
 				m_state.str++;
 				return;
 			}
-			root.val++;
+			tokenU32At_impl(rootIndex).val++;
 			parseValue_impl();
 			skipWhiteSpace_impl();
 
@@ -1024,13 +1055,13 @@ private:
 				case ']':
 					// end of array
 					m_state.str++;
-					m_record.oaec += root.val;
+					m_record.oaec += tokenU32At_impl(rootIndex).val;
 					m_record.oac++;
 					return;
 				case ',':
 					// new entry
 					m_state.str++;
-					root.val++;
+					tokenU32At_impl(rootIndex).val++;
 
 					skipWhiteSpace_impl();
 					parseValue_impl();
@@ -1067,16 +1098,17 @@ private:
 
 		// master function
 		void parseValue_impl() {
-			char curr = *m_state.str;
-			m_state.str++;
-			switch (curr) {
+			switch (cur()) {
 			case '[':
-				parseArray_impl(*tokenPush_impl<ValueU32_impl>());
+				m_state.str++;
+				parseArray_impl(tokenIndex_impl(tokenPush_impl<ValueU32_impl>()));
 				break;
 			case '{':
-				parseObject_impl(*tokenPush_impl<ValueU32_impl>());
+				m_state.str++;
+				parseObject_impl(tokenIndex_impl(tokenPush_impl<ValueU32_impl>()));
 				break;
 			case '"':
+				m_state.str++;
 				parseValueString_impl(*tokenPush_impl<ValueU32_impl>());
 				m_record.bnnsc++;
 				break;
