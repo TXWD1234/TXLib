@@ -619,6 +619,8 @@ private:
 	tx::PackedPartedArrayOverlay<u8>::StateStorage m_stringPoolStateStorage;
 
 	struct TokenizerRecord;
+	// connection state between tokenizer and compiler, as well as global state
+	// *basically the place for me to shove all my random variables*
 	struct ConnectionState_impl {
 		// tokenizer to compiler
 		u8* tokenEnd;
@@ -629,6 +631,11 @@ private:
 
 		// compiler to product
 		u32 rootIndex = 0;
+
+		// the string pool is disabled if this is true. normally because the
+		// json text is too small to contain a string (edge case
+		// "str.size() < 3")
+		bool noStringPool;
 	} m_connState;
 
 private:
@@ -722,7 +729,7 @@ private:
 		~Tokenizer_impl() {
 			allocEntry_traits::deallocate(
 			    m_parent->m_allocator, m_interningBuffer,
-			    m_parent->m_stringPoolMetaSize);
+			    tx::nextPowTwo(m_parent->m_stringPoolMetaSize));
 		}
 
 
@@ -1178,10 +1185,12 @@ private:
 	};
 
 	void tokenize_impl() {
-		m_stringPool = tx::PackedPartedArrayOverlay<u8>(
-		    m_result, m_resultSize,
-		    m_stringPoolMeta, m_stringPoolMetaSize,
-		    &m_stringPoolStateStorage);
+		m_connState.noStringPool = !m_stringPoolMetaSize;
+		if (!m_connState.noStringPool)
+			m_stringPool = tx::PackedPartedArrayOverlay<u8>(
+			    m_result, m_resultSize,
+			    m_stringPoolMeta, m_stringPoolMetaSize,
+			    &m_stringPoolStateStorage);
 
 		auto [token, tokenEnd, tokenBufferSize, record] =
 		    Tokenizer_impl{ this }.run();
@@ -1474,8 +1483,8 @@ private:
 		 * note: all size calculated in unit of byte (sizeof(u8))
 		 */
 
-		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
-		u32 stringPoolMetaSize = m_stringPool.size_meta() * sizeof(u32);
+		u32 stringPoolDataSize = m_connState.noStringPool ? 0 : tx::nextAlign<u32>(m_stringPool.size_elements());
+		u32 stringPoolMetaSize = m_connState.noStringPool ? 0 : m_stringPool.size_meta() * sizeof(u32);
 		u32 tokenDataSize = static_cast<u32>(m_connState.tokenEnd - m_token);
 		u32 subSize = m_connState.record.bnnsc * sizeof(u32);
 		u32 addSize = (m_connState.record.oaec + m_connState.record.oac) * sizeof(u32);
@@ -1500,6 +1509,9 @@ private:
 		}
 	}
 	void compileStringPool_impl() {
+		if (m_connState.noStringPool) return; // no need to set rootIndex here
+		// because it's default to 0; no need to set stringPoolMetaOffset here
+		// because stringPoolExtract will not ever be called
 		u32 stringPoolDataSize = tx::nextAlign<u32>(m_stringPool.size_elements());
 		m_connState.rootIndex =
 		    stringPoolDataSize + m_stringPool.size_meta() * sizeof(u32);
@@ -1551,4 +1563,6 @@ JsonDocument::JsonDocument(
  * - Exception Refactor - throw-free
  *   - DevNote: Error
  *   - iterator bound check
+ * - Bit packing correctness
+ * - JsonObject Meta ValueEntry_impl AoS -> SoA
  */
