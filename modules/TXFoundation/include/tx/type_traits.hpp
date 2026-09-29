@@ -184,6 +184,11 @@ constexpr decltype(auto) arg_list_back(Args&&... args) {
 	return arg_list_at<sizeof...(Args) - 1>(std::forward<Args>(args)...);
 }
 
+template <class... Args>
+constexpr size_t arg_list_count(Args&&...) {
+	return sizeof...(Args);
+}
+
 
 
 
