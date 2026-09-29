@@ -5,6 +5,7 @@
 #include "impl/allocator.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
+#include <memory>
 #include <type_traits>
 #include <concepts>
 #include <span>
@@ -80,6 +81,7 @@ private:
 	using Impl = OverlayInlinedImpl<OverlayInlined>;
 	using Base = Overlay<T, Impl, TArgs...>;
 	using State = typename Base::State_impl;
+	using ParamObj = impl::overlay_parameter_object_t<Base>;
 	friend Base;
 
 private:
@@ -92,51 +94,67 @@ private:
 	 * ctors, and update the MMW accordingly.
 	 */
 
-	template <class... Args>
 	struct SingleBufferTrait {
 		static constexpr bool value =
-		    std::constructible_from<State, T*, u32, Args...>;
+		    std::constructible_from<State, T*, u32>;
 	};
-	template <class... Args>
-	static constexpr bool SingleBuffer = SingleBufferTrait<Args...>::value;
-
-	template <class MetaT, class... Args>
+	template <class MetaT>
 	struct DataMetaBufferTrait {
 		static constexpr bool value =
-		    std::constructible_from<State, T*, u32, MetaT*, u32, Args...>;
+		    std::constructible_from<State, T*, u32, MetaT*, u32>;
 	};
-	template <class MetaT, class... Args>
-	static constexpr bool DataMetaBuffer = DataMetaBufferTrait<Args...>::value;
+
+	static constexpr bool SingleBuffer = SingleBufferTrait::value;
+	template <class MetaT>
+	static constexpr bool DataMetaBuffer = DataMetaBufferTrait<MetaT>::value;
 
 public:
+	// ================ Public Construction Interface ================
+
 	// single buffer
+	OverlayInlined(T* bufferPtr, u32 bufferSize)
+	    requires SingleBuffer
+	    : Base(Impl(bufferPtr, bufferSize)) {}
+	OverlayInlined(std::span<T> buffer)
+	    requires SingleBuffer
+	    : Base(Impl(buffer.data(), buffer.size())) {}
 
-	template <class... Args>
-	OverlayInlined(T* bufferPtr, u32 bufferSize, Args&&... args)
-	    requires SingleBuffer<Args...>
-	    : Base(Impl(bufferPtr, bufferSize, std::forward<Args>(args)...)) {}
-
-	template <class... Args>
-	OverlayInlined(std::span<T> buffer, Args&&... args)
-	    requires SingleBuffer<Args...>
-	    : Base(Impl(buffer.data(), buffer.size(), std::forward<Args>(args)...)) {}
+	OverlayInlined(T* bufferPtr, u32 bufferSize, const ParamObj& param)
+	    requires SingleBuffer && impl::overlay_parameterized<Base>
+	    : Base(Impl(bufferPtr, bufferSize, param)) {}
+	OverlayInlined(std::span<T> buffer, const ParamObj& param)
+	    requires SingleBuffer && impl::overlay_parameterized<Base>
+	    : Base(Impl(buffer.data(), buffer.size(), param)) {}
 
 	// double buffer (data, meta)
 
-	template <class MetaT, class... Args>
+	template <class MetaT>
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
-	               MetaT* metaBufferPtr, u32 metaBufferSize, Args&&... args)
-	    requires DataMetaBuffer<MetaT, Args...>
+	               MetaT* metaBufferPtr, u32 metaBufferSize)
+	    requires DataMetaBuffer<MetaT>
 	    : Base(Impl(dataBufferPtr, dataBufferSize,
-	                metaBufferPtr, metaBufferSize, std::forward<Args>(args)...)) {}
-
-	template <class MetaT, class... Args>
+	                metaBufferPtr, metaBufferSize)) {}
+	template <class MetaT>
 	OverlayInlined(std::span<T> dataBuffer,
-	               std::span<MetaT> metaBuffer, Args&&... args)
-	    requires DataMetaBuffer<MetaT, Args...>
+	               std::span<MetaT> metaBuffer)
+	    requires DataMetaBuffer<MetaT>
 	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
-	                metaBuffer.data(), metaBuffer.size(),
-	                std::forward<Args>(args)...)) {}
+	                metaBuffer.data(), metaBuffer.size())) {}
+
+	template <class MetaT>
+	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
+	               MetaT* metaBufferPtr, u32 metaBufferSize,
+	               const ParamObj& param)
+	    requires DataMetaBuffer<MetaT> && impl::overlay_parameterized<Base>
+	    : Base(Impl(dataBufferPtr, dataBufferSize,
+	                metaBufferPtr, metaBufferSize, param)) {}
+	template <class MetaT>
+	OverlayInlined(std::span<T> dataBuffer,
+	               std::span<MetaT> metaBuffer,
+	               const ParamObj& param)
+	    requires DataMetaBuffer<MetaT> && impl::overlay_parameterized<Base>
+	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
+	                metaBuffer.data(), metaBuffer.size(), param)) {}
 
 	// m_state will be default initialized into null state
 	OverlayInlined() {}
@@ -206,29 +224,39 @@ private:
 template <template <class...> class Overlay, class T, class... TArgs>
 class OverlayMMW : OverlayInlined<Overlay, T, TArgs...> {
 private:
-	// Variadic template helpers for allocator parameter
-
 	template <class... Args>
 	static constexpr bool LastArgIsAlloc =
 	    tx::type_list_count_v<tx::type_list_t<Args...>> &&
 	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
 
-
-
-private:
 	using Base = OverlayInlined<Overlay, T, TArgs...>;
 	using Allocator = std::conditional_t<
 	    LastArgIsAlloc<TArgs...>,
 	    tx::type_list_back_t<tx::type_list_t<TArgs...>>, std::allocator<T>>;
+	using ParamObj = impl::overlay_parameter_object_t<Base>;
+
+private:
+	// ================ Allocation & Reallocation ================
+
+	template <class U>
+	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
+
+	[[no_unique_address]] Allocator m_alloc;
 
 public:
-	template <class... Args>
-	    requires impl::overlay_parameterized<Base>
+	// ================ Public Construction Interface ================
+
 	OverlayMMW(
-	    u32 bufferSize,
-	    const impl::overlay_parameter_object_t<Base>& param,
-	    Allocator = Allocator{})
-	    : Base(nullptr, bufferSize, param) {}
+	    u32 bufferSize, Allocator alloc = Allocator{})
+	    requires Base::SingleBuffer
+	    : Base(alloc_traits<T>::allocate(alloc, bufferSize), bufferSize),
+	      m_alloc(std::move(alloc)) {}
+
+	OverlayMMW(
+	    u32 bufferSize, const ParamObj& param, Allocator alloc = Allocator{})
+	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
+	    : Base(alloc_traits<T>::allocate(alloc, bufferSize), bufferSize, param),
+	      m_alloc(std::move(alloc)) {}
 
 private:
 };
