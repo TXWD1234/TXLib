@@ -27,6 +27,7 @@ concept overlay = requires(O o) {
 	 * State_impl
 	 * Parameters - optional
 	 * 
+	 * Internal Utility APIs
 	 */
 };
 
@@ -45,46 +46,22 @@ concept overlay_parameter_object =
     impl::overlay_parameterized<O> &&
     std::same_as<T, impl::overlay_parameter_object_t<O>>;
 
-// OverlayInlined's implementation
-// do not touch
-template <class Derived>
-class OverlayInlinedImpl {
-	friend Derived;
 
-private:
-	using State = typename Derived::State;
+// ################ Base Subclass / Wrapper Utilities ################
 
-private:
-	State m_state;
-
-private:
-	template <class... Args>
-	OverlayInlinedImpl(Args&&... args) : m_state(std::forward<Args>(args)...) {}
-
-private:
-	template <class Self>
-	tx::const_propagate<Self, State>& operator()(this Self&& self) {
-		return self.m_state;
-	}
-};
-// Overlay Inlined
 /**
- * The normal way of using an overlay.
- * The intended way to create an overlay object.
+ * Basic subclass of OverlayBase
+ * Providing addition to the protected internal utilities to serve all overlay
+ * pattern wrappers
  */
-template <template <class...> class Overlay, class T, class... TArgs>
-// requires
-class OverlayInlined
-    : public Overlay<
-          T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...> {
+template <impl::overlay O, class T>
+class OverlayInternal : public O {
 private:
-	using Impl = OverlayInlinedImpl<OverlayInlined>;
-	using Base = Overlay<T, Impl, TArgs...>;
-	using State = typename Base::State_impl;
-	using ParamObj = impl::overlay_parameter_object_t<Base>;
-	friend Base;
+	using State = typename O::State_impl;
 
-private:
+protected:
+	// ================ Buffer Traits ================
+
 	/**
 	 * Since if I try to make this universal, it will just become an ungodly
 	 * mess of template spaghetti, I intentially choosed hard coding.
@@ -107,23 +84,101 @@ private:
 	static constexpr bool SingleBuffer = SingleBufferTrait::value;
 	template <class MetaT>
 	static constexpr bool DataMetaBuffer = DataMetaBufferTrait<MetaT>::value;
+};
+
+/**
+ * Basic subclass of the OverlayBase
+ * Providing addition to the public interface of the Base class to serve
+ * all overlay pattern wrappers
+ */
+template <impl::overlay O, class T>
+class OverlayInterface : public O {
+public:
+	// ================ Type Alias ================
+
+	using value_type = T;
+};
+
+/**
+ * Basic subclass of the OverlayBase
+ * Providing addition to the public interface of the Base class for relocation
+ * to serve OverlayInlined and OverlayAlias
+ */
+template <impl::overlay O, class T>
+class OverlayRelocationInterface : public O {
+public:
+	// ================ Relocation ================
+};
+
+// ################ Overlay Pattern Wrappers ################
+
+// OverlayInlined's implementation
+// do not touch
+template <class OInlined>
+class OverlayInlinedImpl {
+	friend OInlined;
+
+private:
+	using State = typename OInlined::State;
+
+private:
+	State m_state;
+
+private:
+	template <class... Args>
+	OverlayInlinedImpl(Args&&... args) : m_state(std::forward<Args>(args)...) {}
+
+private:
+	template <class Self>
+	tx::const_propagate<Self, State>& operator()(this Self&& self) {
+		return self.m_state;
+	}
+};
+// Overlay Inlined
+/**
+ * The normal way of using an overlay.
+ * The intended way to create an overlay object.
+ */
+template <template <class...> class Overlay, class T, class... TArgs>
+// requires
+class OverlayInlined
+    : public OverlayRelocationInterface<
+          OverlayInterface<
+              OverlayInternal<
+                  Overlay<T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+                  T>,
+              T>,
+          T> {
+private:
+	using Impl = OverlayInlinedImpl<OverlayInlined>;
+	using Base =
+	    OverlayRelocationInterface<
+	        OverlayInterface<
+	            OverlayInternal<
+	                Overlay<T, Impl, TArgs...>,
+	                T>,
+	            T>,
+	        T>;
+	using State = typename Base::State_impl;
+	using ParamObj = impl::overlay_parameter_object_t<Base>;
+	friend Base;
 
 public:
 	// ================ Public Construction Interface ================
 
 	// single buffer
 	OverlayInlined(T* bufferPtr, u32 bufferSize)
-	    requires SingleBuffer
+	    requires Base::SingleBuffer
 	    : Base(Impl(bufferPtr, bufferSize)) {}
 	OverlayInlined(std::span<T> buffer)
-	    requires SingleBuffer
+	    requires Base::SingleBuffer
 	    : Base(Impl(buffer.data(), buffer.size())) {}
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize, const ParamObj& param)
-	    requires SingleBuffer && impl::overlay_parameterized<Base>
+	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
 	    : Base(Impl(bufferPtr, bufferSize, param)) {}
 	OverlayInlined(std::span<T> buffer, const ParamObj& param)
-	    requires SingleBuffer && impl::overlay_parameterized<Base>
+	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
 	    : Base(Impl(buffer.data(), buffer.size(), param)) {}
 
 	// double buffer (data, meta)
@@ -131,13 +186,15 @@ public:
 	template <class MetaT>
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               MetaT* metaBufferPtr, u32 metaBufferSize)
-	    requires DataMetaBuffer<MetaT>
+	    requires Base::template
+	DataMetaBuffer<MetaT>
 	    : Base(Impl(dataBufferPtr, dataBufferSize,
 	                metaBufferPtr, metaBufferSize)) {}
 	template <class MetaT>
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<MetaT> metaBuffer)
-	    requires DataMetaBuffer<MetaT>
+	    requires Base::template
+	DataMetaBuffer<MetaT>
 	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
 	                metaBuffer.data(), metaBuffer.size())) {}
 
@@ -145,14 +202,16 @@ public:
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               MetaT* metaBufferPtr, u32 metaBufferSize,
 	               const ParamObj& param)
-	    requires DataMetaBuffer<MetaT> && impl::overlay_parameterized<Base>
+	    requires Base::template
+	DataMetaBuffer<MetaT>&& impl::overlay_parameterized<Base>
 	    : Base(Impl(dataBufferPtr, dataBufferSize,
 	                metaBufferPtr, metaBufferSize, param)) {}
 	template <class MetaT>
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<MetaT> metaBuffer,
 	               const ParamObj& param)
-	    requires DataMetaBuffer<MetaT> && impl::overlay_parameterized<Base>
+	    requires Base::template
+	DataMetaBuffer<MetaT>&& impl::overlay_parameterized<Base>
 	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
 	                metaBuffer.data(), metaBuffer.size(), param)) {}
 
@@ -189,8 +248,13 @@ private:
 template <template <class...> class Overlay, class T, class... TArgs>
 // requires
 class OverlayAlias
-    : public Overlay<
-          T, OverlayAliasImpl<OverlayAlias<Overlay, T, TArgs...>>, TArgs...> {
+    : public OverlayRelocationInterface<
+          OverlayInterface<
+              OverlayInternal<
+                  Overlay<T, OverlayAliasImpl<OverlayAlias<Overlay, T, TArgs...>>, TArgs...>,
+                  T>,
+              T>,
+          T> {
 	/**
 	 * This class is always constructed with an existing state of an existing
 	 * overlay object, and is not expected to manage the lifetime of the
@@ -222,14 +286,23 @@ private:
  *                Default is std::allocator<T>
  */
 template <template <class...> class Overlay, class T, class... TArgs>
-class OverlayMMW : OverlayInlined<Overlay, T, TArgs...> {
+class OverlayMMW
+    : OverlayInterface<
+          OverlayInternal<
+              Overlay<T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+              T>,
+          T> {
 private:
 	template <class... Args>
 	static constexpr bool LastArgIsAlloc =
 	    tx::type_list_count_v<tx::type_list_t<Args...>> &&
 	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
 
-	using Base = OverlayInlined<Overlay, T, TArgs...>;
+	using Base = OverlayInterface<
+	    OverlayInternal<
+	        Overlay<T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+	        T>,
+	    T>;
 	using Allocator = std::conditional_t<
 	    LastArgIsAlloc<TArgs...>,
 	    tx::type_list_back_t<tx::type_list_t<TArgs...>>, std::allocator<T>>;
