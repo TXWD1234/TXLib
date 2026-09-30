@@ -38,6 +38,7 @@ concept overlay_parameterized =
 	    typename O::Parameters;
     };
 
+// DevNote: eval to void if non-parameterized
 template <impl::overlay_parameterized O>
 using overlay_parameter_object_t = typename O::Parameters;
 
@@ -46,8 +47,13 @@ concept overlay_parameter_object =
     impl::overlay_parameterized<O> &&
     std::same_as<T, impl::overlay_parameter_object_t<O>>;
 
-
 // ################ Base Subclass / Wrapper Utilities ################
+/**
+ * The sequence of applying the wrapper utility classes are non-randomizable.
+ * OverlayInternal must be the first subclass around the raw Base class.
+ * The rule is: From least specific / most generic (closer to the raw Base
+ * class) to most specific / least generic (further from the raw Base class).
+ */
 
 /**
  * Basic subclass of OverlayBase
@@ -56,6 +62,9 @@ concept overlay_parameter_object =
  */
 template <impl::overlay O, class T>
 class OverlayInternal : public O {
+protected:
+	using overlay_internal_tag = void;
+
 private:
 	using State = typename O::State_impl;
 
@@ -71,43 +80,113 @@ protected:
 	 * ctors, and update the MMW accordingly.
 	 */
 
-	struct SingleBufferTrait {
-		static constexpr bool value =
-		    std::constructible_from<State, T*, u32>;
-	};
-	template <class MetaT>
-	struct DataMetaBufferTrait {
-		static constexpr bool value =
-		    std::constructible_from<State, T*, u32, MetaT*, u32>;
+	static constexpr bool SingleBuffer =
+	    std::constructible_from<State, T*, u32>;
+	static constexpr bool DataMetaBuffer = requires {
+		typename O::meta_type;
+		requires std::constructible_from<
+		    State, T*, u32, typename O::meta_type*, u32>;
 	};
 
-	static constexpr bool SingleBuffer = SingleBufferTrait::value;
-	template <class MetaT>
-	static constexpr bool DataMetaBuffer = DataMetaBufferTrait<MetaT>::value;
+protected:
+	// ================ Buffer Trait Utilities ================
+
+	using Meta = typename decltype([] {
+		if constexpr (DataMetaBuffer)
+			return std::type_identity<typename O::meta_type>{};
+		else
+			return std::type_identity<void>{};
+	}())::type;
+
+protected:
+	// ================ Type Alias ================
+
+	using OverlayBase = O;
+
+public:
+	using O::O;
 };
+
+template <class O>
+concept overlay_internal =
+    impl::overlay<O> && requires { typename O::overlay_internal_tag; };
 
 /**
  * Basic subclass of the OverlayBase
  * Providing addition to the public interface of the Base class to serve
  * all overlay pattern wrappers
+ * 
+ * O must be an overlay internal
  */
-template <impl::overlay O, class T>
+template <impl::overlay_internal O, class T>
 class OverlayInterface : public O {
 public:
 	// ================ Type Alias ================
 
 	using value_type = T;
+
+public:
+	using O::O;
 };
 
 /**
  * Basic subclass of the OverlayBase
  * Providing addition to the public interface of the Base class for relocation
  * to serve OverlayInlined and OverlayAlias
+ * 
+ * O must be an overlay internal
  */
-template <impl::overlay O, class T>
+template <impl::overlay_internal O, class T>
 class OverlayRelocationInterface : public O {
+private:
+	using Base = O;
+	using Meta = typename Base::Meta;
+
 public:
 	// ================ Relocation ================
+
+	/**
+	 * Rebind is stubbed for now. The architectural requirement of rebind is
+	 * currently way too vague and cannot derive a stable interface. It will be
+	 * completed when a demand appears
+	 */
+
+	// single buffer
+	void relocate(T* bufferPtr, u32 bufferSize)
+	    requires Base::SingleBuffer
+	{ this->overlaySetBufferState(bufferPtr, bufferSize); }
+	void relocate(std::span<T> buffer)
+	    requires Base::SingleBuffer
+	{ this->overlaySetBufferState(buffer.data(), buffer.size()); }
+
+	// double buffer (data, meta)
+	void relocate(T* dataBufferPtr, u32 dataBufferSize,
+	              Meta* metaBufferPtr, u32 metaBufferSize)
+	    requires Base::DataMetaBuffer
+	{ this->overlaySetBufferState(
+		dataBufferPtr, dataBufferSize,
+		metaBufferPtr, metaBufferSize); }
+	void relocate(std::span<T> dataBuffer,
+	              std::span<Meta> metaBuffer)
+	    requires Base::DataMetaBuffer
+	{ this->overlaySetBufferState(
+		dataBuffer.data(), dataBuffer.size(),
+		metaBuffer.data(), metaBuffer.size()); }
+
+	// ================ Buffer Information ================
+
+	template <std::invocable<T*, u32> Func>
+	void getBufferInfo(Func&& f)
+	    requires Base::SingleBuffer
+	{ this->overlayGetBufferState(std::forward<Func>(f)); }
+
+	template <std::invocable<T*, u32, Meta*, u32> Func>
+	void getBufferInfo(Func&& f)
+	    requires Base::DataMetaBuffer
+	{ this->overlayGetBufferState(std::forward<Func>(f)); }
+
+public:
+	using O::O;
 };
 
 // ################ Overlay Pattern Wrappers ################
@@ -117,6 +196,7 @@ public:
 template <class OInlined>
 class OverlayInlinedImpl {
 	friend OInlined;
+	friend typename OInlined::OverlayBase;
 
 private:
 	using State = typename OInlined::State;
@@ -161,7 +241,8 @@ private:
 	        T>;
 	using State = typename Base::State_impl;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
-	friend Base;
+	using Meta = typename Base::Meta;
+	friend Impl;
 
 public:
 	// ================ Public Construction Interface ================
@@ -183,35 +264,27 @@ public:
 
 	// double buffer (data, meta)
 
-	template <class MetaT>
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
-	               MetaT* metaBufferPtr, u32 metaBufferSize)
-	    requires Base::template
-	DataMetaBuffer<MetaT>
+	               Meta* metaBufferPtr, u32 metaBufferSize)
+	    requires Base::DataMetaBuffer
 	    : Base(Impl(dataBufferPtr, dataBufferSize,
 	                metaBufferPtr, metaBufferSize)) {}
-	template <class MetaT>
 	OverlayInlined(std::span<T> dataBuffer,
-	               std::span<MetaT> metaBuffer)
-	    requires Base::template
-	DataMetaBuffer<MetaT>
+	               std::span<Meta> metaBuffer)
+	    requires Base::DataMetaBuffer
 	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
 	                metaBuffer.data(), metaBuffer.size())) {}
 
-	template <class MetaT>
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
-	               MetaT* metaBufferPtr, u32 metaBufferSize,
+	               Meta* metaBufferPtr, u32 metaBufferSize,
 	               const ParamObj& param)
-	    requires Base::template
-	DataMetaBuffer<MetaT>&& impl::overlay_parameterized<Base>
+	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
 	    : Base(Impl(dataBufferPtr, dataBufferSize,
 	                metaBufferPtr, metaBufferSize, param)) {}
-	template <class MetaT>
 	OverlayInlined(std::span<T> dataBuffer,
-	               std::span<MetaT> metaBuffer,
+	               std::span<Meta> metaBuffer,
 	               const ParamObj& param)
-	    requires Base::template
-	DataMetaBuffer<MetaT>&& impl::overlay_parameterized<Base>
+	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
 	    : Base(Impl(dataBuffer.data(), dataBuffer.size(),
 	                metaBuffer.data(), metaBuffer.size(), param)) {}
 
@@ -221,12 +294,13 @@ public:
 
 // OverlayAlias's implementation
 // do not touch
-template <class Derived>
+template <class OAlias>
 class OverlayAliasImpl {
-	friend Derived;
+	friend OAlias;
+	friend typename OAlias::OverlayBase;
 
 private:
-	using State = typename Derived::State;
+	using State = typename OAlias::State;
 
 private:
 	State* m_state;
@@ -263,9 +337,16 @@ class OverlayAlias
 	 */
 private:
 	using Impl = OverlayAliasImpl<OverlayAlias>;
-	using Base = Overlay<T, Impl, TArgs...>;
+	using Base =
+	    OverlayRelocationInterface<
+	        OverlayInterface<
+	            OverlayInternal<
+	                Overlay<T, Impl, TArgs...>,
+	                T>,
+	            T>,
+	        T>;
 	using State = typename Base::State_impl;
-	friend Base;
+	friend Impl;
 
 public:
 	OverlayAlias(OverlayInlined<Overlay, T, TArgs...>& parent)
@@ -287,9 +368,9 @@ private:
  */
 template <template <class...> class Overlay, class T, class... TArgs>
 class OverlayMMW
-    : OverlayInterface<
+    : public OverlayInterface<
           OverlayInternal<
-              Overlay<T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+              Overlay<T, OverlayInlinedImpl<OverlayMMW<Overlay, T, TArgs...>>, TArgs...>,
               T>,
           T> {
 private:
@@ -298,15 +379,18 @@ private:
 	    tx::type_list_count_v<tx::type_list_t<Args...>> &&
 	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
 
+	using InlinedImpl = OverlayInlinedImpl<OverlayMMW<Overlay, T, TArgs...>>;
 	using Base = OverlayInterface<
 	    OverlayInternal<
-	        Overlay<T, OverlayInlinedImpl<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+	        Overlay<T, InlinedImpl, TArgs...>,
 	        T>,
 	    T>;
+	using State = typename Base::State_impl;
 	using Allocator = std::conditional_t<
 	    LastArgIsAlloc<TArgs...>,
 	    tx::type_list_back_t<tx::type_list_t<TArgs...>>, std::allocator<T>>;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
+	friend InlinedImpl;
 
 private:
 	// ================ Allocation & Reallocation ================
@@ -322,13 +406,15 @@ public:
 	OverlayMMW(
 	    u32 bufferSize, Allocator alloc = Allocator{})
 	    requires Base::SingleBuffer
-	    : Base(alloc_traits<T>::allocate(alloc, bufferSize), bufferSize),
+	    : Base(InlinedImpl(
+	          alloc_traits<T>::allocate(alloc, bufferSize), bufferSize)),
 	      m_alloc(std::move(alloc)) {}
 
 	OverlayMMW(
 	    u32 bufferSize, const ParamObj& param, Allocator alloc = Allocator{})
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : Base(alloc_traits<T>::allocate(alloc, bufferSize), bufferSize, param),
+	    : Base(InlinedImpl(
+	          alloc_traits<T>::allocate(alloc, bufferSize), bufferSize, param)),
 	      m_alloc(std::move(alloc)) {}
 
 private:
