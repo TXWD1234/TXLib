@@ -38,9 +38,13 @@ concept overlay_parameterized =
 	    typename O::Parameters;
     };
 
-// DevNote: eval to void if non-parameterized
-template <impl::overlay_parameterized O>
-using overlay_parameter_object_t = typename O::Parameters;
+template <impl::overlay O>
+using overlay_parameter_object_t = typename decltype([] {
+	if constexpr (requires { typename O::Parameters; })
+		return std::type_identity<typename O::Parameters>{};
+	else
+		return std::type_identity<void>{};
+}())::type;
 
 template <class T, class O>
 concept overlay_parameter_object =
