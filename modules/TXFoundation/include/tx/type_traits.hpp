@@ -22,18 +22,34 @@ template <class>
 inline constexpr bool false_v = false;
 
 
-// ================ ########### ================
-// **************** Type Traits ****************
-// ================ ########### ================
+// #############################################
+// $$$$$$$$$$$$$$$$ Type Traits $$$$$$$$$$$$$$$$
+// #############################################
 
 // Conditional Presence
-class Nothing {
+class Nothing {};
+
+template <auto V>
+struct nttp_holder {
+	using value_type = decltype(V);
+	static constexpr auto value = V;
+
+	constexpr operator value_type() const noexcept { return value; }
+	constexpr value_type operator()() const noexcept { return value; }
 };
+template <auto V>
+inline constexpr auto nttp_holder_v = V;
 
 // propagate constness from type From to type To
 template <class From, class To>
 using const_propagate = std::conditional_t<
     std::is_const_v<std::remove_reference_t<From>>, const To, To>;
+
+template <class Parent, class Consumer>
+struct protected_accessor : public Parent {
+	friend Consumer;
+};
+
 
 // ################ Type List ################
 /**
