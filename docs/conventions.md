@@ -61,3 +61,12 @@ TXData: BinarySetView [3]: Refactor ...
 - Class members all have `m_` prefix.
 - Class implementation functions and classes all have `_impl` suffix.
 - Implementation details that are used across multiple components should be extracted and generalized in `namespace impl`.
+
+## Namespace
+**Everything from TXLib must be in namespace `tx`.**
+All of the user facing entities (The interface of the library) should be directly under `tx` namespace, with exceptions. (TXGraphics)
+All of the library facing entities (The internal utilities) should be in namespace `tx::impl`.
+*The `tx::impl` namespace is for library internal utilities, not implementations details. Therefore encapsulation and regulated naming is still necessary.*
+Inside namespace `tx::impl`, each module can have their dedicted sub namespace for their implementation details, for example: TXJson's `tx::impl::json`.
+For general implementation details, `tx::impl::details` is encouraged to be used.
+*Any nested namespace in `tx::impl` is considered implementation detail, and proper encapsulation and regulation are not enforced.*
