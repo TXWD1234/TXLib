@@ -89,22 +89,22 @@ template <class T>
 concept overlay_state_construction_policy =
     std::derived_from<T, details::overlay_state_construction_policy_tag>;
 
-// ================ Buffer Expension Handler ================
+// ================ Buffer Expansion Handler ================
 /**
  * Called when an insertion (eg. push_back, emplace_back, insert...) is
  * requested, and the logical size of the overlay base increments.
- * Also for the distinction of data expension between True Overlay and MMW
+ * Also for the distinction of data expansion between True Overlay and MMW
  * Overlay, in which the latter dynamicly resize while the former asserts.
  */
 
 /**
- * OverlayBase* base, T* data, u32 currentSize, u32 expensionCount, u32 currentCapacity
+ * OverlayBase* base, T* data, u32 currentSize, u32 expansionCount, u32 currentCapacity
  */
 
 namespace details {
 
 // for True Overlay
-struct OverlayBufferExpensionAssert {
+struct OverlayBufferExpansionAssert {
 private:
 	void expand_impl(
 	    u32 expansionCount, u32 currentSize, u32 currentCapacity) const {
@@ -148,10 +148,10 @@ public:
  * It handles resize, and stores the allocator. In construction of OverlayMMW,
  * allocation is done directly via the parameter allocator; In destruction of
  * OverlayMMW, deallocation is done via the allocator stored in this class,
- * which is acquired via overlayGetBufferExpensionHandler_impl() from Base class
+ * which is acquired via overlayGetBufferExpansionHandler_impl() from Base class
  */
 template <class OMMW>
-struct OverlayBufferExpensionResize {
+struct OverlayBufferExpansionResize {
 private:
 	using Allocator = typename OMMW::Allocator;
 	using Meta = typename OMMW::Meta;
@@ -182,8 +182,9 @@ private:
 	}
 
 public:
-	OverlayBufferExpensionResize(Allocator alloc_)
-	    : alloc(alloc_) {}
+	OverlayBufferExpansionResize(Allocator alloc_)
+	    : alloc(std::move(alloc_)) {}
+	OverlayBufferExpansionResize() = default;
 
 	[[no_unique_address]] mutable Allocator alloc;
 
@@ -386,11 +387,11 @@ public:
  * There are 2 essential policy functors taken by the OverlayBase:
  * - StateProvider: provide the State_impl object
  *   - variant: Owner (Inlined) / Alias
- * - BufferExpensionHandler: handle data expension
+ * - BufferExpansionHandler: handle data expansion
  *   - variant: Assert (True Overlay) / Resize (MMW Overlay)
  * Some policy classes are direct implementation of some wrappers, namely
  * OverlayStateOwner -> OverlayInlined, OverlayStateAlias -> OverlayAlias,
- * OverlayBufferExpensionResize (OverlayMMWAllocationManager) -> OverlayMMW.
+ * OverlayBufferExpansionResize (OverlayMMWAllocationManager) -> OverlayMMW.
  * *They cannot be the class themselves is because reusability, and object
  * construction sequence.*
  */
@@ -451,17 +452,19 @@ class OverlayInlined
     : public OverlayRelocationInterface<
           OverlayInterface<
               OverlayInternal<
-                  Overlay<T, OverlayStateOwner<OverlayInlined<Overlay, T, TArgs...>>, TArgs...>,
+                  Overlay<T, OverlayStateOwner<OverlayInlined<Overlay, T, TArgs...>>,
+                          details::OverlayBufferExpansionAssert, TArgs...>,
                   T>,
               T>,
           T> {
 private:
 	using Impl = OverlayStateOwner<OverlayInlined>;
+	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
 	    OverlayRelocationInterface<
 	        OverlayInterface<
 	            OverlayInternal<
-	                Overlay<T, Impl, TArgs...>,
+	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	                T>,
 	            T>,
 	        T>;
@@ -472,10 +475,8 @@ private:
 
 private:
 	template <class... Args>
-	static Impl makeImpl_impl(Args&&... args) {
-		return Impl(std::forward<Args>(args)...,
-		            details::overlay_state_construction_policy_true_tag{});
-	}
+	OverlayInlined(Args&&... args)
+	    : Base(Impl(std::forward<Args>(args)...), ExpansionHandler{}) {}
 
 public:
 	// ================ Public Construction Interface ================
@@ -484,46 +485,46 @@ public:
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize)
 	    requires Base::SingleBuffer
-	    : Base(makeImpl_impl(bufferPtr, bufferSize)) {}
+	    : OverlayInlined(bufferPtr, bufferSize) {}
 	OverlayInlined(std::span<T> buffer)
 	    requires Base::SingleBuffer
-	    : Base(makeImpl_impl(buffer.data(), buffer.size())) {}
+	    : OverlayInlined(buffer.data(), buffer.size()) {}
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : Base(makeImpl_impl(bufferPtr, bufferSize, param)) {}
+	    : OverlayInlined(bufferPtr, bufferSize, param) {}
 	OverlayInlined(std::span<T> buffer, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : Base(makeImpl_impl(buffer.data(), buffer.size(), param)) {}
+	    : OverlayInlined(buffer.data(), buffer.size(), param) {}
 
 	// double buffer (data, meta)
 
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               Meta* metaBufferPtr, u32 metaBufferSize)
 	    requires Base::DataMetaBuffer
-	    : Base(makeImpl_impl(dataBufferPtr, dataBufferSize,
-	                         metaBufferPtr, metaBufferSize)) {}
+	    : OverlayInlined(dataBufferPtr, dataBufferSize,
+	                     metaBufferPtr, metaBufferSize) {}
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<Meta> metaBuffer)
 	    requires Base::DataMetaBuffer
-	    : Base(makeImpl_impl(dataBuffer.data(), dataBuffer.size(),
-	                         metaBuffer.data(), metaBuffer.size())) {}
+	    : OverlayInlined(dataBuffer.data(), dataBuffer.size(),
+	                     metaBuffer.data(), metaBuffer.size()) {}
 
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               Meta* metaBufferPtr, u32 metaBufferSize,
 	               const ParamObj& param)
 	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
-	    : Base(makeImpl_impl(dataBufferPtr, dataBufferSize,
-	                         metaBufferPtr, metaBufferSize, param)) {}
+	    : OverlayInlined(dataBufferPtr, dataBufferSize,
+	                     metaBufferPtr, metaBufferSize, param) {}
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<Meta> metaBuffer,
 	               const ParamObj& param)
 	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
-	    : Base(makeImpl_impl(dataBuffer.data(), dataBuffer.size(),
-	                         metaBuffer.data(), metaBuffer.size(), param)) {}
+	    : OverlayInlined(dataBuffer.data(), dataBuffer.size(),
+	                     metaBuffer.data(), metaBuffer.size(), param) {}
 
 	// m_state will be default initialized into null state
-	OverlayInlined() : Base(makeImpl_impl()) {}
+	OverlayInlined() : Base() {}
 };
 
 // Overlay Alias
@@ -537,7 +538,8 @@ class OverlayAlias
     : public OverlayRelocationInterface<
           OverlayInterface<
               OverlayInternal<
-                  Overlay<T, OverlayStateAlias<OverlayAlias<Overlay, T, TArgs...>>, TArgs...>,
+                  Overlay<T, OverlayStateAlias<OverlayAlias<Overlay, T, TArgs...>>,
+                          details::OverlayBufferExpansionAssert, TArgs...>,
                   T>,
               T>,
           T> {
@@ -549,11 +551,12 @@ class OverlayAlias
 	 */
 private:
 	using Impl = OverlayStateAlias<OverlayAlias>;
+	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
 	    OverlayRelocationInterface<
 	        OverlayInterface<
 	            OverlayInternal<
-	                Overlay<T, Impl, TArgs...>,
+	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	                T>,
 	            T>,
 	        T>;
@@ -563,11 +566,11 @@ private:
 public:
 	// <------------------------------------------------------------------ accept any overlay
 	OverlayAlias(OverlayInlined<Overlay, T, TArgs...>& parent)
-	    : Base(Impl(&parent.overlayGetStateProvider_impl()())) {}
+	    : OverlayAlias(&parent.overlayGetStateProvider_impl()()) {}
 
 private:
 	OverlayAlias(State* state)
-	    : Base(Impl(state)) {}
+	    : Base(Impl(state), ExpansionHandler{}) {}
 };
 
 // Memory Managing Wrapper
@@ -583,7 +586,10 @@ template <template <class...> class Overlay, class T, class... TArgs>
 class OverlayMMW
     : public OverlayInterface<
           OverlayInternal<
-              Overlay<T, OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>, TArgs...>,
+              Overlay<T, OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>,
+                      details::OverlayBufferExpansionResize<
+                          OverlayMMW<Overlay, T, TArgs...>>,
+                      TArgs...>,
               T>,
           T> {
 private:
@@ -593,9 +599,10 @@ private:
 	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
 
 	using Impl = OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>;
+	using ExpansionHandler = details::OverlayBufferExpansionResize<OverlayMMW>;
 	using Base = OverlayInterface<
 	    OverlayInternal<
-	        Overlay<T, Impl, TArgs...>,
+	        Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	        T>,
 	    T>;
 	using State = typename Base::State_impl;
@@ -607,10 +614,8 @@ private:
 
 private:
 	template <class... Args>
-	static Impl makeImpl_impl(Args&&... args) {
-		return Impl(std::forward<Args>(args)...,
-		            details::overlay_state_construction_policy_mmw_tag{});
-	}
+	OverlayMMW(Allocator alloc, Args&&... args)
+	    : Base(Impl(std::forward<Args>(args)...), ExpansionHandler(alloc)) {}
 
 private:
 	// ================ Allocation & Reallocation ================
@@ -618,24 +623,24 @@ private:
 	template <class U>
 	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
 
-	[[no_unique_address]] Allocator m_alloc;
-
 public:
 	// ================ Public Construction Interface ================
 
 	OverlayMMW(
 	    u32 bufferSize, Allocator alloc = Allocator{})
 	    requires Base::SingleBuffer
-	    : Base(makeImpl_impl(
-	          alloc_traits<T>::allocate(alloc, bufferSize), bufferSize)),
-	      m_alloc(std::move(alloc)) {}
+	    : OverlayMMW(alloc,
+	                 alloc_traits<T>::allocate(alloc, bufferSize),
+	                 bufferSize) {}
 
 	OverlayMMW(
 	    u32 bufferSize, const ParamObj& param, Allocator alloc = Allocator{})
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : Base(makeImpl_impl(
-	          alloc_traits<T>::allocate(alloc, bufferSize), bufferSize, param)),
-	      m_alloc(std::move(alloc)) {}
+	    : OverlayMMW(alloc,
+	                 alloc_traits<T>::allocate(alloc, bufferSize),
+	                 bufferSize, param) {}
+
+	OverlayMMW() : Base(Impl(), ExpansionHandler()) {}
 
 private:
 };
