@@ -456,6 +456,8 @@ private:
 	template <class... Args>
 	OverlayInlined(Args&&... args)
 	    : Base(Impl(std::forward<Args>(args)...), ExpansionHandler{}) {}
+	OverlayInlined(Impl&& implObj)
+	    : Base(std::move(implObj), ExpansionHandler{}) {}
 
 public:
 	// ================ Public Construction Interface ================
@@ -464,14 +466,14 @@ public:
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize)
 	    requires Base::SingleBuffer
-	    : OverlayInlined(bufferPtr, bufferSize) {}
+	    : OverlayInlined(Impl(bufferPtr, bufferSize)) {}
 	OverlayInlined(std::span<T> buffer)
 	    requires Base::SingleBuffer
 	    : OverlayInlined(buffer.data(), buffer.size()) {}
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : OverlayInlined(bufferPtr, bufferSize, param) {}
+	    : OverlayInlined(Impl(bufferPtr, bufferSize, param)) {}
 	OverlayInlined(std::span<T> buffer, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
 	    : OverlayInlined(buffer.data(), buffer.size(), param) {}
@@ -481,8 +483,8 @@ public:
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               Meta* metaBufferPtr, u32 metaBufferSize)
 	    requires Base::DataMetaBuffer
-	    : OverlayInlined(dataBufferPtr, dataBufferSize,
-	                     metaBufferPtr, metaBufferSize) {}
+	    : OverlayInlined(Impl(dataBufferPtr, dataBufferSize,
+	                          metaBufferPtr, metaBufferSize)) {}
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<Meta> metaBuffer)
 	    requires Base::DataMetaBuffer
@@ -493,8 +495,8 @@ public:
 	               Meta* metaBufferPtr, u32 metaBufferSize,
 	               const ParamObj& param)
 	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
-	    : OverlayInlined(dataBufferPtr, dataBufferSize,
-	                     metaBufferPtr, metaBufferSize, param) {}
+	    : OverlayInlined(Impl(dataBufferPtr, dataBufferSize,
+	                          metaBufferPtr, metaBufferSize, param)) {}
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<Meta> metaBuffer,
 	               const ParamObj& param)
@@ -619,9 +621,49 @@ public:
 	                 alloc_traits<T>::allocate(alloc, bufferSize),
 	                 bufferSize, param) {}
 
+	OverlayMMW(
+	    u32 dataBufferSize, u32 metaBufferSize, Allocator alloc = Allocator{})
+	    requires Base::DataMetaBuffer
+	    : OverlayMMW(alloc,
+	                 alloc_traits<T>::allocate(alloc, dataBufferSize),
+	                 dataBufferSize,
+	                 alloc_traits<T>::allocate(alloc, metaBufferSize),
+	                 metaBufferSize) {}
+
+	OverlayMMW(
+	    u32 dataBufferSize, u32 metaBufferSize,
+	    const ParamObj& param, Allocator alloc = Allocator{})
+	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
+	    : OverlayMMW(alloc,
+	                 alloc_traits<T>::allocate(alloc, dataBufferSize),
+	                 dataBufferSize,
+	                 alloc_traits<T>::allocate(alloc, metaBufferSize),
+	                 metaBufferSize, param) {}
+
 	OverlayMMW() : Base(Impl(), ExpansionHandler()) {}
 
-private:
+public:
+	~OverlayMMW()
+	    requires Base::SingleBuffer
+	{
+		this->overlayDestroyElements();
+		this->overlayGetBufferState([this](T* ptr, u32 size) {
+			alloc_traits<T>::deallocate(
+			    this->overlayGetBufferExpansionHandler().alloc,
+			    ptr, size);
+		});
+	}
+	~OverlayMMW()
+	    requires Base::DataMetaBuffer
+	{
+		this->overlayDestroyElements();
+		this->overlayGetBufferState(
+		    [this](T* dataPtr, u32 dataSize, Base::Meta* metaPtr, u32 metaSize) {
+			    auto& alloc = this->overlayGetBufferExpansionHandler().alloc;
+			    alloc_traits<T>::deallocate(alloc, dataPtr, dataSize);
+			    alloc_traits<T>::deallocate(alloc, metaPtr, metaSize);
+		    });
+	}
 };
 
 // ################ Overlay Base Implementation Utilities ################
