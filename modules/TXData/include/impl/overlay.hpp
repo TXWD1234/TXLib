@@ -69,26 +69,6 @@ concept overlay_parameter_object =
     impl::overlay_parameterized<O> &&
     std::same_as<T, impl::overlay_parameter_object_t<O>>;
 
-// ================ State Construction Policy ================
-/**
- * This is for the distinction of construction between True Overlay and MMW
- * Overlay, in which the latter allows null input while the former forbidden it.
- */
-
-namespace details {
-struct overlay_state_construction_policy_tag {};
-
-struct overlay_state_construction_policy_true_tag
-    : overlay_state_construction_policy_tag {};
-struct overlay_state_construction_policy_mmw_tag
-    : overlay_state_construction_policy_tag {};
-
-} // namespace details
-
-template <class T>
-concept overlay_state_construction_policy =
-    std::derived_from<T, details::overlay_state_construction_policy_tag>;
-
 // ================ Buffer Expansion Handler ================
 /**
  * Called when an insertion (eg. push_back, emplace_back, insert...) is
@@ -256,19 +236,13 @@ protected:
 	 * ctors, and update the MMW accordingly.
 	 */
 
-	/**
-	 * The State Construction Policy Tags here are just place holders.
-	 */
-
 	static constexpr bool SingleBuffer =
 	    std::constructible_from<
-	        State, T*, u32,
-	        details::overlay_state_construction_policy_true_tag>;
+	        State, T*, u32>;
 	static constexpr bool DataMetaBuffer = requires {
 		typename O::meta_type;
 		requires std::constructible_from<
-		    State, T*, u32, typename O::meta_type*, u32,
-		    details::overlay_state_construction_policy_true_tag>;
+		    State, T*, u32, typename O::meta_type*, u32>;
 	};
 
 protected:
@@ -649,15 +623,7 @@ private:
 
 template <class T>
 inline void overlayNullCheck(T* ptr, u32 size) {
-	// <--------------------------------------------------------------------------
-}
-template <class T, impl::overlay_state_construction_policy P>
-inline T* overlayDispatchNullCheck(T* ptr, u32 size, P) {
-	if constexpr (
-	    std::same_as<
-	        P, details::overlay_state_construction_policy_true_tag>)
-		impl::overlayNullCheck(ptr, size);
-	return ptr;
+	// <------------------------------------------------- assert_impl
 }
 
 } // namespace tx::impl
