@@ -3,6 +3,7 @@
 
 #pragma once
 #include "impl/allocator.hpp"
+#include "impl/data_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include <memory>
@@ -17,15 +18,20 @@ namespace tx::impl {
 // ===========================================================
 /**
  * Terminology:
- * True Overlay: OverlayInlined and OverlayAlias, being completely non-owning,
- *               manage no memory, being the overlay state by the original
- *               Overlay Pattern.
- * MMW Overlay:  OverlayMMW and OverlayMMWAlias, own the data, menages memory,
- *               and handles reallocation. It is the vector-like high level
- *               dynamic buffer wrapper of the overlays.
+ * True Overlay:  OverlayInlined and OverlayAlias, being completely non-owning,
+ *                manage no memory, being the overlay state by the original
+ *                Overlay Pattern.
+ * MMW Overlay:   OverlayMMW and OverlayMMWAlias, own the data, menages memory,
+ *                and handles reallocation. It is the vector-like high level
+ *                dynamic buffer wrapper of the overlays.
+ * Policy Object: The objects that OverlayBase takes, which is how wrappers
+ *                change the behavior of OverlayBase.
+ * State_impl:    The object that contain all data in OverlayBase, the only
+ *                source of truth of an overlay data structure instance.
+ * BufferState:   The buffer information stored in State_impl.
  */
 
-// ################ Type Traits & Concepts ################
+// ################ Implementation Utilities ################
 
 template <class O>
 concept overlay = requires(O o) {
@@ -69,17 +75,152 @@ concept overlay_parameter_object =
  * Overlay, in which the latter allows null input while the former forbidden it.
  */
 
-struct overlay_state_construction_policy_true_tag {
-	using overlay_state_construction_policy_tag = void;
-};
-struct overlay_state_construction_policy_mmw_tag {
-	using overlay_state_construction_policy_tag = void;
-};
+namespace details {
+struct overlay_state_construction_policy_tag {};
+
+struct overlay_state_construction_policy_true_tag
+    : overlay_state_construction_policy_tag {};
+struct overlay_state_construction_policy_mmw_tag
+    : overlay_state_construction_policy_tag {};
+
+} // namespace details
 
 template <class T>
-concept overlay_state_construction_policy = requires {
-	typename T::overlay_state_construction_policy_tag;
+concept overlay_state_construction_policy =
+    std::derived_from<T, details::overlay_state_construction_policy_tag>;
+
+// ================ Buffer Expension Handler ================
+/**
+ * Called when an insertion (eg. push_back, emplace_back, insert...) is
+ * requested, and the logical size of the overlay base increments.
+ * Also for the distinction of data expension between True Overlay and MMW
+ * Overlay, in which the latter dynamicly resize while the former asserts.
+ */
+
+/**
+ * OverlayBase* base, T* data, u32 currentSize, u32 expensionCount, u32 currentCapacity
+ */
+
+namespace details {
+
+// for True Overlay
+struct OverlayBufferExpensionAssert {
+private:
+	void expand_impl(
+	    u32 expansionCount, u32 currentSize, u32 currentCapacity) const {
+		// <-------------------- bad expansion
+	}
+
+public:
+	/**
+	 * The extra `base` and `bufferPtr` parameter are just place holder to
+	 * match up the signature of OverlayBufferExpansionResize
+	 */
+
+	template <class OverlayBase, class T>
+	void expand(
+	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const {
+		expand_impl(
+		    expansionCount, currentSize, currentCapacity);
+	}
+	template <class OverlayBase, class T>
+	void expandData(
+	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const {
+		expand_impl(
+		    expansionCount, currentSize, currentCapacity);
+	}
+	template <class OverlayBase, class T>
+	void expandMeta(
+	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const {
+		expand_impl(
+		    expansionCount, currentSize, currentCapacity);
+	}
 };
+// for MMW Overlay
+/**
+ * Because resizing need an allocator instance, as well as access to
+ * OverlayBase's internal method `overlayRelocateBufferState_impl`, this resize
+ * class must become the master class of all MMW classes, and the Impl class of
+ * OverlayMMW.
+ * It handles resize, and stores the allocator. In construction of OverlayMMW,
+ * allocation is done directly via the parameter allocator; In destruction of
+ * OverlayMMW, deallocation is done via the allocator stored in this class,
+ * which is acquired via overlayGetBufferExpensionHandler_impl() from Base class
+ */
+template <class OMMW>
+struct OverlayBufferExpensionResize {
+private:
+	using Allocator = typename OMMW::Allocator;
+	using Meta = typename OMMW::Meta;
+	using OverlayBase = typename OMMW::OverlayBase;
+	using T = typename OMMW::value_type;
+	template <class U>
+	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
+
+private:
+	static constexpr u32 ExpansionFactor = 2;
+	u32 findNewCapacity_impl(
+	    u32 expansionCount, u32 currentSize, u32 currentCapacity) {
+		return std::max(currentSize + expansionCount,
+		                currentCapacity * ExpansionFactor);
+	}
+
+	template <class Func>
+	void expand_impl(
+	    T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity, Func&& f) const {
+		if (currentSize + expansionCount <= currentCapacity) return;
+		u32 newCapacity = findNewCapacity_impl(
+		    expansionCount, currentSize, currentCapacity);
+
+		f(alloc_traits<T>::allocate(alloc, newCapacity),
+		  newCapacity);
+		alloc_traits<T>::deallocate(alloc, bufferPtr, currentCapacity);
+	}
+
+public:
+	OverlayBufferExpensionResize(Allocator alloc_)
+	    : alloc(alloc_) {}
+
+	[[no_unique_address]] mutable Allocator alloc;
+
+
+	void expand(
+	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const
+	    requires OMMW::SingleBuffer
+	{
+		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
+		            [base](T* ptr, u32 size) {
+			            base->overlayRelocateBufferState(ptr, size);
+		            });
+	}
+
+	void expandData(
+	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const
+	    requires OMMW::DataMetaBuffer
+	{
+		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
+		            [base](T* ptr, u32 size) {
+			            base->overlayRelocateBufferStateData(ptr, size);
+		            });
+	}
+	void expandMeta(
+	    OverlayBase* base, Meta* bufferPtr, u32 expansionCount,
+	    u32 currentSize, u32 currentCapacity) const
+	    requires OMMW::DataMetaBuffer
+	{
+		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
+		            [base](T* ptr, u32 size) {
+			            base->overlayRelocateBufferStateMeta(ptr, size);
+		            });
+	}
+};
+} // namespace details
 
 // ################ Base Subclass / Wrapper Utilities ################
 /**
@@ -121,12 +262,12 @@ protected:
 	static constexpr bool SingleBuffer =
 	    std::constructible_from<
 	        State, T*, u32,
-	        overlay_state_construction_policy_true_tag>;
+	        details::overlay_state_construction_policy_true_tag>;
 	static constexpr bool DataMetaBuffer = requires {
 		typename O::meta_type;
 		requires std::constructible_from<
 		    State, T*, u32, typename O::meta_type*, u32,
-		    overlay_state_construction_policy_true_tag>;
+		    details::overlay_state_construction_policy_true_tag>;
 	};
 
 protected:
@@ -187,6 +328,7 @@ public:
 	// ================ Relocation ================
 
 	/**
+	 * // DevNote: stub
 	 * Rebind is stubbed for now. The architectural requirement of rebind is
 	 * currently way too vague and cannot derive a stable interface. It will be
 	 * completed when a demand appears
@@ -195,22 +337,22 @@ public:
 	// single buffer
 	void relocate(T* bufferPtr, u32 bufferSize)
 	    requires Base::SingleBuffer
-	{ this->overlaySetBufferState(bufferPtr, bufferSize); }
+	{ this->overlayRelocateBufferState(bufferPtr, bufferSize); }
 	void relocate(std::span<T> buffer)
 	    requires Base::SingleBuffer
-	{ this->overlaySetBufferState(buffer.data(), buffer.size()); }
+	{ this->overlayRelocateBufferState(buffer.data(), buffer.size()); }
 
 	// double buffer (data, meta)
 	void relocate(T* dataBufferPtr, u32 dataBufferSize,
 	              Meta* metaBufferPtr, u32 metaBufferSize)
 	    requires Base::DataMetaBuffer
-	{ this->overlaySetBufferState(
+	{ this->overlayRelocateBufferState(
 		dataBufferPtr, dataBufferSize,
 		metaBufferPtr, metaBufferSize); }
 	void relocate(std::span<T> dataBuffer,
 	              std::span<Meta> metaBuffer)
 	    requires Base::DataMetaBuffer
-	{ this->overlaySetBufferState(
+	{ this->overlayRelocateBufferState(
 		dataBuffer.data(), dataBuffer.size(),
 		metaBuffer.data(), metaBuffer.size()); }
 
@@ -231,6 +373,27 @@ public:
 };
 
 // ################ Overlay Pattern Wrappers ################
+/**
+ * # Conversion Hierarchy
+ * Everything can be converted into OverlayAlias.
+ * Only OverlayMMW can be converted into OverlayMMWAlias.
+ * Nothing is convertable to OverlayInlined.
+ * Nothing is convertable to OverlayMMW.
+ */
+
+/**
+ * # The Impl Pattern
+ * There are 2 essential policy functors taken by the OverlayBase:
+ * - StateProvider: provide the State_impl object
+ *   - variant: Owner (Inlined) / Alias
+ * - BufferExpensionHandler: handle data expension
+ *   - variant: Assert (True Overlay) / Resize (MMW Overlay)
+ * Some policy classes are direct implementation of some wrappers, namely
+ * OverlayStateOwner -> OverlayInlined, OverlayStateAlias -> OverlayAlias,
+ * OverlayBufferExpensionResize (OverlayMMWAllocationManager) -> OverlayMMW.
+ * *They cannot be the class themselves is because reusability, and object
+ * construction sequence.*
+ */
 
 // OverlayInlined's direct implementation
 template <class OInlined>
@@ -311,7 +474,7 @@ private:
 	template <class... Args>
 	static Impl makeImpl_impl(Args&&... args) {
 		return Impl(std::forward<Args>(args)...,
-		            impl::overlay_state_construction_policy_true_tag{});
+		            details::overlay_state_construction_policy_true_tag{});
 	}
 
 public:
@@ -360,7 +523,7 @@ public:
 	                         metaBuffer.data(), metaBuffer.size(), param)) {}
 
 	// m_state will be default initialized into null state
-	OverlayInlined() {}
+	OverlayInlined() : Base(makeImpl_impl()) {}
 };
 
 // Overlay Alias
@@ -398,8 +561,9 @@ private:
 	friend Impl;
 
 public:
+	// <------------------------------------------------------------------ accept any overlay
 	OverlayAlias(OverlayInlined<Overlay, T, TArgs...>& parent)
-	    : Base(Impl(&parent.overlayGetState_impl())) {}
+	    : Base(Impl(&parent.overlayGetStateProvider_impl()())) {}
 
 private:
 	OverlayAlias(State* state)
@@ -445,7 +609,7 @@ private:
 	template <class... Args>
 	static Impl makeImpl_impl(Args&&... args) {
 		return Impl(std::forward<Args>(args)...,
-		            impl::overlay_state_construction_policy_mmw_tag{});
+		            details::overlay_state_construction_policy_mmw_tag{});
 	}
 
 private:
@@ -475,5 +639,20 @@ public:
 
 private:
 };
+
+// ################ Overlay Base Implementation Utilities ################
+
+template <class T>
+inline void overlayNullCheck(T* ptr, u32 size) {
+	// <--------------------------------------------------------------------------
+}
+template <class T, impl::overlay_state_construction_policy P>
+inline T* overlayDispatchNullCheck(T* ptr, u32 size, P) {
+	if constexpr (
+	    std::same_as<
+	        P, details::overlay_state_construction_policy_true_tag>)
+		impl::overlayNullCheck(ptr, size);
+	return ptr;
+}
 
 } // namespace tx::impl
