@@ -210,7 +210,7 @@ public:
  * The rule is: From least specific / most generic (closer to the raw Base
  * class) to most specific / least generic (further from the raw Base class).
  */
-
+namespace details {
 /**
  * Basic subclass of OverlayBase
  * Providing addition to the protected internal utilities to serve all overlay
@@ -275,7 +275,7 @@ concept overlay_internal =
  * 
  * O must be an overlay internal
  */
-template <impl::overlay_internal O, class T>
+template <details::overlay_internal O, class T>
 class OverlayInterface : public O {
 public:
 	// ================ Type Alias ================
@@ -293,7 +293,7 @@ public:
  * 
  * O must be an overlay internal
  */
-template <impl::overlay_internal O, class T>
+template <details::overlay_internal O, class T>
 class OverlayRelocationInterface : public O {
 private:
 	using Base = O;
@@ -346,6 +346,7 @@ public:
 public:
 	using O::O;
 };
+} // namespace details
 
 // ################ Overlay Pattern Wrappers ################
 /**
@@ -370,11 +371,11 @@ public:
  * construction sequence.*
  */
 
+namespace details {
 // OverlayInlined's direct implementation
 template <class OInlined>
 class OverlayStateOwner {
 	friend OInlined;
-	friend typename OInlined::OverlayBase;
 
 private:
 	using State = typename OInlined::State;
@@ -386,18 +387,19 @@ private:
 	template <class... Args>
 	OverlayStateOwner(Args&&... args) : m_state(std::forward<Args>(args)...) {}
 
-private:
+public:
 	template <class Self>
 	tx::const_propagate<Self, State>& operator()(this Self&& self) {
 		return self.m_state;
 	}
+
+	OverlayStateOwner(OverlayStateOwner&&) = default;
 };
 
 // OverlayAlias's direct implementation
 template <class OAlias>
 class OverlayStateAlias {
 	friend OAlias;
-	friend typename OAlias::OverlayBase;
 
 private:
 	using State = typename OAlias::State;
@@ -408,12 +410,15 @@ private:
 private:
 	OverlayStateAlias(State* statePtr) : m_state(statePtr) {}
 
-private:
+public:
 	template <class Self>
 	tx::const_propagate<Self, State>& operator()(this Self&& self) {
 		return *static_cast<tx::const_propagate<Self, State>*>(self.m_state);
 	}
+
+	OverlayStateAlias(OverlayStateAlias&&) = default;
 };
+} // namespace details
 
 // Overlay Inlined
 /**
@@ -423,21 +428,21 @@ private:
 template <template <class...> class Overlay, class T, class... TArgs>
 // requires
 class OverlayInlined
-    : public OverlayRelocationInterface<
-          OverlayInterface<
-              OverlayInternal<
-                  Overlay<T, OverlayStateOwner<OverlayInlined<Overlay, T, TArgs...>>,
+    : public details::OverlayRelocationInterface<
+          details::OverlayInterface<
+              details::OverlayInternal<
+                  Overlay<T, details::OverlayStateOwner<OverlayInlined<Overlay, T, TArgs...>>,
                           details::OverlayBufferExpansionAssert, TArgs...>,
                   T>,
               T>,
           T> {
 private:
-	using Impl = OverlayStateOwner<OverlayInlined>;
+	using Impl = details::OverlayStateOwner<OverlayInlined>;
 	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
-	    OverlayRelocationInterface<
-	        OverlayInterface<
-	            OverlayInternal<
+	    details::OverlayRelocationInterface<
+	        details::OverlayInterface<
+	            details::OverlayInternal<
 	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	                T>,
 	            T>,
@@ -509,10 +514,10 @@ public:
 template <template <class...> class Overlay, class T, class... TArgs>
 // requires
 class OverlayAlias
-    : public OverlayRelocationInterface<
-          OverlayInterface<
-              OverlayInternal<
-                  Overlay<T, OverlayStateAlias<OverlayAlias<Overlay, T, TArgs...>>,
+    : public details::OverlayRelocationInterface<
+          details::OverlayInterface<
+              details::OverlayInternal<
+                  Overlay<T, details::OverlayStateAlias<OverlayAlias<Overlay, T, TArgs...>>,
                           details::OverlayBufferExpansionAssert, TArgs...>,
                   T>,
               T>,
@@ -524,12 +529,12 @@ class OverlayAlias
 	 * lifetime of the parent overlay object.
 	 */
 private:
-	using Impl = OverlayStateAlias<OverlayAlias>;
+	using Impl = details::OverlayStateAlias<OverlayAlias>;
 	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
-	    OverlayRelocationInterface<
-	        OverlayInterface<
-	            OverlayInternal<
+	    details::OverlayRelocationInterface<
+	        details::OverlayInterface<
+	            details::OverlayInternal<
 	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	                T>,
 	            T>,
@@ -558,9 +563,9 @@ private:
  */
 template <template <class...> class Overlay, class T, class... TArgs>
 class OverlayMMW
-    : public OverlayInterface<
-          OverlayInternal<
-              Overlay<T, OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>,
+    : public details::OverlayInterface<
+          details::OverlayInternal<
+              Overlay<T, details::OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>,
                       details::OverlayBufferExpansionResize<
                           OverlayMMW<Overlay, T, TArgs...>>,
                       TArgs...>,
@@ -572,10 +577,10 @@ private:
 	    tx::type_list_count_v<tx::type_list_t<Args...>> &&
 	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
 
-	using Impl = OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>;
+	using Impl = details::OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>;
 	using ExpansionHandler = details::OverlayBufferExpansionResize<OverlayMMW>;
-	using Base = OverlayInterface<
-	    OverlayInternal<
+	using Base = details::OverlayInterface<
+	    details::OverlayInternal<
 	        Overlay<T, Impl, ExpansionHandler, TArgs...>,
 	        T>,
 	    T>;
