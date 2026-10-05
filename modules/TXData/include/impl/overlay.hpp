@@ -5,8 +5,10 @@
 #include "impl/allocator.hpp"
 #include "impl/data_utils.hpp"
 #include "tx/basic_types.hpp"
+#include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
 #include <memory>
+#include <source_location>
 #include <type_traits>
 #include <concepts>
 #include <span>
@@ -88,7 +90,8 @@ struct OverlayBufferExpansionAssert {
 private:
 	void expand_impl(
 	    u32 expansionCount, u32 currentSize, u32 currentCapacity) const {
-		// <-------------------- bad expansion
+		impl::assert_impl(assert::bad_expansion(
+		    currentSize, currentCapacity, expansionCount));
 	}
 
 public:
@@ -122,7 +125,7 @@ public:
 // for MMW Overlay
 /**
  * Because resizing need an allocator instance, as well as access to
- * OverlayBase's internal method `overlayRelocateBufferState_impl`, this resize
+ * OverlayBase's internal method `overlayRelocateBuffer_impl`, this resize
  * class must become the master class of all MMW classes, and the Impl class of
  * OverlayMMW.
  * It handles resize, and stores the allocator. In construction of OverlayMMW,
@@ -176,7 +179,7 @@ public:
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
-			            base->overlayRelocateBufferState(ptr, size);
+			            base->overlayRelocateBuffer(ptr, size);
 		            });
 	}
 
@@ -187,7 +190,7 @@ public:
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
-			            base->overlayRelocateBufferStateData(ptr, size);
+			            base->overlayRelocateBufferData(ptr, size);
 		            });
 	}
 	void expandMeta(
@@ -197,7 +200,7 @@ public:
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
-			            base->overlayRelocateBufferStateMeta(ptr, size);
+			            base->overlayRelocateBufferMeta(ptr, size);
 		            });
 	}
 };
@@ -312,22 +315,22 @@ public:
 	// single buffer
 	void relocate(T* bufferPtr, u32 bufferSize)
 	    requires Base::SingleBuffer
-	{ this->overlayRelocateBufferState(bufferPtr, bufferSize); }
+	{ this->overlayRelocateBuffer(bufferPtr, bufferSize); }
 	void relocate(std::span<T> buffer)
 	    requires Base::SingleBuffer
-	{ this->overlayRelocateBufferState(buffer.data(), buffer.size()); }
+	{ this->overlayRelocateBuffer(buffer.data(), buffer.size()); }
 
 	// double buffer (data, meta)
 	void relocate(T* dataBufferPtr, u32 dataBufferSize,
 	              Meta* metaBufferPtr, u32 metaBufferSize)
 	    requires Base::DataMetaBuffer
-	{ this->overlayRelocateBufferState(
+	{ this->overlayRelocateBuffer(
 		dataBufferPtr, dataBufferSize,
 		metaBufferPtr, metaBufferSize); }
 	void relocate(std::span<T> dataBuffer,
 	              std::span<Meta> metaBuffer)
 	    requires Base::DataMetaBuffer
-	{ this->overlayRelocateBufferState(
+	{ this->overlayRelocateBuffer(
 		dataBuffer.data(), dataBuffer.size(),
 		metaBuffer.data(), metaBuffer.size()); }
 
@@ -545,8 +548,8 @@ private:
 	friend Impl;
 
 public:
-	// <------------------------------------------------------------------ accept any overlay
-	OverlayAlias(OverlayInlined<Overlay, T, TArgs...>& parent)
+	template <std::derived_from<typename Base::OverlayBase> O>
+	OverlayAlias(O& parent)
 	    : OverlayAlias(&parent.overlayGetStateProvider_impl()()) {}
 
 private:
@@ -669,8 +672,97 @@ public:
 // ################ Overlay Base Implementation Utilities ################
 
 template <class T>
-inline void overlayNullCheck(T* ptr, u32 size) {
-	// <------------------------------------------------- assert_impl
+inline T* overlayNullCheck(
+    T* ptr, u32 size,
+    std::source_location loc = std::source_location::current()) {
+	impl::assert_impl(assert::buffer_valid(ptr, size), loc);
+	return ptr;
 }
+
+/**
+ * Func will be called in constructor body. It's intended usage is to check
+ * custom buffer input constraints, such as Pow2.
+ * Buffer validity (null check) is already handled
+ */
+template <class T, std::invocable<T*&, u32&> Func>
+struct OverlayBaseBufferStateSingle {
+	OverlayBaseBufferStateSingle(
+	    T* dataPtr_, u32 dataSize_)
+	    : dataPtr(overlayNullCheck(dataPtr_, dataSize_)),
+	      dataSize(dataSize_) {
+		Func{}(dataPtr, dataSize);
+	}
+	T* dataPtr = nullptr;
+	u32 dataSize = 0;
+
+	void null_impl() {
+		dataPtr = nullptr;
+		dataSize = 0;
+	}
+
+	// copy from
+	void copy_impl(const OverlayBaseBufferStateSingle& other) {
+		dataPtr = other.dataPtr;
+		dataSize = other.dataSize;
+	}
+
+	OverlayBaseBufferStateSingle(const OverlayBaseBufferStateSingle&) = delete;
+	OverlayBaseBufferStateSingle& operator=(const OverlayBaseBufferStateSingle&) = delete;
+	OverlayBaseBufferStateSingle(OverlayBaseBufferStateSingle&& other)
+	    : dataPtr(other.dataPtr), dataSize(other.dataSize) { other.null_impl(); }
+	OverlayBaseBufferStateSingle& operator=(OverlayBaseBufferStateSingle&& other) {
+		if (&other == this) return;
+		copy_impl(other);
+		other.null_impl();
+		return *this;
+	};
+};
+
+/**
+ * Func will be called in constructor body. It's intended usage is to check
+ * custom buffer input constraints, such as Pow2.
+ * Buffer validity (null check) is already handled
+ */
+template <class T, class Meta, std::invocable<T*&, u32&, Meta*&, u32&> Func>
+struct OverlayBaseBufferStateDataMeta {
+	OverlayBaseBufferStateDataMeta(
+	    T* dataPtr_, u32 dataSize_, Meta* metaPtr_, u32 metaSize_)
+	    : dataPtr(overlayNullCheck(dataPtr_, dataSize_)),
+	      metaPtr(overlayNullCheck(metaPtr_, metaSize_)),
+	      dataSize(dataSize_), metaSize(metaSize_) {
+		Func{}(dataPtr, dataSize, metaPtr, metaSize);
+	}
+	T* dataPtr = nullptr;
+	Meta* metaPtr = nullptr;
+	u32 dataSize = 0;
+	u32 metaSize = 0;
+
+	void null_impl() {
+		dataPtr = nullptr;
+		metaPtr = nullptr;
+		dataSize = 0;
+		metaSize = 0;
+	}
+
+	// copy from
+	void copy_impl(const OverlayBaseBufferStateDataMeta& other) {
+		dataPtr = other.dataPtr;
+		metaPtr = other.metaPtr;
+		dataSize = other.dataSize;
+		metaSize = other.metaSize;
+	}
+
+	OverlayBaseBufferStateDataMeta(const OverlayBaseBufferStateDataMeta&) = delete;
+	OverlayBaseBufferStateDataMeta& operator=(const OverlayBaseBufferStateDataMeta&) = delete;
+	OverlayBaseBufferStateDataMeta(OverlayBaseBufferStateDataMeta&& other)
+	    : dataPtr(other.dataPtr), metaPtr(other.metaPtr),
+	      dataSize(other.dataSize), metaSize(other.metaSize) { other.null_impl(); }
+	OverlayBaseBufferStateDataMeta& operator=(OverlayBaseBufferStateDataMeta&& other) {
+		if (&other == this) return;
+		copy_impl(other);
+		other.null_impl();
+		return *this;
+	};
+};
 
 } // namespace tx::impl

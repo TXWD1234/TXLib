@@ -101,10 +101,12 @@ struct AssertPreset {
 };
 // wrapper function for the preset pattern
 template <class Expr, class Msg>
-constexpr void assert_impl(AssertPreset<Expr, Msg> preset) {
+constexpr void assert_impl(
+    AssertPreset<Expr, Msg> preset,
+    std::source_location loc = std::source_location::current()) {
 	impl::assert_impl(
 	    preset.expr,
-	    preset.msg);
+	    preset.msg, loc);
 }
 
 namespace assert {
@@ -126,6 +128,15 @@ inline auto bad_expansion(u32 size, u32 capacity, u32 expansionCount = 1) {
 		[=] { return std::format(
 		          "Bad expansion. Size overflows buffer capacity. size = {}; capacity = {}; expansionCount = {}",
 		          size, capacity, expansionCount); }
+	};
+}
+template <class T>
+inline auto buffer_valid(T* ptr, u32 size) {
+	return AssertPreset{
+		[=] { return ptr && size; },
+		[=] { return std::format(
+		          "Invalid buffer. Pointer is null or size is zero. ptr = {}; size = {}",
+		          static_cast<const void*>(ptr), size); }
 	};
 }
 
