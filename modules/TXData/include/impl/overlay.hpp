@@ -18,6 +18,10 @@ namespace tx::impl {
 // ===========================================================
 // **************** Overlay Pattern Utilities ****************
 // ===========================================================
+// > *Welcome to the darkest corner of TXLib.*
+// > *It works, but it sucks. It sucks, but it works.*
+// > *In this file, I suffer.* —— TXJerry
+
 /**
  * Terminology:
  * True Overlay:  OverlayInlined and OverlayAlias, being completely non-owning,
@@ -32,8 +36,6 @@ namespace tx::impl {
  *                source of truth of an overlay data structure instance.
  * BufferState:   The buffer information stored in State_impl.
  */
-// > *It works, but it sucks. It sucks, but it works.*
-// > *In this file, I suffer.* —— TXJerry
 
 // ----------------------------------------------------------
 // ················ Implementation Utilities ················
@@ -68,7 +70,7 @@ using overlay_parameter_object_t = typename decltype([] {
 	if constexpr (requires { typename O::Parameters; })
 		return std::type_identity<typename O::Parameters>{};
 	else
-		return std::type_identity<void>{};
+		return std::type_identity<tx::Nothing>{};
 }())::type;
 
 template <class T, class O>
@@ -305,7 +307,7 @@ template <details::overlay_internal O, class T>
 class OverlayRelocationInterface : public O {
 private:
 	using Base = O;
-	using Meta = typename Base::Meta;
+	using Meta_t = typename Base::Meta;
 
 public:
 	// ================ Relocation ================
@@ -327,13 +329,13 @@ public:
 
 	// double buffer (data, meta)
 	void relocate(T* dataBufferPtr, u32 dataBufferSize,
-	              Meta* metaBufferPtr, u32 metaBufferSize)
+	              Meta_t* metaBufferPtr, u32 metaBufferSize)
 	    requires Base::DataMetaBuffer
 	{ this->overlayRelocateBuffer(
 		dataBufferPtr, dataBufferSize,
 		metaBufferPtr, metaBufferSize); }
 	void relocate(std::span<T> dataBuffer,
-	              std::span<Meta> metaBuffer)
+	              std::span<Meta_t> metaBuffer)
 	    requires Base::DataMetaBuffer
 	{ this->overlayRelocateBuffer(
 		dataBuffer.data(), dataBuffer.size(),
@@ -346,7 +348,7 @@ public:
 	    requires Base::SingleBuffer
 	{ this->overlayGetBufferState(std::forward<Func>(f)); }
 
-	template <std::invocable<T*, u32, Meta*, u32> Func>
+	template <std::invocable<T*, u32, Meta_t*, u32> Func>
 	void getBufferInfo(Func&& f)
 	    requires Base::DataMetaBuffer
 	{ this->overlayGetBufferState(std::forward<Func>(f)); }
@@ -385,17 +387,12 @@ public:
 
 namespace details {
 // OverlayInlined's direct implementation
-template <class OInlined>
+template <class State>
 class OverlayStateOwner {
-	friend OInlined;
-
-private:
-	using State = typename OInlined::State;
-
 private:
 	State m_state;
 
-private:
+public:
 	template <class... Args>
 	OverlayStateOwner(Args&&... args) : m_state(std::forward<Args>(args)...) {}
 
@@ -437,37 +434,35 @@ public:
  * The normal way of using an overlay.
  * The intended way to create an overlay object.
  */
-template <template <class...> class Overlay, class T, class... TArgs>
+template <template <class, template <class> class, class...> class Overlay, class T, class... TArgs>
 // requires
 class OverlayInlined
     : public details::OverlayRelocationInterface<
           details::OverlayInterface<
               details::OverlayInternal<
-                  Overlay<T, details::OverlayStateOwner<OverlayInlined<Overlay, T, TArgs...>>,
+                  Overlay<T, details::OverlayStateOwner,
                           details::OverlayBufferExpansionAssert, TArgs...>,
                   T>,
               T>,
           T> {
 private:
-	using Impl = details::OverlayStateOwner<OverlayInlined>;
 	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
 	    details::OverlayRelocationInterface<
 	        details::OverlayInterface<
 	            details::OverlayInternal<
-	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
+	                Overlay<T, details::OverlayStateOwner,
+	                        details::OverlayBufferExpansionAssert, TArgs...>,
 	                T>,
 	            T>,
 	        T>;
 	using State = typename Base::State_impl;
+	using Impl = details::OverlayStateOwner<State>;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
 	using Meta = typename Base::Meta;
 	friend Impl;
 
 private:
-	template <class... Args>
-	OverlayInlined(Args&&... args)
-	    : Base(Impl(std::forward<Args>(args)...), ExpansionHandler{}) {}
 	OverlayInlined(Impl&& implObj)
 	    : Base(std::move(implObj), ExpansionHandler{}) {}
 
@@ -481,14 +476,14 @@ public:
 	    : OverlayInlined(Impl(bufferPtr, bufferSize)) {}
 	OverlayInlined(std::span<T> buffer)
 	    requires Base::SingleBuffer
-	    : OverlayInlined(buffer.data(), buffer.size()) {}
+	    : OverlayInlined(Impl(buffer.data(), buffer.size())) {}
 
 	OverlayInlined(T* bufferPtr, u32 bufferSize, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
 	    : OverlayInlined(Impl(bufferPtr, bufferSize, param)) {}
 	OverlayInlined(std::span<T> buffer, const ParamObj& param)
 	    requires Base::SingleBuffer && impl::overlay_parameterized<Base>
-	    : OverlayInlined(buffer.data(), buffer.size(), param) {}
+	    : OverlayInlined(Impl(buffer.data(), buffer.size(), param)) {}
 
 	// double buffer (data, meta)
 
@@ -500,8 +495,8 @@ public:
 	OverlayInlined(std::span<T> dataBuffer,
 	               std::span<Meta> metaBuffer)
 	    requires Base::DataMetaBuffer
-	    : OverlayInlined(dataBuffer.data(), dataBuffer.size(),
-	                     metaBuffer.data(), metaBuffer.size()) {}
+	    : OverlayInlined(Impl(dataBuffer.data(), dataBuffer.size(),
+	                          metaBuffer.data(), metaBuffer.size())) {}
 
 	OverlayInlined(T* dataBufferPtr, u32 dataBufferSize,
 	               Meta* metaBufferPtr, u32 metaBufferSize,
@@ -513,8 +508,8 @@ public:
 	               std::span<Meta> metaBuffer,
 	               const ParamObj& param)
 	    requires Base::DataMetaBuffer && impl::overlay_parameterized<Base>
-	    : OverlayInlined(dataBuffer.data(), dataBuffer.size(),
-	                     metaBuffer.data(), metaBuffer.size(), param) {}
+	    : OverlayInlined(Impl(dataBuffer.data(), dataBuffer.size(),
+	                          metaBuffer.data(), metaBuffer.size(), param)) {}
 
 	// m_state will be default initialized into null state
 	OverlayInlined() : Base(Impl(), ExpansionHandler()) {}
