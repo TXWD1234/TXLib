@@ -5,8 +5,10 @@
 #include "impl/data_foundation.hpp"
 #include "impl/data_utils.hpp"
 #include "impl/numeric_utils.hpp"
+#include "impl/overlay.hpp"
 #include "tx/exception.hpp"
 #include "tx/basic_types.hpp"
+#include "tx/type_traits.hpp"
 #include <concepts>
 #include <span>
 #include <memory>
@@ -14,93 +16,83 @@
 
 namespace tx {
 /**
- * Every time before you push, you should check `full()`.
- *   Any push operation on an full buffer is Undefined Behavior
- * Every time before you pop, you should check `empty()`.
- *   Any pop operation on an empty buffer is Undefined Behavior
+ * internal implementation of data structure, shouldn't be instantiated by user
  */
-template <class T>
-class RingBufferOverlay {
-private:
+template <class T, template <class> class StateProviderTemplate, class BufferExpansionHandler>
+class RingBufferOverlayBase {
+protected:
+	// default to null state
 	struct State_impl {
-		u32 begin = 0, end = 0;
+		using BufferState_impl = impl::OverlayBaseBufferStateSingle<
+		    T, decltype([](T*& ptr, u32& size) {
+			    if (!tx::isPowTwo(size)) {
+				    impl::assert_impl(
+				        [] { return false; },
+				        [=] {
+					        return std::format(
+					            "Bad construction. Argument `bufferSize` must"
+					            " be a power of 2. bufferSize = {}",
+					            size);
+				        });
+				    ptr = nullptr;
+				    size = 0;
+			    }
+		    })>;
+		BufferState_impl buffer;
+
+		struct LogicState_impl {
+			u32 begin = 0, end = 0;
+		} logic;
+
+		State_impl(T* ptr, u32 size) : buffer(ptr, size) {}
+		State_impl() = default;
+		// State_impl(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
 	};
+
+	using StateProvider = StateProviderTemplate<State_impl>;
+	friend StateProvider;
+	friend BufferExpansionHandler;
+	//static_assert(tx::invocable_r<StateProvider, State_impl&>);
+	//static_assert(std::invocable<RingBufferOverlayBase, T*&, u32, u32, u32>);
 
 public:
 	using value_type = T;
+	// DevNote: stale?
 	using StateStorage = impl::Storage<State_impl>;
 
 public:
-	/**
-	 * @param ptr the data pointer to a piece of memory that has at least
-	 * size of `capacity`.
-	 * @param size the capacity of this container object. It cannot resize.
-	 * It must be a power of 2. If not, the object created by it will be
-	 * invalid
-	 */
-	RingBufferOverlay(T* bufferPtr, u32 bufferSize, StateStorage* statePtr)
-	    : RingBufferOverlay<T>(statePtr, bufferPtr, bufferSize) { std::construct_at(m_state); }
-	/**
-	 * @param buffer the provided storage memory buffer
-	 * The size of `buffer` must be a power of 2. If not, the object
-	 * created by it will be invalid
-	 */
-	RingBufferOverlay(std::span<T> buffer, StateStorage* statePtr)
-	    : tx::RingBufferOverlay<T>(buffer.data(), buffer.size(), statePtr) {}
-	/**
-	 * Default Constructor that produces an object in null state
-	 */
-	RingBufferOverlay() : m_data(nullptr), m_state(nullptr), m_size(0) {}
-	/**
-     * Note on the destructor:
-	 * It intentionally did not call the clear() function, because this class
-	 * is just an overlay, it should not do operations that user did not ask
-	 * for.
-	 * But overall, the clear() operation is still necessary to be called
-	 * before the overlay is destroied, unless specialized condition is applied
-     */
-	~RingBufferOverlay() {}
+	// DevNote: should this be move?
+	RingBufferOverlayBase(StateProvider&& stateProvider,
+	                      BufferExpansionHandler&& bufferExpansionHandler)
+	    : m_state(std::move(stateProvider)),
+	      m_expand(std::move(bufferExpansionHandler)) {}
+	RingBufferOverlayBase() = default;
 
-	RingBufferOverlay(const RingBufferOverlay&) = default;
-	RingBufferOverlay& operator=(const RingBufferOverlay&) = default;
-	RingBufferOverlay(RingBufferOverlay&& other) = default;
-	RingBufferOverlay& operator=(RingBufferOverlay&& other) = default;
+	RingBufferOverlayBase(const RingBufferOverlayBase&) = default;
+	RingBufferOverlayBase& operator=(const RingBufferOverlayBase&) = default;
+	RingBufferOverlayBase(RingBufferOverlayBase&& other) = default;
+	RingBufferOverlayBase& operator=(RingBufferOverlayBase&& other) = default;
 
-	// Construct a new object, but preserve the state in StateStorage
-	// There must be a live internal state object in StateStorage. It should be
-	// from another overlay object
-	static RingBufferOverlay<T> fromExistingState(
-	    T* bufferPtr, u32 bufferSize, StateStorage* statePtr) {
-		RingBufferOverlay<T> obj(statePtr, bufferPtr, bufferSize);
-		obj.m_state = std::launder(obj.m_state);
-		return obj;
-	}
-	static RingBufferOverlay<T> fromExistingState(
-	    std::span<T> buffer, StateStorage* statePtr) {
-		RingBufferOverlay<T> obj(statePtr, buffer.data(), buffer.size());
-		obj.m_state = std::launder(obj.m_state);
-		return obj;
-	}
+	bool valid() const { return state().buffer.ptr && state().buffer.size; }
 
-	bool valid() const { return m_data && m_size && m_state; }
-
+public:
 	// basic getter
 
 	bool full() const {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		return size() == m_size;
+		return size() == state().buffer.size;
 	}
 	bool empty() const {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		return m_state->begin == m_state->end;
+		return state().logic.begin == state().logic.end;
 	}
 	u32 size() const {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		return m_state->end - m_state->begin;
+		return state().logic.end - state().logic.begin;
 	}
-	u32 capacity() const { return m_size; }
-	T* data() { return m_data; }
-	const T* data() const { return m_data; }
+	u32 capacity() const { return state().buffer.size; }
+	T* data() { return state().buffer.ptr; }
+	const T* data() const { return state().buffer.ptr; }
 
 	// single operations
 
@@ -108,46 +100,46 @@ public:
 	    requires std::is_constructible_v<T, U&&>
 	void push_back(U&& val) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
-		std::construct_at(m_data + findPhysIndex_impl(m_state->end), std::forward<U>(val));
-		m_state->end++;
+		expand_impl();
+		std::construct_at(state().buffer.ptr + findPhysIndex_impl(state().logic.end), std::forward<U>(val));
+		state().logic.end++;
 	}
 	template <class... Args>
 	void emplace_back(Args&&... args) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
-		std::construct_at(m_data + findPhysIndex_impl(m_state->end), std::forward<Args>(args)...);
-		m_state->end++;
+		expand_impl();
+		std::construct_at(state().buffer.ptr + findPhysIndex_impl(state().logic.end), std::forward<Args>(args)...);
+		state().logic.end++;
 	}
 
 	void pop_back() {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		impl::assert_impl(impl::assert::buffer_not_empty(size()));
-		m_state->end--;
-		std::destroy_at(m_data + findPhysIndex_impl(m_state->end));
+		state().logic.end--;
+		std::destroy_at(state().buffer.ptr + findPhysIndex_impl(state().logic.end));
 	}
 
 	template <class U>
 	    requires std::is_constructible_v<T, U&&>
 	void push_front(U&& val) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
-		m_state->begin--;
-		std::construct_at(m_data + findPhysIndex_impl(m_state->begin), std::forward<U>(val));
+		expand_impl();
+		state().logic.begin--;
+		std::construct_at(state().buffer.ptr + findPhysIndex_impl(state().logic.begin), std::forward<U>(val));
 	}
 	template <class... Args>
 	void emplace_front(Args&&... args) {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		impl::assert_impl(impl::assert::bad_expansion(size(), m_size));
-		m_state->begin--;
-		std::construct_at(m_data + findPhysIndex_impl(m_state->begin), std::forward<Args>(args)...);
+		expand_impl();
+		state().logic.begin--;
+		std::construct_at(state().buffer.ptr + findPhysIndex_impl(state().logic.begin), std::forward<Args>(args)...);
 	}
 
 	void pop_front() {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		impl::assert_impl(impl::assert::buffer_not_empty(size()));
-		std::destroy_at(m_data + findPhysIndex_impl(m_state->begin));
-		m_state->begin++;
+		std::destroy_at(state().buffer.ptr + findPhysIndex_impl(state().logic.begin));
+		state().logic.begin++;
 	}
 
 	// single data getters
@@ -156,15 +148,15 @@ public:
 	decltype(auto) front(this Self&& self) {
 		impl::assert_impl(impl::assert::overlay_object_valid(&self));
 		impl::assert_impl(impl::assert::buffer_not_empty(self.size()));
-		tx::const_propagate<Self, T>* ptr = self.m_data;
-		return *(ptr + self.findPhysIndex_impl(self.m_state->begin));
+		tx::const_propagate<Self, T>* ptr = self.state().buffer.ptr;
+		return *(ptr + self.findPhysIndex_impl(self.state().logic.begin));
 	}
 	template <class Self>
 	decltype(auto) back(this Self&& self) {
 		impl::assert_impl(impl::assert::overlay_object_valid(&self));
 		impl::assert_impl(impl::assert::buffer_not_empty(self.size()));
-		tx::const_propagate<Self, T>* ptr = self.m_data;
-		return *(ptr + self.findPhysIndex_impl(self.m_state->end - 1));
+		tx::const_propagate<Self, T>* ptr = self.state().buffer.ptr;
+		return *(ptr + self.findPhysIndex_impl(self.state().logic.end - 1));
 	}
 
 	// multi and random access operations
@@ -173,33 +165,33 @@ public:
 	decltype(auto) operator[](this Self&& self, u32 index) {
 		impl::assert_impl(impl::assert::overlay_object_valid(&self));
 		impl::assert_impl(impl::assert::out_of_range(self.size(), index));
-		tx::const_propagate<Self, T>* ptr = self.m_data;
-		return *(ptr + self.findPhysIndex_impl(self.m_state->begin + index));
+		tx::const_propagate<Self, T>* ptr = self.state().buffer.ptr;
+		return *(ptr + self.findPhysIndex_impl(self.state().logic.begin + index));
 	}
 
 	void clear() {
 		impl::assert_impl(impl::assert::overlay_object_valid(this));
 		if (empty()) return;
-		u32 physBegin = findPhysIndex_impl(m_state->begin);
-		u32 physEnd = findPhysIndex_impl(m_state->end);
+		u32 physBegin = findPhysIndex_impl(state().logic.begin);
+		u32 physEnd = findPhysIndex_impl(state().logic.end);
 		if (physBegin < physEnd) {
 			// linear
-			std::destroy(m_data + physBegin,
-			             m_data + physEnd);
+			std::destroy(state().buffer.ptr + physBegin,
+			             state().buffer.ptr + physEnd);
 		} else if (physBegin > physEnd) {
 			// wrap
-			std::destroy(m_data,
-			             m_data + physEnd);
-			std::destroy(m_data + physBegin,
-			             m_data + m_size);
+			std::destroy(state().buffer.ptr,
+			             state().buffer.ptr + physEnd);
+			std::destroy(state().buffer.ptr + physBegin,
+			             state().buffer.ptr + state().buffer.size);
 		} else {
 			// completely full
 			// the empty edge case is prevented by the empty() check at the top
-			std::destroy(m_data,
-			             m_data + m_size);
+			std::destroy(state().buffer.ptr,
+			             state().buffer.ptr + state().buffer.size);
 		}
-		m_state->begin = 0;
-		m_state->end = 0;
+		state().logic.begin = 0;
+		state().logic.end = 0;
 	}
 
 	// Flatten (unwrap) the ring buffer inplace
@@ -213,11 +205,11 @@ public:
 		flattenRelocate_impl(
 		    [this](u32 first, u32 last, T* dest) {
 			    std::uninitialized_copy(
-			        this->m_data + first,
-			        this->m_data + last,
+			        this->state().buffer.ptr + first,
+			        this->state().buffer.ptr + last,
 			        dest);
 		    },
-		    dest, m_size, m_state);
+		    dest, state().buffer.size, &state());
 	}
 	// Flatten (unwrap) the ring buffer and copy it to another buffer
 	// The provided destination buffer must have size bigger then the current
@@ -229,16 +221,17 @@ public:
 		flattenRelocate_impl(
 		    [this](u32 first, u32 last, T* dest) {
 			    std::uninitialized_move(
-			        this->m_data + first,
-			        this->m_data + last,
+			        this->state().buffer.ptr + first,
+			        this->state().buffer.ptr + last,
 			        dest);
 		    },
-		    dest, m_size, m_state);
+		    dest, state().buffer.size, &state());
 	}
 
 public:
 	// lifetime APIs
 
+	// <---------------------- remove
 	// Destroies internal state object, ends lifetime of this overlay and every
 	// other overlays that share the same buffers. Any other copies of this
 	// overlay are now dangling and must not be used.
@@ -251,49 +244,37 @@ public:
 	}
 
 private:
-	T* m_data;
-	State_impl* m_state;
-	u32 m_size;
+	// m_state is guaranteed to be valid, because this is only instantiated
+	// internally.
+	// But the State_impl object returned by `m_state()` might not be valid
+	StateProvider m_state;
+	BufferExpansionHandler m_expand;
 
 private:
-	// helpers
+	// ================ Architectural Helpers ================
 
-	// base constructor
-	// moved statePtr to the front to prevent signature collision
-	// (it's shenanigan I know but there's no better solution)
-	RingBufferOverlay(StateStorage* statePtr, T* bufferPtr, u32 bufferSize)
-	    : m_data(tx::isPowTwo(bufferSize) ? bufferPtr : nullptr),
-	      // m_state will be handled later with constructor specific logic
-	      // here is only a default for valid() check to pass
-	      m_state(reinterpret_cast<State_impl*>(statePtr)),
-	      m_size(tx::isPowTwo(bufferSize) ? bufferSize : 0) {
-		impl::assert_impl(
-		    [&] { return valid(); },
-		    [&] {
-			    if (!tx::isPowTwo(bufferSize)) {
-				    return std::format(
-				        "Bad construction. Argument `bufferSize` must be a power of 2. bufferSize = {}",
-				        bufferSize);
-			    } else {
-				    return std::format(
-				        "Bad construction. Invalid pointer provided. bufferPtr = {}; statePtr = {}",
-				        static_cast<const void*>(bufferPtr),
-				        static_cast<const void*>(statePtr));
-			    }
-		    });
+	// exist purely for intellisense to know the return type
+	State_impl& state() { return m_state(); }
+
+	void expand_impl(u32 expansionCount = 1) {
+		m_expand(this, state().buffer.ptr, size(),
+		         expansionCount, state().buffer.size);
 	}
+
+private:
+	// ================ Logical Helpers ================
 
 	// find physical index
 	u32 findPhysIndex_impl(u32 index) const {
-		return impl::findPowTwoWrappedPhysIndex(index, m_size);
+		return impl::findPowTwoWrappedPhysIndex(index, state().buffer.size);
 	}
 
 	template <std::invocable<u32, u32, T*> Func>
 	static void flattenRelocate_impl(
 	    Func&& copyFunc, T* dest, u32 dataBufferSize, const State_impl* state) {
-		if (state->begin == state->end) return;
-		u32 physBegin = impl::findPowTwoWrappedPhysIndex(state->begin, dataBufferSize);
-		u32 physEnd = impl::findPowTwoWrappedPhysIndex(state->end, dataBufferSize);
+		if (state->logic.begin == state->logic.end) return;
+		u32 physBegin = impl::findPowTwoWrappedPhysIndex(state->logic.begin, dataBufferSize);
+		u32 physEnd = impl::findPowTwoWrappedPhysIndex(state->logic.end, dataBufferSize);
 		if (physBegin < physEnd) {
 			// linear
 			copyFunc(
@@ -314,97 +295,135 @@ private:
 	}
 
 protected:
-	// destroy the current overlay object
-	// other copies of this overlay are not synced; it is not recommended to
-	// call this function on overlay that is not unique
-	void null_impl() {
-		m_data = nullptr;
-		m_state = nullptr;
-		m_size = 0;
-	}
-	void swap_impl(RingBufferOverlay<T>& other) {
-		std::swap(m_data, other.m_data);
-		std::swap(m_size, other.m_size);
-		std::swap(m_state->begin, other.m_state->begin);
-		std::swap(m_state->end, other.m_state->end);
-	}
-	// copy the data and state of another object after construction
-	// to fully sync with the other object
-	void copy_impl(const RingBufferOverlay<T>& other) {
-		m_state->begin = other.m_state->begin;
-		m_state->end = other.m_state->end;
-		if (other.empty()) return;
-		u32 physBegin = other.findPhysIndex_impl(other.m_state->begin);
-		u32 physEnd = other.findPhysIndex_impl(other.m_state->end);
-		if (physBegin < physEnd) {
-			// linear
-			std::uninitialized_copy(
-			    other.m_data + physBegin,
-			    other.m_data + physEnd,
-			    this->m_data + physBegin);
-		} else if (physBegin > physEnd) {
-			// wrap
-			std::uninitialized_copy(
-			    other.m_data,
-			    other.m_data + physEnd,
-			    this->m_data);
-			std::uninitialized_copy(
-			    other.m_data + physBegin,
-			    other.m_data + m_size,
-			    this->m_data + physBegin);
-		} else {
-			// completely full
-			// the empty edge case is prevented by the empty() check at the top
-			std::uninitialized_copy(
-			    other.m_data,
-			    other.m_data + m_size,
-			    this->m_data);
-		}
-	}
-	// query if object is valid
-	// used for defend moved-from object
-	bool isNull_impl() const {
-		return !m_data;
-	}
-	// called at destruction to clean up data
-	void destruct_impl() {
-		clear();
-	}
+	/**
+	 * List of intrinsics to be implemented:
+	 * all functions taking in lambda should return whatever the lambda returns
+	 * 
+	 * [Exposure of Policy Object]
+	 * - overlayGetStateProvider()
+	 * - overlayGetBufferExpansionHandler()
+	 * - overlaySetStateProvider() // support move
+	 * - overlaySetBufferExpansionHandler() // support move
+	 * 
+	 * [BufferState management]
+	 * - overlayGetBufferState(callback(T*, u32, [MetaT*, u32]))
+	 * - overlaySetBufferState(BufferInfo) (SingleBuffer)
+	 * - overlaySetBufferStateData(BufferInfo) (DataMetaBuffer)
+	 * - overlaySetBufferStateMeta(BufferInfo) (DataMetaBuffer)
+	 * - overlayRelocateBuffer(BufferInfo) (SingleBuffer)       // null guard internal
+	 * - overlayRelocateBufferData(BufferInfo) (DataMetaBuffer) // null guard internal
+	 * - overlayRelocateBufferMeta(BufferInfo) (DataMetaBuffer) // null guard internal
+	 * 
+	 * [LogicState & element management]
+	 * - overlayGetElementCount(u32, [u32])
+	 * - overlayCopyElements(T*, [Meta*]) // copy to
+	 * - overlayGetLogicStateCopy() // specifically for MMW's state copy; return
+	 *                              // manipulated LogicState_impl
+	 * - overlaySetLogicState(LogicState_impl)
+	 * 
+	 * - overlayDestroyElements() // null guard
+	 * 
+	 * - using meta_type (DataMetaBuffer)
+	 * //- using state_type
+	 */
+
+
+
+
+
+
+
+	// // destroy the current overlay object
+	// // other copies of this overlay are not synced; it is not recommended to
+	// // call this function on overlay that is not unique
+	// void null_impl() {
+	// 	state().buffer.ptr = nullptr;
+	// 	m_state = nullptr;
+	// 	state().buffer.size = 0;
+	// }
+	// void swap_impl(RingBufferOverlay<T>& other) {
+	// 	std::swap(state().buffer.ptr, other.state().buffer.ptr);
+	// 	std::swap(state().buffer.size, other.state().buffer.size);
+	// 	std::swap(state().logic.begin, other.state().logic.begin);
+	// 	std::swap(state().logic.end, other.state().logic.end);
+	// }
+	// // copy the data and state of another object after construction
+	// // to fully sync with the other object
+	// void copy_impl(const RingBufferOverlay<T>& other) {
+	// 	state().logic.begin = other.state().logic.begin;
+	// 	state().logic.end = other.state().logic.end;
+	// 	if (other.empty()) return;
+	// 	u32 physBegin = other.findPhysIndex_impl(other.state().logic.begin);
+	// 	u32 physEnd = other.findPhysIndex_impl(other.state().logic.end);
+	// 	if (physBegin < physEnd) {
+	// 		// linear
+	// 		std::uninitialized_copy(
+	// 		    other.state().buffer.ptr + physBegin,
+	// 		    other.state().buffer.ptr + physEnd,
+	// 		    this->state().buffer.ptr + physBegin);
+	// 	} else if (physBegin > physEnd) {
+	// 		// wrap
+	// 		std::uninitialized_copy(
+	// 		    other.state().buffer.ptr,
+	// 		    other.state().buffer.ptr + physEnd,
+	// 		    this->state().buffer.ptr);
+	// 		std::uninitialized_copy(
+	// 		    other.state().buffer.ptr + physBegin,
+	// 		    other.state().buffer.ptr + state().buffer.size,
+	// 		    this->state().buffer.ptr + physBegin);
+	// 	} else {
+	// 		// completely full
+	// 		// the empty edge case is prevented by the empty() check at the top
+	// 		std::uninitialized_copy(
+	// 		    other.state().buffer.ptr,
+	// 		    other.state().buffer.ptr + state().buffer.size,
+	// 		    this->state().buffer.ptr);
+	// 	}
+	// }
+	// // query if object is valid
+	// // used for defend moved-from object
+	// bool isNull_impl() const {
+	// 	return !state().buffer.ptr;
+	// }
+	// // called at destruction to clean up data
+	// void destruct_impl() {
+	// 	clear();
+	// }
 };
 
-template <class T, u32 size>
-    requires(size > 0 && (size & (size - 1)) == 0)
-class RingBuffer : public RingBufferOverlay<T> {
-public:
-	RingBuffer()
-	    : RingBufferOverlay<T>(
-	          allocate<T>(size), size) {}
-	~RingBuffer() {
-		if (!this->isNull_impl()) {
-			this->destruct_impl(); // destroy live elements before freeing
-			free(this->data());
-		}
-	}
+// template <class T, u32 size>
+//     requires(size > 0 && (size & (size - 1)) == 0)
+// class RingBuffer : public RingBufferOverlay<T> {
+// public:
+// 	RingBuffer()
+// 	    : RingBufferOverlay<T>(
+// 	          allocate<T>(size), size) {}
+// 	~RingBuffer() {
+// 		if (!this->isNull_impl()) {
+// 			this->destruct_impl(); // destroy live elements before freeing
+// 			free(this->data());
+// 		}
+// 	}
 
-	RingBuffer(const RingBuffer<T, size>& other)
-	    : RingBufferOverlay<T>(
-	          allocate<T>(other.capacity()), other.capacity()) {
-		copy_impl(other);
-	}
-	RingBuffer(RingBuffer<T, size>&& other) : RingBufferOverlay<T>(other) {
-		// just use the copy constructor of RingBufferOverlay - shallow copy
-		other.null_impl();
-	}
-	RingBuffer& operator=(RingBuffer<T, size> other) {
-		this->swap_impl(other);
-		return *this;
-	}
+// 	RingBuffer(const RingBuffer<T, size>& other)
+// 	    : RingBufferOverlay<T>(
+// 	          allocate<T>(other.capacity()), other.capacity()) {
+// 		copy_impl(other);
+// 	}
+// 	RingBuffer(RingBuffer<T, size>&& other) : RingBufferOverlay<T>(other) {
+// 		// just use the copy constructor of RingBufferOverlay - shallow copy
+// 		other.null_impl();
+// 	}
+// 	RingBuffer& operator=(RingBuffer<T, size> other) {
+// 		this->swap_impl(other);
+// 		return *this;
+// 	}
 
-private:
-	// cannot be swap_impl because ambiguity with base's swap_impl
-	// this function exists for potential future expansion
-	void swap(RingBuffer<T, size>& other) {
-		swap_impl(other);
-	}
-};
+// private:
+// 	// cannot be swap_impl because ambiguity with base's swap_impl
+// 	// this function exists for potential future expansion
+// 	void swap(RingBuffer<T, size>& other) {
+// 		swap_impl(other);
+// 	}
+// };
 } // namespace tx
