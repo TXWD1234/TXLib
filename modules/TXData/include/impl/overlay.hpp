@@ -47,6 +47,7 @@ concept overlay = true;
 // { o.valid() } -> std::same_as<bool>;
 // o.destruct();
 // typename O::StateStorage;
+// typename buffer_trait;
 
 /**
 	 * State_impl
@@ -77,6 +78,41 @@ template <class T, class O>
 concept overlay_parameter_object =
     impl::overlay_parameterized<O> &&
     std::same_as<T, impl::overlay_parameter_object_t<O>>;
+
+// ================ Buffer Trait ================
+/**
+ * Defines the difference between varieties of buffer shapes, such as
+ * SingleBuffer and DataMetaBuffer.
+ * The OverlayBase class should define it's buffer trait via:
+ * ```cpp
+ * using buffer_trait = impl::overlay_single_buffer_trait;
+ * ```
+ */
+
+struct overlay_single_buffer_trait {};
+
+template <class Meta>
+struct overlay_data_meta_buffer_trait {
+	using type = Meta;
+};
+
+namespace details {
+
+template <class Trait>
+concept overlay_single_buffer =
+    std::same_as<Trait, impl::overlay_single_buffer_trait>;
+template <class Trait>
+concept overlay_data_meta_buffer =
+    tx::instantiation_of<Trait, impl::overlay_data_meta_buffer_trait>;
+
+template <class Trait>
+using overlay_meta_t = typename decltype([] {
+	if constexpr (overlay_data_meta_buffer<Trait>)
+		return std::type_identity<typename Trait::type>{};
+	else
+		return std::type_identity<tx::Nothing>{};
+}())::type;
+} // namespace details
 
 // ================ Buffer Expansion Handler ================
 /**
@@ -140,13 +176,9 @@ public:
  * OverlayMMW, deallocation is done via the allocator stored in this class,
  * which is acquired via overlayGetBufferExpansionHandler() from Base class
  */
-template <class OMMW>
+template <class Allocator, class buffer_trait, class T>
 struct OverlayBufferExpansionResize {
 private:
-	using Allocator = typename OMMW::Allocator;
-	using Meta = typename OMMW::Meta;
-	using OverlayBase = typename OMMW::OverlayBase;
-	using T = typename OMMW::value_type;
 	template <class U>
 	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
 
@@ -178,11 +210,11 @@ public:
 
 	[[no_unique_address]] mutable Allocator alloc;
 
-
+	template <class OverlayBase>
 	void expand(
 	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
 	    u32 currentSize, u32 currentCapacity) const
-	    requires OMMW::SingleBuffer
+	    requires details::overlay_single_buffer<buffer_trait>
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
@@ -190,26 +222,38 @@ public:
 		            });
 	}
 
+	template <class OverlayBase>
 	void expandData(
 	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
 	    u32 currentSize, u32 currentCapacity) const
-	    requires OMMW::DataMetaBuffer
+	    requires details::overlay_data_meta_buffer<buffer_trait>
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
 			            base->overlayRelocateBufferData(ptr, size);
 		            });
 	}
+	template <class OverlayBase>
 	void expandMeta(
-	    OverlayBase* base, Meta* bufferPtr, u32 expansionCount,
-	    u32 currentSize, u32 currentCapacity) const
-	    requires OMMW::DataMetaBuffer
+	    OverlayBase* base, details::overlay_meta_t<buffer_trait>* bufferPtr,
+	    u32 expansionCount, u32 currentSize, u32 currentCapacity) const
+	    requires details::overlay_data_meta_buffer<buffer_trait>
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
 		            [base](T* ptr, u32 size) {
 			            base->overlayRelocateBufferMeta(ptr, size);
 		            });
 	}
+};
+
+struct OverlayBufferExpansionAssertTrait {
+	template <class buffer_trait>
+	using type = OverlayBufferExpansionAssert;
+};
+template <class Allocator, class T>
+struct OverlayBufferExpansionResizeTrait {
+	template <class buffer_trait>
+	using type = OverlayBufferExpansionResize<Allocator, buffer_trait, T>;
 };
 } // namespace details
 
@@ -247,23 +291,22 @@ protected:
 	 */
 
 	static constexpr bool SingleBuffer =
-	    std::constructible_from<
-	        State, T*, u32>;
-	static constexpr bool DataMetaBuffer = requires {
-		typename O::meta_type;
-		requires std::constructible_from<
-		    State, T*, u32, typename O::meta_type*, u32>;
-	};
+	    details::overlay_single_buffer<typename O::buffer_trait>;
+	static constexpr bool DataMetaBuffer =
+	    details::overlay_data_meta_buffer<typename O::buffer_trait>;
 
 protected:
 	// ================ Buffer Trait Utilities ================
 
-	using Meta = typename decltype([] {
-		if constexpr (DataMetaBuffer)
-			return std::type_identity<typename O::meta_type>{};
-		else
-			return std::type_identity<void>{};
-	}())::type;
+	using Meta = details::overlay_meta_t<typename O::buffer_trait>;
+
+	static_assert(!SingleBuffer ||
+	              (SingleBuffer &&
+	               std::constructible_from<State, T*, u32>));
+	static_assert(!DataMetaBuffer ||
+	              (DataMetaBuffer &&
+	               std::constructible_from<State, T*, u32, Meta, u32>));
+
 
 protected:
 	// ================ Type Alias ================
@@ -401,22 +444,15 @@ public:
 	tx::const_propagate<Self, State>& operator()(this Self&& self) {
 		return self.m_state;
 	}
-
-	OverlayStateOwner(OverlayStateOwner&&) = default;
 };
 
 // OverlayAlias's direct implementation
-template <class OAlias>
+template <class State>
 class OverlayStateAlias {
-	friend OAlias;
-
-private:
-	using State = typename OAlias::State;
-
 private:
 	State* m_state;
 
-private:
+public:
 	OverlayStateAlias(State* statePtr) : m_state(statePtr) {}
 
 public:
@@ -424,8 +460,6 @@ public:
 	tx::const_propagate<Self, State>& operator()(this Self&& self) {
 		return *static_cast<tx::const_propagate<Self, State>*>(self.m_state);
 	}
-
-	OverlayStateAlias(OverlayStateAlias&&) = default;
 };
 } // namespace details
 
@@ -441,7 +475,7 @@ class OverlayInlined
           details::OverlayInterface<
               details::OverlayInternal<
                   Overlay<T, details::OverlayStateOwner,
-                          details::OverlayBufferExpansionAssert, TArgs...>,
+                          details::OverlayBufferExpansionAssertTrait, TArgs...>,
                   T>,
               T>,
           T> {
@@ -452,7 +486,7 @@ private:
 	        details::OverlayInterface<
 	            details::OverlayInternal<
 	                Overlay<T, details::OverlayStateOwner,
-	                        details::OverlayBufferExpansionAssert, TArgs...>,
+	                        details::OverlayBufferExpansionAssertTrait, TArgs...>,
 	                T>,
 	            T>,
 	        T>;
@@ -460,7 +494,6 @@ private:
 	using Impl = details::OverlayStateOwner<State>;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
 	using Meta = typename Base::Meta;
-	friend Impl;
 
 private:
 	OverlayInlined(Impl&& implObj)
@@ -520,14 +553,14 @@ public:
  * Handle object for concurrent access
  * Slightly slower then Inlined due to pointer indirection 
  */
-template <template <class...> class Overlay, class T, class... TArgs>
+template <template <class, template <class> class, class...> class Overlay, class T, class... TArgs>
 // requires
 class OverlayAlias
     : public details::OverlayRelocationInterface<
           details::OverlayInterface<
               details::OverlayInternal<
-                  Overlay<T, details::OverlayStateAlias<OverlayAlias<Overlay, T, TArgs...>>,
-                          details::OverlayBufferExpansionAssert, TArgs...>,
+                  Overlay<T, details::OverlayStateAlias,
+                          details::OverlayBufferExpansionAssertTrait, TArgs...>,
                   T>,
               T>,
           T> {
@@ -538,18 +571,18 @@ class OverlayAlias
 	 * lifetime of the parent overlay object.
 	 */
 private:
-	using Impl = details::OverlayStateAlias<OverlayAlias>;
 	using ExpansionHandler = details::OverlayBufferExpansionAssert;
 	using Base =
 	    details::OverlayRelocationInterface<
 	        details::OverlayInterface<
 	            details::OverlayInternal<
-	                Overlay<T, Impl, ExpansionHandler, TArgs...>,
+	                Overlay<T, details::OverlayStateAlias,
+	                        details::OverlayBufferExpansionAssertTrait, TArgs...>,
 	                T>,
 	            T>,
 	        T>;
 	using State = typename Base::State_impl;
-	friend Impl;
+	using Impl = details::OverlayStateAlias<State>;
 
 public:
 	template <std::derived_from<typename Base::OverlayBase> O>
@@ -563,6 +596,23 @@ private:
 
 // ################ MMW Overlay ################
 // Memory Managing Wrapper
+namespace details {
+template <class... Args>
+inline constexpr bool LastArgIsAlloc =
+    requires {
+	    requires tx::type_list_count_v<tx::type_list_t<Args...>> > 0;
+	    requires tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
+    };
+
+template <class Fallback, class... Args>
+using ParseLastAllocatorArg = typename decltype([] {
+	if constexpr (details::LastArgIsAlloc<Args...>)
+		return std::type_identity<
+		    tx::type_list_back_t<tx::type_list_t<Args...>>>{};
+	else
+		return std::type_identity<Fallback>{};
+}())::type;
+} // namespace details
 
 /**
  * The high-level std::vector-like wrapper of overlays
@@ -572,36 +622,30 @@ private:
  * - `Allocator`: The last parameter of the template. The type does not matter.
  *                Default is std::allocator<T>
  */
-template <template <class...> class Overlay, class T, class... TArgs>
+template <template <class, template <class> class, class...> class Overlay, class T, class... TArgs>
 class OverlayMMW
     : public details::OverlayInterface<
           details::OverlayInternal<
-              Overlay<T, details::OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>,
-                      details::OverlayBufferExpansionResize<
-                          OverlayMMW<Overlay, T, TArgs...>>,
+              Overlay<T, details::OverlayStateOwner,
+                      details::OverlayBufferExpansionResizeTrait<
+                          details::ParseLastAllocatorArg<std::allocator<T>, TArgs...>, T>,
                       TArgs...>,
               T>,
           T> {
 private:
-	template <class... Args>
-	static constexpr bool LastArgIsAlloc =
-	    tx::type_list_count_v<tx::type_list_t<Args...>> &&
-	    tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
-
-	using Impl = details::OverlayStateOwner<OverlayMMW<Overlay, T, TArgs...>>;
-	using ExpansionHandler = details::OverlayBufferExpansionResize<OverlayMMW>;
+	using Allocator = details::ParseLastAllocatorArg<std::allocator<T>, TArgs...>;
 	using Base = details::OverlayInterface<
 	    details::OverlayInternal<
-	        Overlay<T, Impl, ExpansionHandler, TArgs...>,
+	        Overlay<T, details::OverlayStateOwner,
+	                details::OverlayBufferExpansionResizeTrait<Allocator, T>, TArgs...>,
 	        T>,
 	    T>;
+	using ExpansionHandler = details::OverlayBufferExpansionResize<
+	    Allocator, typename Base::buffer_trait, T>;
 	using State = typename Base::State_impl;
-	using Allocator = std::conditional_t<
-	    LastArgIsAlloc<TArgs...>,
-	    tx::type_list_back_t<tx::type_list_t<TArgs...>>, std::allocator<T>>;
+	using Impl = details::OverlayStateOwner<State>;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
 	using Meta = typename Base::Meta;
-	friend Impl;
 
 private:
 	template <class... Args>

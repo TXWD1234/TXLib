@@ -18,7 +18,7 @@ namespace tx {
 /**
  * internal implementation of data structure, shouldn't be instantiated by user
  */
-template <class T, template <class> class StateProviderTemplate, class BufferExpansionHandler>
+template <class T, template <class> class StateProviderTemplate, class BufferExpansionHandlerTraits>
 class RingBufferOverlayBase {
 protected:
 	// default to null state
@@ -49,11 +49,16 @@ protected:
 		// State_impl(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
 	};
 
+	using buffer_trait = impl::overlay_single_buffer_trait;
 	using StateProvider = StateProviderTemplate<State_impl>;
+	using BufferExpansionHandler =
+	    typename BufferExpansionHandlerTraits::
+	        template type<buffer_trait>;
 	friend StateProvider;
 	friend BufferExpansionHandler;
 	//static_assert(tx::invocable_r<StateProvider, State_impl&>);
 	//static_assert(std::invocable<RingBufferOverlayBase, T*&, u32, u32, u32>);
+
 
 public:
 	using value_type = T;
