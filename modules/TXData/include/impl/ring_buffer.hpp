@@ -19,7 +19,18 @@ namespace tx {
  * internal implementation of data structure, shouldn't be instantiated by user
  */
 template <class T, template <class> class StateProviderTemplate, class BufferExpansionHandlerTraits>
-class RingBufferOverlayBase {
+class RingBufferOverlayBase
+    : private impl::OverlayBaseInternal<
+          RingBufferOverlayBase<
+              T, StateProviderTemplate,
+              BufferExpansionHandlerTraits>>,
+      protected impl::OverlayBaseIntrinsics<
+          RingBufferOverlayBase<
+              T, StateProviderTemplate,
+              BufferExpansionHandlerTraits>> {
+	friend impl::OverlayBaseInternal<RingBufferOverlayBase>;
+	friend impl::OverlayBaseIntrinsics<RingBufferOverlayBase>;
+
 protected:
 	// default to null state
 	struct State_impl {
@@ -49,7 +60,7 @@ protected:
 		// State_impl(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
 	};
 
-	using buffer_trait = impl::overlay_single_buffer_trait;
+	using buffer_trait = impl::overlay_single_buffer_trait<T>;
 	using StateProvider = StateProviderTemplate<State_impl>;
 	using BufferExpansionHandler =
 	    typename BufferExpansionHandlerTraits::
@@ -59,26 +70,12 @@ protected:
 	//static_assert(tx::invocable_r<StateProvider, State_impl&>);
 	//static_assert(std::invocable<RingBufferOverlayBase, T*&, u32, u32, u32>);
 
-
 public:
-	using value_type = T;
-	// DevNote: stale?
-	using StateStorage = impl::Storage<State_impl>;
-
-public:
-	// DevNote: should this be move?
 	RingBufferOverlayBase(StateProvider&& stateProvider,
 	                      BufferExpansionHandler&& bufferExpansionHandler)
 	    : m_state(std::move(stateProvider)),
 	      m_expand(std::move(bufferExpansionHandler)) {}
 	RingBufferOverlayBase() = default;
-
-	RingBufferOverlayBase(const RingBufferOverlayBase&) = default;
-	RingBufferOverlayBase& operator=(const RingBufferOverlayBase&) = default;
-	RingBufferOverlayBase(RingBufferOverlayBase&& other) = default;
-	RingBufferOverlayBase& operator=(RingBufferOverlayBase&& other) = default;
-
-	bool valid() const { return state().buffer.ptr && state().buffer.size; }
 
 public:
 	// basic getter
@@ -233,27 +230,12 @@ public:
 		    dest, state().buffer.size, &state());
 	}
 
-public:
-	// lifetime APIs
-
-	// <---------------------- remove
-	// Destroies internal state object, ends lifetime of this overlay and every
-	// other overlays that share the same buffers. Any other copies of this
-	// overlay are now dangling and must not be used.
-	// This is the point of no return.
-	void destruct() {
-		impl::assert_impl(impl::assert::overlay_object_valid(this));
-		std::destroy_at(m_state);
-		// Not nulling the object because if so it would be inconsistent with
-		// the alias objects of this object, since they are not nulled.
-	}
-
 private:
 	// m_state is guaranteed to be valid, because this is only instantiated
 	// internally.
 	// But the State_impl object returned by `m_state()` might not be valid
 	StateProvider m_state;
-	BufferExpansionHandler m_expand;
+	[[no_unique_address]] BufferExpansionHandler m_expand;
 
 private:
 	// ================ Architectural Helpers ================
@@ -262,8 +244,7 @@ private:
 	State_impl& state() { return m_state(); }
 
 	void expand_impl(u32 expansionCount = 1) {
-		m_expand(this, state().buffer.ptr, size(),
-		         expansionCount, state().buffer.size);
+		this->expand(size(), expansionCount);
 	}
 
 private:
@@ -305,8 +286,8 @@ protected:
 	 * all functions taking in lambda should return whatever the lambda returns
 	 * 
 	 * [Exposure of Policy Object]
-	 * - overlayGetStateProvider()
-	 * - overlayGetBufferExpansionHandler()
+	 * - overlayGetStateProvider() // return by ref
+	 * - overlayGetBufferExpansionHandler() // return by value
 	 * - overlaySetStateProvider() // support move
 	 * - overlaySetBufferExpansionHandler() // support move
 	 * 

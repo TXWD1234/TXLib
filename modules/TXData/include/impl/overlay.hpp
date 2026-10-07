@@ -85,30 +85,37 @@ concept overlay_parameter_object =
  * SingleBuffer and DataMetaBuffer.
  * The OverlayBase class should define it's buffer trait via:
  * ```cpp
- * using buffer_trait = impl::overlay_single_buffer_trait;
+ * using buffer_trait = impl::overlay_single_buffer_trait<T>;
  * ```
  */
 
-struct overlay_single_buffer_trait {};
+template <class T>
+struct overlay_single_buffer_trait {
+	using type = T;
+};
 
-template <class Meta>
+template <class T, class Meta>
 struct overlay_data_meta_buffer_trait {
-	using type = Meta;
+	using type = T;
+	using meta_type = Meta;
 };
 
 namespace details {
 
 template <class Trait>
 concept overlay_single_buffer =
-    std::same_as<Trait, impl::overlay_single_buffer_trait>;
+    tx::instantiation_of<Trait, impl::overlay_single_buffer_trait>;
 template <class Trait>
 concept overlay_data_meta_buffer =
     tx::instantiation_of<Trait, impl::overlay_data_meta_buffer_trait>;
 
 template <class Trait>
+using overlay_data_t = typename Trait::type;
+
+template <class Trait>
 using overlay_meta_t = typename decltype([] {
 	if constexpr (overlay_data_meta_buffer<Trait>)
-		return std::type_identity<typename Trait::type>{};
+		return std::type_identity<typename Trait::meta_type>{};
 	else
 		return std::type_identity<tx::Nothing>{};
 }())::type;
@@ -184,7 +191,7 @@ private:
 
 private:
 	static constexpr u32 ExpansionFactor = 2;
-	u32 findNewCapacity_impl(
+	static u32 findNewCapacity_impl(
 	    u32 expansionCount, u32 currentSize, u32 currentCapacity) {
 		return std::max(currentSize + expansionCount,
 		                currentCapacity * ExpansionFactor);
@@ -212,7 +219,7 @@ public:
 
 	template <class OverlayBase>
 	void expand(
-	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    OverlayBase* base, u32 expansionCount, T* bufferPtr,
 	    u32 currentSize, u32 currentCapacity) const
 	    requires details::overlay_single_buffer<buffer_trait>
 	{
@@ -224,7 +231,7 @@ public:
 
 	template <class OverlayBase>
 	void expandData(
-	    OverlayBase* base, T* bufferPtr, u32 expansionCount,
+	    OverlayBase* base, u32 expansionCount, T* bufferPtr,
 	    u32 currentSize, u32 currentCapacity) const
 	    requires details::overlay_data_meta_buffer<buffer_trait>
 	{
@@ -235,8 +242,9 @@ public:
 	}
 	template <class OverlayBase>
 	void expandMeta(
-	    OverlayBase* base, details::overlay_meta_t<buffer_trait>* bufferPtr,
-	    u32 expansionCount, u32 currentSize, u32 currentCapacity) const
+	    OverlayBase* base, u32 expansionCount,
+	    details::overlay_meta_t<buffer_trait>* bufferPtr,
+	    u32 currentSize, u32 currentCapacity) const
 	    requires details::overlay_data_meta_buffer<buffer_trait>
 	{
 		expand_impl(bufferPtr, expansionCount, currentSize, currentCapacity,
@@ -305,7 +313,7 @@ protected:
 	               std::constructible_from<State, T*, u32>));
 	static_assert(!DataMetaBuffer ||
 	              (DataMetaBuffer &&
-	               std::constructible_from<State, T*, u32, Meta, u32>));
+	               std::constructible_from<State, T*, u32, Meta*, u32>));
 
 
 protected:
@@ -845,12 +853,34 @@ inline T* overlayNullCheck(
 	return ptr;
 }
 
+// ================ Buffer State ================
 /**
- * Func will be called in constructor body. It's intended usage is to check
- * custom buffer input constraints, such as Pow2.
- * Buffer validity (null check) is already handled
+ * Specification:
+ * - Everything public
+ * - Template Param:
+ *   - must have `std::invocable<BufferInfo> Func = tx::Nothing`
+ * - Construction:
+ *   - must exist:
+ *    - default constructor which nulls everything
+ *    - constructor taking buffer info (standard constructor)
+ *     - call `Func` in constructor body
+ *    - move constructor
+ *   - must not exist:
+ *    - copy semantics
+ * - Member:
+ *   - `valid()` checking null state
+ *   - `null_impl()` nulling self
+ *   - `copy_impl(other)` copy from other to self
  */
-template <class T, std::invocable<T*&, u32&> Func>
+/**
+ * Usage:
+ * Second Parameter Argument: Func will be called in constructor body. It's
+ * intended usage is to check custom buffer input constraints, such as Pow2.
+ * Buffer validity (null check) is already handled.
+ */
+
+
+template <class T, std::invocable<T*&, u32&> Func = tx::Nothing>
 struct OverlayBaseBufferStateSingle {
 	OverlayBaseBufferStateSingle() = default;
 	OverlayBaseBufferStateSingle(
@@ -861,6 +891,8 @@ struct OverlayBaseBufferStateSingle {
 	}
 	T* ptr = nullptr;
 	u32 size = 0;
+
+	bool valid() const { return ptr && size; }
 
 	void null_impl() {
 		ptr = nullptr;
@@ -890,7 +922,7 @@ struct OverlayBaseBufferStateSingle {
  * custom buffer input constraints, such as Pow2.
  * Buffer validity (null check) is already handled
  */
-template <class T, class Meta, std::invocable<T*&, u32&, Meta*&, u32&> Func>
+template <class T, class Meta, std::invocable<T*&, u32&, Meta*&, u32&> Func = tx::Nothing>
 struct OverlayBaseBufferStateDataMeta {
 	OverlayBaseBufferStateDataMeta() = default;
 	OverlayBaseBufferStateDataMeta(
@@ -904,6 +936,10 @@ struct OverlayBaseBufferStateDataMeta {
 	Meta* metaPtr = nullptr;
 	u32 dataSize = 0;
 	u32 metaSize = 0;
+
+	bool valid() const {
+		return dataPtr && metaPtr && dataSize && metaSize;
+	}
 
 	void null_impl() {
 		dataPtr = nullptr;
@@ -931,6 +967,185 @@ struct OverlayBaseBufferStateDataMeta {
 		other.null_impl();
 		return *this;
 	};
+};
+
+// ================ CRTP Interface Helpers ================
+/**
+ * Interface Helpers classes inherited by OverlayBase must be friended by
+ * OverlayBase.
+ */
+
+// Generalizing the internal implementation and provide helpers for OverlayBase
+// Should be inherited privately.
+template <impl::overlay OverlayBase>
+struct OverlayBaseInternal {
+private:
+	using State = typename OverlayBase::State_impl;
+
+	static constexpr bool SingleBuffer =
+	    details::overlay_single_buffer<typename OverlayBase::buffer_trait>;
+	static constexpr bool DataMetaBuffer =
+	    details::overlay_data_meta_buffer<typename OverlayBase::buffer_trait>;
+
+	using Meta = details::overlay_meta_t<typename OverlayBase::buffer_trait>;
+
+private:
+	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
+	State& state() { return self().m_state(); }
+
+public:
+	// @param size logical size
+	void expand(u32 size, u32 expansionCount = 1)
+	    requires SingleBuffer
+	{
+		self()->m_expand.expand(
+		    self(), expansionCount,
+		    state().buffer.ptr, size, state().buffer.size);
+	}
+	// @param size logical size
+	void expandData(u32 size, u32 expansionCount = 1)
+	    requires DataMetaBuffer
+	{
+		self()->m_expand.expandData(
+		    self(), expansionCount,
+		    state().buffer.ptr, size, state().buffer.size);
+	}
+	// @param size logical size
+	void expandMeta(u32 size, u32 expansionCount = 1)
+	    requires DataMetaBuffer
+	{
+		self()->m_expand.expandMeta(
+		    self(), expansionCount,
+		    state().buffer.ptr, size, state().buffer.size);
+	}
+};
+
+// Provide public interface for OverlayBase
+// *CRTP finally being used like CRTP.*
+// Should be inherited publicly
+template <impl::overlay OverlayBase>
+struct OverlayBaseInterface {
+private:
+	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
+
+public:
+	// ================ Overlay Pattern Oriented ================
+
+	bool valid() const { self().state().buffer.valid(); }
+
+public:
+	// ================ General Public Interface ================
+
+	/**
+	 * size/empty/full/capacity/data
+	 */
+};
+
+// Provide default intrinsic interface for OverlayBase
+// Should be inherited protectedly.
+/**
+ * This Intrinsic class only provide default intrinsics created under
+ * general assumptions of normal overlay data structures. If any specific
+ * custom conditions apply, shadow the functions with specific logic in the
+ * OverlayBase implementation.
+ */
+template <impl::overlay OverlayBase>
+struct OverlayBaseIntrinsics {
+	/**
+	 * All default intrinsic implementation are encouraged to use as few
+	 * internal access privilege as possible, and replace direct internal
+	 * access with intrinsics as much as possible.
+	 * The reason for that is because all intrinsics imeplementation are
+	 * implemented under assumption, and might be overridden by the OverlayBase
+	 * class implementation. When an intrinsic implementation calls other
+	 * intrinsic instead of hardcoded default logic, the called intrinsic is
+	 * guaranteed to contain correct logic.
+	 */
+private:
+	using State = typename OverlayBase::State_impl;
+	using StateProvider = typename OverlayBase::StateProvider;
+	using BufferExpansionHandler = typename OverlayBase::BufferExpansionHandler;
+
+	static constexpr bool SingleBuffer =
+	    details::overlay_single_buffer<typename OverlayBase::buffer_trait>;
+	static constexpr bool DataMetaBuffer =
+	    details::overlay_data_meta_buffer<typename OverlayBase::buffer_trait>;
+
+	using T = details::overlay_data_t<typename OverlayBase::buffer_trait>;
+	using Meta = details::overlay_meta_t<typename OverlayBase::buffer_trait>;
+
+private:
+	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
+
+protected:
+	// ================ Policy Object Exposure ================
+
+	// <------------ constness
+	StateProvider& overlayGetStateProvider() { return self()->m_state; }
+	BufferExpansionHandler overlayGetBufferExpansionHandler() { return self()->m_expand; }
+
+	template <class U>
+	    requires std::same_as<std::remove_cvref_t<U>, StateProvider>
+	void overlaySetStateProvider(U&& stateProvider) {
+		self()->m_state = std::forward<U>(stateProvider);
+	}
+	template <class U>
+	    requires std::same_as<std::remove_cvref_t<U>, BufferExpansionHandler>
+	void overlaySetBufferExpansionHandler(U&& bufferExpansionHandler) {
+		self()->m_expand = std::forward<U>(bufferExpansionHandler);
+	}
+
+protected:
+	// ================ Buffer State Management ================
+
+	template <class Func>
+	    requires((SingleBuffer && std::invocable<Func, T*, u32>) ||
+	             (DataMetaBuffer && std::invocable<Func, T*, u32, Meta*, u32>))
+	decltype(auto) overlayGetBufferState(Func&& f) {
+		if constexpr (SingleBuffer) {
+			return f(self()->state().buffer.ptr, self()->state().buffer.size);
+		} else {
+			return f(
+			    self()->state().buffer.dataPtr, self()->state().buffer.dataSize,
+			    self()->state().buffer.metaPtr, self()->state().buffer.metaSize);
+		}
+	}
+
+	void overlaySetBufferState(T* ptr, u32 size)
+	    requires SingleBuffer
+	{
+		self()->state().buffer = typename State::BufferState_impl(ptr, size);
+	}
+	void overlaySetBufferStateData(T* dataPtr, u32 dataSize)
+	    requires DataMetaBuffer
+	{
+		self()->state().buffer.dataPtr = dataPtr;
+		self()->state().buffer.dataSize = dataSize;
+	}
+	void overlaySetBufferStateMeta(Meta* metaPtr, u32 metaSize)
+	    requires DataMetaBuffer
+	{
+		self()->state().buffer.metaPtr = metaPtr;
+		self()->state().buffer.metaSize = metaSize;
+	}
+
+	void overlayRelocateBuffer(T* ptr, u32 size)
+	    requires SingleBuffer
+	{
+
+		self()->overlaySetBufferStateData(ptr, size);
+	}
+	void overlayRelocateBufferData(T* dataPtr, u32 dataSize)
+	    requires DataMetaBuffer
+	{
+		self()->overlaySetBufferStateData(dataPtr, dataSize);
+	}
+	void overlayRelocateBufferMeta(Meta* metaPtr, u32 metaSize)
+	    requires DataMetaBuffer
+	{
+
+		self()->overlaySetBufferStateData(metaPtr, metaSize);
+	}
 };
 
 } // namespace tx::impl

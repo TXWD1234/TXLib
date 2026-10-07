@@ -27,7 +27,11 @@ inline constexpr bool false_v = false;
 // #############################################
 
 // Conditional Presence
-class Nothing {};
+// Also used for lambda place holders
+struct Nothing {
+	template <typename... Args>
+	constexpr void operator()(Args&&...) const noexcept {}
+};
 
 template <auto V>
 struct nttp_holder {
