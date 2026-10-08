@@ -95,4 +95,7 @@ endif()
 
 include("${TXLib_INSTALLATION_DIR}/add_umbrella_target.cmake")
 
+# Expose TXLib location
+set(TXLib_SOURCE_DIR ${TXLib_SOURCE_DIR} PARENT_SCOPE)
+
 tx_log("Done adding TXLib.")
