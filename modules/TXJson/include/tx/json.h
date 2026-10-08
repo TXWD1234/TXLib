@@ -267,7 +267,7 @@ public:
 		return getRaw_impl<Type>();
 	}
 	template <JsonTypes Type>
-	json_enum_type_t<Type> getUnchecked() const {
+	json_enum_type_t<Type> get_unchecked() const {
 		return getRaw_impl<Type>();
 	}
 
@@ -297,6 +297,45 @@ private:
 
 	template <JsonTypes Type>
 	json_enum_type_t<Type> getRaw_impl() const;
+
+public:
+	// ================ Public Interface Shortend ================
+
+	bool is_obj() const { return is(JsonTypes::Object); }
+	bool is_arr() const { return is(JsonTypes::Array); }
+	bool is_str() const { return is(JsonTypes::String); }
+	bool is_int() const { return is(JsonTypes::Int); }
+	bool is_float() const { return is(JsonTypes::Float); }
+	bool is_bool() const { return is(JsonTypes::Boolean); }
+	bool is_null() const { return is(JsonTypes::Null); }
+
+	std::expected<JsonObject, JsonTypes> get_obj() const;
+	std::expected<JsonArray, JsonTypes> get_arr() const;
+	std::expected<std::string_view, JsonTypes> get_str() const {
+		return get<JsonTypes::String>();
+	}
+	std::expected<i64, JsonTypes> get_int() const {
+		return get<JsonTypes::Int>();
+	}
+	std::expected<f64, JsonTypes> get_float() const {
+		return get<JsonTypes::Float>();
+	}
+	std::expected<bool, JsonTypes> get_bool() const {
+		return get<JsonTypes::Boolean>();
+	}
+	std::expected<std::nullptr_t, JsonTypes> get_null() const {
+		return get<JsonTypes::Null>();
+	}
+
+	// ================ Type-Specific Unchecked Accessors ================
+
+	JsonObject get_obj_unchecked() const;
+	JsonArray get_arr_unchecked() const;
+	std::string_view get_str_unchecked() const { return get_unchecked<JsonTypes::String>(); }
+	i64 get_int_unchecked() const { return get_unchecked<JsonTypes::Int>(); }
+	f64 get_float_unchecked() const { return get_unchecked<JsonTypes::Float>(); }
+	bool get_bool_unchecked() const { return get_unchecked<JsonTypes::Boolean>(); }
+	std::nullptr_t get_null_unchecked() const { return get_unchecked<JsonTypes::Null>(); }
 };
 
 class JsonObject : public impl::json::DocumentPointer {
@@ -551,6 +590,15 @@ inline JsonValue JsonValue::operator[](u32 index) const {
 	} else
 		return JsonValue{ nullptr, InvalidU32 };
 }
+
+inline std::expected<JsonObject, JsonTypes> JsonValue::get_obj() const {
+	return get<JsonTypes::Object>();
+}
+inline std::expected<JsonArray, JsonTypes> JsonValue::get_arr() const {
+	return get<JsonTypes::Array>();
+}
+inline JsonObject JsonValue::get_obj_unchecked() const { return get_unchecked<JsonTypes::Object>(); }
+inline JsonArray JsonValue::get_arr_unchecked() const { return get_unchecked<JsonTypes::Array>(); }
 
 
 inline JsonObject JsonDocument::root() const {
