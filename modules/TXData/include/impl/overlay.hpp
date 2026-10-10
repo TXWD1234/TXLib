@@ -932,6 +932,7 @@ struct OverlayBaseBufferStateDataMeta {
 	      dataSize(dataSize_), metaSize(metaSize_) {
 		Func{}(dataPtr, dataSize, metaPtr, metaSize);
 	}
+	// <---------- refactor to 2 single
 	T* dataPtr = nullptr;
 	Meta* metaPtr = nullptr;
 	u32 dataSize = 0;
@@ -980,18 +981,14 @@ struct OverlayBaseBufferStateDataMeta {
 template <impl::overlay OverlayBase>
 struct OverlayBaseInternal {
 private:
-	using State = typename OverlayBase::State_impl;
-
 	static constexpr bool SingleBuffer =
 	    details::overlay_single_buffer<typename OverlayBase::buffer_trait>;
 	static constexpr bool DataMetaBuffer =
 	    details::overlay_data_meta_buffer<typename OverlayBase::buffer_trait>;
 
-	using Meta = details::overlay_meta_t<typename OverlayBase::buffer_trait>;
-
 private:
 	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
-	State& state() { return self().m_state(); }
+	auto& state() { return self()->m_state(); }
 
 public:
 	// @param size logical size
@@ -1031,7 +1028,7 @@ private:
 public:
 	// ================ Overlay Pattern Oriented ================
 
-	bool valid() const { self().state().buffer.valid(); }
+	bool valid() const { return self()->state().buffer.valid(); }
 
 public:
 	// ================ General Public Interface ================
@@ -1049,7 +1046,9 @@ public:
  * custom conditions apply, shadow the functions with specific logic in the
  * OverlayBase implementation.
  */
-template <impl::overlay OverlayBase>
+template <impl::overlay OverlayBase, class State,
+          class StateProvider, class BufferExpansionHandler,
+          class buffer_trait>
 struct OverlayBaseIntrinsics {
 	/**
 	 * All default intrinsic implementation are encouraged to use as few
@@ -1061,18 +1060,15 @@ struct OverlayBaseIntrinsics {
 	 * intrinsic instead of hardcoded default logic, the called intrinsic is
 	 * guaranteed to contain correct logic.
 	 */
+
 private:
-	using State = typename OverlayBase::State_impl;
-	using StateProvider = typename OverlayBase::StateProvider;
-	using BufferExpansionHandler = typename OverlayBase::BufferExpansionHandler;
-
 	static constexpr bool SingleBuffer =
-	    details::overlay_single_buffer<typename OverlayBase::buffer_trait>;
+	    details::overlay_single_buffer<buffer_trait>;
 	static constexpr bool DataMetaBuffer =
-	    details::overlay_data_meta_buffer<typename OverlayBase::buffer_trait>;
+	    details::overlay_data_meta_buffer<buffer_trait>;
 
-	using T = details::overlay_data_t<typename OverlayBase::buffer_trait>;
-	using Meta = details::overlay_meta_t<typename OverlayBase::buffer_trait>;
+	using T = details::overlay_data_t<buffer_trait>;
+	using Meta = details::overlay_meta_t<buffer_trait>;
 
 private:
 	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
@@ -1085,7 +1081,7 @@ protected:
 	BufferExpansionHandler overlayGetBufferExpansionHandler() { return self()->m_expand; }
 
 	template <class U>
-	    requires std::same_as<std::remove_cvref_t<U>, StateProvider>
+	    requires std::same_as<std::remove_cvref_t<U>, typename OverlayBase::StateProvider>
 	void overlaySetStateProvider(U&& stateProvider) {
 		self()->m_state = std::forward<U>(stateProvider);
 	}
@@ -1149,3 +1145,10 @@ protected:
 };
 
 } // namespace tx::impl
+
+/**
+ * TODO:
+ * [Minor]
+ * - refactor all state references via inheritance to the independent type
+ * - add concepts where ever fits
+ */

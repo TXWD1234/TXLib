@@ -15,50 +15,76 @@
 #include <format>
 
 namespace tx {
+
+namespace impl {
+namespace details {
+template <class T>
+struct RingBufferState {
+	// default to null state
+	using BufferState_impl = impl::OverlayBaseBufferStateSingle<
+	    T, decltype([](T*& ptr, u32& size) {
+		    if (!tx::isPowTwo(size)) {
+			    impl::assert_impl(
+			        [] { return false; },
+			        [=] {
+				        return std::format(
+				            "Bad construction. Argument `bufferSize` must"
+				            " be a power of 2. bufferSize = {}",
+				            size);
+			        });
+			    ptr = nullptr;
+			    size = 0;
+		    }
+	    })>;
+	BufferState_impl buffer;
+
+	struct LogicState_impl {
+		u32 begin = 0, end = 0;
+	} logic;
+
+	RingBufferState(T* ptr, u32 size) : buffer(ptr, size) {}
+	RingBufferState() = default;
+	// RingBufferState(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
+};
+} // namespace details
+
+
 /**
  * internal implementation of data structure, shouldn't be instantiated by user
  */
-template <class T, template <class> class StateProviderTemplate, class BufferExpansionHandlerTraits>
+template <class T,
+          template <class> class StateProviderTemplate,
+          class BufferExpansionHandlerTraits>
 class RingBufferOverlayBase
     : private impl::OverlayBaseInternal<
+          RingBufferOverlayBase<
+              T, StateProviderTemplate,
+              BufferExpansionHandlerTraits>>,
+      public impl::OverlayBaseInterface<
           RingBufferOverlayBase<
               T, StateProviderTemplate,
               BufferExpansionHandlerTraits>>,
       protected impl::OverlayBaseIntrinsics<
           RingBufferOverlayBase<
               T, StateProviderTemplate,
-              BufferExpansionHandlerTraits>> {
+              BufferExpansionHandlerTraits>,
+          details::RingBufferState<T>,
+          StateProviderTemplate<details::RingBufferState<T>>,
+          typename BufferExpansionHandlerTraits::
+              template type<impl::overlay_single_buffer_trait<T>>,
+          impl::overlay_single_buffer_trait<T>> {
 	friend impl::OverlayBaseInternal<RingBufferOverlayBase>;
-	friend impl::OverlayBaseIntrinsics<RingBufferOverlayBase>;
+	friend impl::OverlayBaseInterface<RingBufferOverlayBase>;
+	friend impl::OverlayBaseIntrinsics<
+	    RingBufferOverlayBase,
+	    details::RingBufferState<T>,
+	    StateProviderTemplate<details::RingBufferState<T>>,
+	    typename BufferExpansionHandlerTraits::
+	        template type<impl::overlay_single_buffer_trait<T>>,
+	    impl::overlay_single_buffer_trait<T>>;
 
 protected:
-	// default to null state
-	struct State_impl {
-		using BufferState_impl = impl::OverlayBaseBufferStateSingle<
-		    T, decltype([](T*& ptr, u32& size) {
-			    if (!tx::isPowTwo(size)) {
-				    impl::assert_impl(
-				        [] { return false; },
-				        [=] {
-					        return std::format(
-					            "Bad construction. Argument `bufferSize` must"
-					            " be a power of 2. bufferSize = {}",
-					            size);
-				        });
-				    ptr = nullptr;
-				    size = 0;
-			    }
-		    })>;
-		BufferState_impl buffer;
-
-		struct LogicState_impl {
-			u32 begin = 0, end = 0;
-		} logic;
-
-		State_impl(T* ptr, u32 size) : buffer(ptr, size) {}
-		State_impl() = default;
-		// State_impl(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
-	};
+	using State_impl = details::RingBufferState<T>;
 
 	using buffer_trait = impl::overlay_single_buffer_trait<T>;
 	using StateProvider = StateProviderTemplate<State_impl>;
@@ -412,4 +438,5 @@ protected:
 // 		swap_impl(other);
 // 	}
 // };
+} // namespace impl
 } // namespace tx
