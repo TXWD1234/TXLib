@@ -139,6 +139,7 @@ inline const T* at(const u8* ptr) {
 }
 // std::bit_cast but for raw pointers
 // memcpy(&ret, ptr, sizeof(T))
+// read only
 template <class T>
 inline T as(const u8* ptr) {
 	T ret;
@@ -158,6 +159,13 @@ inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 		          "size = {}",
 		          size); });
 	return index & (size - (T)1);
+}
+
+template <class T, class... Args>
+    requires std::constructible_from<T, Args...> &&
+             std::assignable_from<T&, T>
+T& reconstruct(T& obj, Args&&... args) {
+	return (obj = T(std::forward<Args>(args)...));
 }
 } // namespace impl
 } // namespace tx

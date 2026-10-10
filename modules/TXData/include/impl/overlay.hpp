@@ -884,10 +884,10 @@ template <class T, std::invocable<T*&, u32&> Func = tx::Nothing>
 struct OverlayBaseBufferStateSingle {
 	OverlayBaseBufferStateSingle() = default;
 	OverlayBaseBufferStateSingle(
-	    T* dataPtr_, u32 dataSize_)
+	    T* dataPtr_, u32 dataSize_, Func f = Func{})
 	    : ptr(overlayNullCheck(dataPtr_, dataSize_)),
 	      size(dataSize_) {
-		Func{}(ptr, size);
+		f(ptr, size);
 	}
 	T* ptr = nullptr;
 	u32 size = 0;
@@ -922,46 +922,37 @@ struct OverlayBaseBufferStateSingle {
  * custom buffer input constraints, such as Pow2.
  * Buffer validity (null check) is already handled
  */
-template <class T, class Meta, std::invocable<T*&, u32&, Meta*&, u32&> Func = tx::Nothing>
+template <class T, class Meta,
+          std::invocable<T*&, u32&> DataFunc = tx::Nothing,
+          std::invocable<Meta*&, u32&> MetaFunc = tx::Nothing>
 struct OverlayBaseBufferStateDataMeta {
 	OverlayBaseBufferStateDataMeta() = default;
 	OverlayBaseBufferStateDataMeta(
-	    T* dataPtr_, u32 dataSize_, Meta* metaPtr_, u32 metaSize_)
-	    : dataPtr(overlayNullCheck(dataPtr_, dataSize_)),
-	      metaPtr(overlayNullCheck(metaPtr_, metaSize_)),
-	      dataSize(dataSize_), metaSize(metaSize_) {
-		Func{}(dataPtr, dataSize, metaPtr, metaSize);
-	}
-	// <---------- refactor to 2 single
-	T* dataPtr = nullptr;
-	Meta* metaPtr = nullptr;
-	u32 dataSize = 0;
-	u32 metaSize = 0;
+	    T* dataPtr_, u32 dataSize_,
+	    Meta* metaPtr_, u32 metaSize_,
+	    DataFunc df = DataFunc{}, MetaFunc mf = MetaFunc{})
+	    : data(overlayNullCheck(dataPtr_, dataSize_), dataSize_, df),
+	      meta(overlayNullCheck(metaPtr_, metaSize_), metaSize_, mf) {}
+	impl::OverlayBaseBufferStateSingle<T, DataFunc> data;
+	impl::OverlayBaseBufferStateSingle<Meta, MetaFunc> meta;
 
-	bool valid() const {
-		return dataPtr && metaPtr && dataSize && metaSize;
-	}
+	bool valid() const { return data.valid() && meta.valid(); }
 
 	void null_impl() {
-		dataPtr = nullptr;
-		metaPtr = nullptr;
-		dataSize = 0;
-		metaSize = 0;
+		data.null_impl();
+		meta.null_impl();
 	}
 
 	// copy from
 	void copy_impl(const OverlayBaseBufferStateDataMeta& other) {
-		dataPtr = other.dataPtr;
-		metaPtr = other.metaPtr;
-		dataSize = other.dataSize;
-		metaSize = other.metaSize;
+		data.copy_impl(other.data);
+		meta.copy_impl(other.meta);
 	}
 
 	OverlayBaseBufferStateDataMeta(const OverlayBaseBufferStateDataMeta&) = delete;
 	OverlayBaseBufferStateDataMeta& operator=(const OverlayBaseBufferStateDataMeta&) = delete;
 	OverlayBaseBufferStateDataMeta(OverlayBaseBufferStateDataMeta&& other)
-	    : dataPtr(other.dataPtr), metaPtr(other.metaPtr),
-	      dataSize(other.dataSize), metaSize(other.metaSize) { other.null_impl(); }
+	    : data(std::move(other.data)), meta(std::move(other.meta)) { other.null_impl(); }
 	OverlayBaseBufferStateDataMeta& operator=(OverlayBaseBufferStateDataMeta&& other) {
 		if (&other == this) return *this;
 		copy_impl(other);
@@ -1100,30 +1091,22 @@ protected:
 	decltype(auto) overlayGetBufferState(Func&& f) {
 		if constexpr (SingleBuffer) {
 			return f(self()->state().buffer.ptr, self()->state().buffer.size);
-		} else {
+		} else if constexpr (DataMetaBuffer) {
 			return f(
-			    self()->state().buffer.dataPtr, self()->state().buffer.dataSize,
-			    self()->state().buffer.metaPtr, self()->state().buffer.metaSize);
+			    self()->state().buffer.data.ptr, self()->state().buffer.data.size,
+			    self()->state().buffer.meta.ptr, self()->state().buffer.meta.size);
 		}
 	}
 
 	void overlaySetBufferState(T* ptr, u32 size)
 	    requires SingleBuffer
-	{
-		self()->state().buffer = typename State::BufferState_impl(ptr, size);
-	}
+	{ impl::reconstruct(self()->state().buffer, ptr, size); }
 	void overlaySetBufferStateData(T* dataPtr, u32 dataSize)
 	    requires DataMetaBuffer
-	{
-		self()->state().buffer.dataPtr = dataPtr;
-		self()->state().buffer.dataSize = dataSize;
-	}
+	{ impl::reconstruct(self()->state().buffer.data, dataPtr, dataSize); }
 	void overlaySetBufferStateMeta(Meta* metaPtr, u32 metaSize)
 	    requires DataMetaBuffer
-	{
-		self()->state().buffer.metaPtr = metaPtr;
-		self()->state().buffer.metaSize = metaSize;
-	}
+	{ impl::reconstruct(self()->state().buffer.data, metaPtr, metaSize); }
 
 	void overlayRelocateBuffer(T* ptr, u32 size)
 	    requires SingleBuffer
