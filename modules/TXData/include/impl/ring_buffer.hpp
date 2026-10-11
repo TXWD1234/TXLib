@@ -59,7 +59,9 @@ class RingBufferOverlayBase
     : private impl::OverlayBaseInternal<
           RingBufferOverlayBase<
               T, StateProviderTemplate,
-              BufferExpansionHandlerTraits>>,
+              BufferExpansionHandlerTraits>,
+          impl::overlay_single_buffer_trait<
+              T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
       public impl::OverlayBaseInterface<
           RingBufferOverlayBase<
               T, StateProviderTemplate,
@@ -71,28 +73,37 @@ class RingBufferOverlayBase
           details::RingBufferState<T>,
           StateProviderTemplate<details::RingBufferState<T>>,
           typename BufferExpansionHandlerTraits::
-              template type<impl::overlay_single_buffer_trait<T>>,
-          impl::overlay_single_buffer_trait<T>> {
-	friend impl::OverlayBaseInternal<RingBufferOverlayBase>;
+              template type<impl::overlay_single_buffer_trait<
+                  T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
+          impl::overlay_single_buffer_trait<
+              T, impl::overlay_buffer_trait_realloc_policy_pow_two>> {
+	friend impl::OverlayBaseInternal<
+	    RingBufferOverlayBase,
+	    impl::overlay_single_buffer_trait<
+	        T, impl::overlay_buffer_trait_realloc_policy_pow_two>>;
 	friend impl::OverlayBaseInterface<RingBufferOverlayBase>;
 	friend impl::OverlayBaseIntrinsics<
 	    RingBufferOverlayBase,
 	    details::RingBufferState<T>,
 	    StateProviderTemplate<details::RingBufferState<T>>,
 	    typename BufferExpansionHandlerTraits::
-	        template type<impl::overlay_single_buffer_trait<T>>,
-	    impl::overlay_single_buffer_trait<T>>;
+	        template type<impl::overlay_single_buffer_trait<
+	            T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
+	    impl::overlay_single_buffer_trait<
+	        T, impl::overlay_buffer_trait_realloc_policy_pow_two>>;
 
 protected:
 	using State_impl = details::RingBufferState<T>;
 
-	using buffer_trait = impl::overlay_single_buffer_trait<T>;
+	using buffer_trait = impl::overlay_single_buffer_trait<
+	    T, impl::overlay_buffer_trait_realloc_policy_pow_two>;
 	using StateProvider = StateProviderTemplate<State_impl>;
 	using BufferExpansionHandler =
 	    typename BufferExpansionHandlerTraits::
 	        template type<buffer_trait>;
 	friend StateProvider;
 	friend BufferExpansionHandler;
+	friend details::OverlayBaseIntrinsicsAccessor<RingBufferOverlayBase>;
 	//static_assert(tx::invocable_r<StateProvider, State_impl&>);
 	//static_assert(std::invocable<RingBufferOverlayBase, T*&, u32, u32, u32>);
 
@@ -317,7 +328,7 @@ protected:
 	 * - overlaySetStateProvider() // support move
 	 * - overlaySetBufferExpansionHandler() // support move
 	 * 
-	 * [BufferState management]
+	 * [BufferState Management]
 	 * - overlayGetBufferState(callback(T*, u32, [MetaT*, u32]))
 	 * - overlaySetBufferState(BufferInfo) (SingleBuffer)
 	 * - overlaySetBufferStateData(BufferInfo) (DataMetaBuffer)
@@ -326,12 +337,14 @@ protected:
 	 * - overlayRelocateBufferData(BufferInfo) (DataMetaBuffer) // null guard internal
 	 * - overlayRelocateBufferMeta(BufferInfo) (DataMetaBuffer) // null guard internal
 	 * 
-	 * [LogicState & element management]
+	 * [LogicState & Element Management]
 	 * - overlayGetElementCount(u32, [u32])
-	 * - overlayCopyElements(T*, [Meta*]) // copy to
 	 * - overlayGetLogicStateCopy() // specifically for MMW's state copy; return
 	 *                              // manipulated LogicState_impl
 	 * - overlaySetLogicState(LogicState_impl)
+	 * - overlayCopyElements(T*)        // copy to
+	 * - overlayCopyElementsData(T*)    // copy to
+	 * - overlayCopyElementsMeta(Meta*) // copy to
 	 * 
 	 * - overlayDestroyElements() // null guard
 	 * 

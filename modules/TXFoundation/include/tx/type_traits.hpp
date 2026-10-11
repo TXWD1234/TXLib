@@ -49,6 +49,17 @@ template <class From, class To>
 using const_propagate = std::conditional_t<
     std::is_const_v<std::remove_reference_t<From>>, const To, To>;
 
+// Flawed
+/**
+ * *A rampant defiant of the C++ inheritance system.*
+ * USE IN CAUTION. Don't touch this if you don't know what you are doing.
+ * Allow any class to access the protected member of a class.
+ * 
+ * Usage:
+ * ```cpp
+ * static_cast<tx::protected_accessor<Parent, Consumer>*>(&parent)->protectedMember
+ * ```
+ */
 template <class Parent, class Consumer>
 struct protected_accessor : public Parent {
 	friend Consumer;

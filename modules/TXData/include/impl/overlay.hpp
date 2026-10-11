@@ -4,6 +4,7 @@
 #pragma once
 #include "impl/allocator.hpp"
 #include "impl/data_utils.hpp"
+#include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
@@ -57,6 +58,23 @@ concept overlay = true;
 	 */
 //};
 
+// ================ Protected Accessor ================
+// Grant access to OverlayBase's intrinsics for OverlayAlias, given that
+// OverlayAlias need to call the intrinsics of any type of OverlayBase, which
+// it might not be inheriting thereby has no privilege over that OverlayBase.
+
+// The OverlayBase must
+// `friend details::OverlayBaseIntrinsicsAccessor<OverlayBase>`
+
+namespace details {
+template <class O>
+struct OverlayBaseIntrinsicsAccessor {
+	static decltype(auto) overlayGetStateProvider(O& o) {
+		return o.overlayGetStateProvider();
+	}
+};
+} // namespace details
+
 // ================ State Parameter Object ================
 
 template <class O>
@@ -89,25 +107,62 @@ concept overlay_parameter_object =
  * ```
  */
 
-template <class T>
-struct overlay_single_buffer_trait {
+namespace details {
+template <class Policy>
+concept overlay_buffer_trait_realloc_policy =
+    requires(u32 u) {
+	    { Policy::expand(u, u, u) } -> std::convertible_to<u32>;
+	    { Policy::copy(u) } -> std::convertible_to<u32>;
+    };
+} // namespace details
+
+// ---------------- Presets ----------------
+
+template <class T,
+          details::overlay_buffer_trait_realloc_policy Policy>
+struct overlay_single_buffer_trait : public Policy {
 	using type = T;
+	using realloc_policy = Policy;
 };
 
-template <class T, class Meta>
-struct overlay_data_meta_buffer_trait {
+template <class T, class Meta,
+          details::overlay_buffer_trait_realloc_policy Policy>
+struct overlay_data_meta_buffer_trait : public Policy {
 	using type = T;
 	using meta_type = Meta;
+	using realloc_policy = Policy;
+};
+
+struct overlay_buffer_trait_realloc_policy_regular {
+	static constexpr u32 ExpansionFactor = 2;
+	static u32 expand(
+	    u32 expansionCount, u32 currentSize, u32 currentCapacity) {
+		return std::max(currentSize + expansionCount,
+		                currentCapacity * ExpansionFactor);
+	}
+	static u32 copy(u32 size) { return size; }
+};
+struct overlay_buffer_trait_realloc_policy_pow_two {
+	static constexpr u32 ExpansionFactor = 2;
+	static u32 expand(
+	    u32 expansionCount, u32 currentSize, u32 currentCapacity) {
+		return tx::nextPowTwo(std::max(
+		    currentSize + expansionCount,
+		    currentCapacity * ExpansionFactor));
+	}
+	static u32 copy(u32 size) { return tx::nextPowTwo(size); }
 };
 
 namespace details {
 
+// ---------------- Accessors ----------------
 template <class Trait>
 concept overlay_single_buffer =
     tx::instantiation_of<Trait, impl::overlay_single_buffer_trait>;
 template <class Trait>
 concept overlay_data_meta_buffer =
     tx::instantiation_of<Trait, impl::overlay_data_meta_buffer_trait>;
+
 
 template <class Trait>
 using overlay_data_t = typename Trait::type;
@@ -152,21 +207,21 @@ public:
 
 	template <class OverlayBase, class T>
 	void expand(
-	    OverlayBase*, T*, u32 expansionCount,
+	    OverlayBase*, u32 expansionCount, T*,
 	    u32 currentSize, u32 currentCapacity) const {
 		expand_impl(
 		    expansionCount, currentSize, currentCapacity);
 	}
 	template <class OverlayBase, class T>
 	void expandData(
-	    OverlayBase*, T*, u32 expansionCount,
+	    OverlayBase*, u32 expansionCount, T*,
 	    u32 currentSize, u32 currentCapacity) const {
 		expand_impl(
 		    expansionCount, currentSize, currentCapacity);
 	}
-	template <class OverlayBase, class T>
+	template <class OverlayBase, class Meta>
 	void expandMeta(
-	    OverlayBase*, T*, u32 expansionCount,
+	    OverlayBase*, u32 expansionCount, Meta*,
 	    u32 currentSize, u32 currentCapacity) const {
 		expand_impl(
 		    expansionCount, currentSize, currentCapacity);
@@ -190,24 +245,17 @@ private:
 	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
 
 private:
-	static constexpr u32 ExpansionFactor = 2;
-	static u32 findNewCapacity_impl(
-	    u32 expansionCount, u32 currentSize, u32 currentCapacity) {
-		return std::max(currentSize + expansionCount,
-		                currentCapacity * ExpansionFactor);
-	}
-
-	template <class Func>
+	template <class U, class Func>
 	void expand_impl(
-	    T* bufferPtr, u32 expansionCount,
+	    U* bufferPtr, u32 expansionCount,
 	    u32 currentSize, u32 currentCapacity, Func&& f) const {
 		if (currentSize + expansionCount <= currentCapacity) return;
-		u32 newCapacity = findNewCapacity_impl(
+		u32 newCapacity = buffer_trait::expand(
 		    expansionCount, currentSize, currentCapacity);
 
-		f(alloc_traits<T>::allocate(alloc, newCapacity),
+		f(alloc_traits<U>::allocate(alloc, newCapacity),
 		  newCapacity);
-		alloc_traits<T>::deallocate(alloc, bufferPtr, currentCapacity);
+		alloc_traits<U>::deallocate(alloc, bufferPtr, currentCapacity);
 	}
 
 public:
@@ -593,9 +641,15 @@ private:
 	using Impl = details::OverlayStateAlias<State>;
 
 public:
-	template <std::derived_from<typename Base::OverlayBase> O>
-	OverlayAlias(O& parent)
-	    : OverlayAlias(&parent.overlayGetStateProvider()()) {}
+	template <template <class, template <class> class, class...> class OTemplate,
+	          template <class> class StateProviderTemplate,
+	          class ExpansionHandlerTrait>
+	OverlayAlias(
+	    OTemplate<T, StateProviderTemplate, ExpansionHandlerTrait, TArgs...>& parent)
+	    : OverlayAlias(
+	          details::OverlayBaseIntrinsicsAccessor<
+	              OTemplate<T, StateProviderTemplate, ExpansionHandlerTrait, TArgs...>>::
+	              overlayGetStateProvider(parent)()) {}
 
 private:
 	OverlayAlias(State* state)
@@ -620,6 +674,28 @@ using ParseLastAllocatorArg = typename decltype([] {
 	else
 		return std::type_identity<Fallback>{};
 }())::type;
+
+template <class... Args>
+using ForwardingLastAllocatorArgs = decltype([]() {
+	if constexpr (details::LastArgIsAlloc<Args...>) {
+		using list = tx::type_list_t<Args...>;
+		return tx::type_list_sublist_t<list, 0, tx::type_list_count_v<list> - 1>{};
+	} else {
+		return tx::type_list_t<Args...>{};
+	}
+}());
+
+template <template <class, template <class> class, class...> class Overlay,
+          class T, class... TArgs>
+using ComposeOverlayBaseType =
+    typename decltype(details::ForwardingLastAllocatorArgs<TArgs...>::apply(
+        []<class... Args>(tx::type_list_t<Args...>) {
+	        return std::type_identity<Overlay<
+	            T, details::OverlayStateOwner,
+	            details::OverlayBufferExpansionResizeTrait<
+	                details::ParseLastAllocatorArg<std::allocator<T>, TArgs...>, T>,
+	            Args...>>{};
+        }))::type;
 } // namespace details
 
 /**
@@ -634,19 +710,14 @@ template <template <class, template <class> class, class...> class Overlay, clas
 class OverlayMMW
     : public details::OverlayInterface<
           details::OverlayInternal<
-              Overlay<T, details::OverlayStateOwner,
-                      details::OverlayBufferExpansionResizeTrait<
-                          details::ParseLastAllocatorArg<std::allocator<T>, TArgs...>, T>,
-                      TArgs...>,
+              details::ComposeOverlayBaseType<Overlay, T, TArgs...>,
               T>,
           T> {
 private:
 	using Allocator = details::ParseLastAllocatorArg<std::allocator<T>, TArgs...>;
 	using Base = details::OverlayInterface<
 	    details::OverlayInternal<
-	        Overlay<T, details::OverlayStateOwner,
-	                details::OverlayBufferExpansionResizeTrait<Allocator, T>, TArgs...>,
-	        T>,
+	        details::ComposeOverlayBaseType<Overlay, T, TArgs...>, T>,
 	    T>;
 	using ExpansionHandler = details::OverlayBufferExpansionResize<
 	    Allocator, typename Base::buffer_trait, T>;
@@ -654,6 +725,7 @@ private:
 	using Impl = details::OverlayStateOwner<State>;
 	using ParamObj = impl::overlay_parameter_object_t<Base>;
 	using Meta = typename Base::Meta;
+	using buffer_trait = typename Base::buffer_trait;
 
 private:
 	template <class... Args>
@@ -666,7 +738,7 @@ private:
 	template <class U>
 	using alloc_traits = tx::typed_allocator_traits<Allocator, U>;
 
-	Allocator getAlloc_impl(const OverlayMMW* o) {
+	static Allocator& getAlloc_impl(const OverlayMMW* o) {
 		return o->overlayGetBufferExpansionHandler().alloc;
 	}
 
@@ -712,6 +784,7 @@ private:
 	void destruct_impl()
 	    requires Base::SingleBuffer
 	{
+		if (!this->valid()) return;
 		this->overlayDestroyElements();
 		this->overlayGetBufferState([this](T* ptr, u32 size) {
 			alloc_traits<T>::deallocate(
@@ -721,10 +794,11 @@ private:
 	void destruct_impl()
 	    requires Base::DataMetaBuffer
 	{
+		if (!this->valid()) return;
 		this->overlayDestroyElements();
 		this->overlayGetBufferState(
 		    [this](T* dataPtr, u32 dataSize, Base::Meta* metaPtr, u32 metaSize) {
-			    auto& alloc = getAlloc_impl(this);
+			    auto alloc = getAlloc_impl(this);
 			    alloc_traits<T>::deallocate(alloc, dataPtr, dataSize);
 			    alloc_traits<Meta>::deallocate(alloc, metaPtr, metaSize);
 		    });
@@ -745,28 +819,33 @@ private:
 	    requires Base::SingleBuffer
 	{
 		this->overlayGetBufferState([this, &other](T* ptr, u32 size) {
+			T* newPtr = reallocate_impl(
+			    getAlloc_impl(this), ptr, size,
+			    buffer_trait::copy(other.overlayGetElementCount(
+			        [](u32 osize) { return osize; })));
 			this->overlaySetBufferState(
-			    reallocate_impl(
-			        getAlloc_impl(this), ptr, size,
-			        other.overlayGetElementCount([](u32 osize) { return osize; })),
-			    size); // size is updated to max(size, targetSize) in reallocate_impl
+			    newPtr, size); // size is updated to max(size, targetSize) in
+			// reallocate_impl
 		});
 	}
 	void copyReallocate_impl(const OverlayMMW& other)
 	    requires Base::DataMetaBuffer
 	{
 		this->overlayGetBufferState(
-		    [this, &other](
-		        T* dataPtr, u32 dataSize, Meta* metaPtr, u32 metaSize) {
-			    this->overlaySetBufferState(
-			        reallocate_impl(
-			            getAlloc_impl(this), dataPtr, dataSize,
-			            other.overlayGetElementCount([](u32 osize, u32) { return osize; })),
-			        dataSize,
-			        reallocate_impl(
-			            getAlloc_impl(this), metaPtr, metaSize,
-			            other.overlayGetElementCount([](u32, u32 osize) { return osize; })),
-			        metaSize);
+		    [this, &other](T* dataPtr, u32 dataSize, Meta* metaPtr, u32 metaSize) {
+			    T* newDataPtr = reallocate_impl(
+			        getAlloc_impl(this), dataPtr, dataSize,
+			        buffer_trait::copy(other.overlayGetElementCount(
+			            [](u32 osize, u32) { return osize; })));
+			    this->overlaySetBufferStateData(
+			        newDataPtr, dataSize);
+
+			    Meta* newMetaPtr = reallocate_impl(
+			        getAlloc_impl(this), metaPtr, metaSize,
+			        buffer_trait::copy(other.overlayGetElementCount(
+			            [](u32, u32 osize) { return osize; })));
+			    this->overlaySetBufferStateData(
+			        newMetaPtr, metaSize);
 		    });
 	}
 
@@ -931,8 +1010,8 @@ struct OverlayBaseBufferStateDataMeta {
 	    T* dataPtr_, u32 dataSize_,
 	    Meta* metaPtr_, u32 metaSize_,
 	    DataFunc df = DataFunc{}, MetaFunc mf = MetaFunc{})
-	    : data(overlayNullCheck(dataPtr_, dataSize_), dataSize_, df),
-	      meta(overlayNullCheck(metaPtr_, metaSize_), metaSize_, mf) {}
+	    : data(dataPtr_, dataSize_, df),
+	      meta(metaPtr_, metaSize_, mf) {}
 	impl::OverlayBaseBufferStateSingle<T, DataFunc> data;
 	impl::OverlayBaseBufferStateSingle<Meta, MetaFunc> meta;
 
@@ -967,19 +1046,24 @@ struct OverlayBaseBufferStateDataMeta {
  * OverlayBase.
  */
 
+
 // Generalizing the internal implementation and provide helpers for OverlayBase
 // Should be inherited privately.
-template <impl::overlay OverlayBase>
+template <impl::overlay OverlayBase, class buffer_trait>
 struct OverlayBaseInternal {
 private:
 	static constexpr bool SingleBuffer =
-	    details::overlay_single_buffer<typename OverlayBase::buffer_trait>;
+	    details::overlay_single_buffer<buffer_trait>;
 	static constexpr bool DataMetaBuffer =
-	    details::overlay_data_meta_buffer<typename OverlayBase::buffer_trait>;
+	    details::overlay_data_meta_buffer<buffer_trait>;
 
 private:
-	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
-	auto& state() { return self()->m_state(); }
+	template <class Self>
+	tx::const_propagate<Self, OverlayBase>* self(this Self&& s) {
+		return static_cast<tx::const_propagate<Self, OverlayBase>*>(&s);
+	}
+	template <class Self>
+	decltype(auto) state(this Self&& s) { return s.self()->m_state(); }
 
 public:
 	// @param size logical size
@@ -996,7 +1080,7 @@ public:
 	{
 		self()->m_expand.expandData(
 		    self(), expansionCount,
-		    state().buffer.ptr, size, state().buffer.size);
+		    state().buffer.data.ptr, size, state().buffer.data.size);
 	}
 	// @param size logical size
 	void expandMeta(u32 size, u32 expansionCount = 1)
@@ -1004,7 +1088,7 @@ public:
 	{
 		self()->m_expand.expandMeta(
 		    self(), expansionCount,
-		    state().buffer.ptr, size, state().buffer.size);
+		    state().buffer.meta.ptr, size, state().buffer.meta.size);
 	}
 };
 
@@ -1014,12 +1098,15 @@ public:
 template <impl::overlay OverlayBase>
 struct OverlayBaseInterface {
 private:
-	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
+	template <class Self>
+	tx::const_propagate<Self, OverlayBase>* self(this Self&& s) {
+		return static_cast<tx::const_propagate<Self, OverlayBase>*>(&s);
+	}
 
 public:
 	// ================ Overlay Pattern Oriented ================
 
-	bool valid() const { return self()->state().buffer.valid(); }
+	bool valid() const { return self()->m_state().buffer.valid(); }
 
 public:
 	// ================ General Public Interface ================
@@ -1062,17 +1149,32 @@ private:
 	using Meta = details::overlay_meta_t<buffer_trait>;
 
 private:
-	OverlayBase* self() { return static_cast<OverlayBase*>(this); }
+	template <class Self>
+	tx::const_propagate<Self, OverlayBase>* self(this Self&& s) {
+		return static_cast<tx::const_propagate<Self, OverlayBase>*>(&s);
+	}
+	template <class Self>
+	decltype(auto) state(this Self&& s) { return s.self()->m_state(); }
 
 protected:
 	// ================ Policy Object Exposure ================
 
-	// <------------ constness
-	StateProvider& overlayGetStateProvider() { return self()->m_state; }
-	BufferExpansionHandler overlayGetBufferExpansionHandler() { return self()->m_expand; }
+	template <class Self>
+	tx::const_propagate<Self, StateProvider>&
+	overlayGetStateProvider(this Self&& s) {
+		return static_cast<tx::const_propagate<Self, OverlayBase>*>(&s)
+		    ->m_state;
+	}
+	template <class Self>
+	tx::const_propagate<Self, BufferExpansionHandler>&
+	overlayGetBufferExpansionHandler(this Self&& s) {
+		return static_cast<tx::const_propagate<Self, OverlayBase>*>(&s)
+		    ->m_expand;
+	}
 
 	template <class U>
-	    requires std::same_as<std::remove_cvref_t<U>, typename OverlayBase::StateProvider>
+	    requires std::same_as<
+	        std::remove_cvref_t<U>, typename OverlayBase::StateProvider>
 	void overlaySetStateProvider(U&& stateProvider) {
 		self()->m_state = std::forward<U>(stateProvider);
 	}
@@ -1088,31 +1190,39 @@ protected:
 	template <class Func>
 	    requires((SingleBuffer && std::invocable<Func, T*, u32>) ||
 	             (DataMetaBuffer && std::invocable<Func, T*, u32, Meta*, u32>))
-	decltype(auto) overlayGetBufferState(Func&& f) {
+	decltype(auto) overlayGetBufferState(Func&& f) const {
 		if constexpr (SingleBuffer) {
-			return f(self()->state().buffer.ptr, self()->state().buffer.size);
+			return f(state().buffer.ptr, state().buffer.size);
 		} else if constexpr (DataMetaBuffer) {
 			return f(
-			    self()->state().buffer.data.ptr, self()->state().buffer.data.size,
-			    self()->state().buffer.meta.ptr, self()->state().buffer.meta.size);
+			    state().buffer.data.ptr, state().buffer.data.size,
+			    state().buffer.meta.ptr, state().buffer.meta.size);
 		}
 	}
 
 	void overlaySetBufferState(T* ptr, u32 size)
 	    requires SingleBuffer
-	{ impl::reconstruct(self()->state().buffer, ptr, size); }
+	{ impl::reconstruct(state().buffer, ptr, size); }
 	void overlaySetBufferStateData(T* dataPtr, u32 dataSize)
 	    requires DataMetaBuffer
-	{ impl::reconstruct(self()->state().buffer.data, dataPtr, dataSize); }
+	{ impl::reconstruct(state().buffer.data, dataPtr, dataSize); }
 	void overlaySetBufferStateMeta(Meta* metaPtr, u32 metaSize)
 	    requires DataMetaBuffer
-	{ impl::reconstruct(self()->state().buffer.data, metaPtr, metaSize); }
+	{ impl::reconstruct(state().buffer.meta, metaPtr, metaSize); }
+
+	/**
+	 * The default relocation is a plain memcpy for all buffers.
+	 * It is encouraged and common to override the relocation functions if any
+	 * custom logic apart from plain memcpy is present.
+	 */
 
 	void overlayRelocateBuffer(T* ptr, u32 size)
 	    requires SingleBuffer
 	{
-
-		self()->overlaySetBufferStateData(ptr, size);
+		self()->overlayGetBufferState([this, ptr, size](T* oPtr, u32 oSize) {
+			self()->overlaySetBufferState(ptr, size);
+			tx::uninitialized_relocate(oPtr, oPtr + oSize, ptr);
+		});
 	}
 	void overlayRelocateBufferData(T* dataPtr, u32 dataSize)
 	    requires DataMetaBuffer
@@ -1123,7 +1233,7 @@ protected:
 	    requires DataMetaBuffer
 	{
 
-		self()->overlaySetBufferStateData(metaPtr, metaSize);
+		self()->overlaySetBufferStateMeta(metaPtr, metaSize);
 	}
 };
 
