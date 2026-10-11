@@ -2,6 +2,7 @@
 // Module: TXGraphics
 
 #pragma once
+#include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/math.h"
 
@@ -11,12 +12,14 @@ namespace tx {
 #ifdef RGB
 #undef RGB
 #endif
+
+class RGBA;
 class RGB {
 public:
-	constexpr RGB(float in_r, float in_g, float in_b) : m_r(in_r), m_g(in_g), m_b(in_b) {
-	}
-	constexpr RGB() : m_r{}, m_g{}, m_b{} {
-	}
+	constexpr RGB(float in_r, float in_g, float in_b)
+	    : m_r(in_r), m_g(in_g), m_b(in_b) {}
+	constexpr RGB(const RGBA& rgba);
+	constexpr RGB() : m_r{}, m_g{}, m_b{} {}
 
 	constexpr inline float r() const { return this->m_r; }
 	constexpr inline float g() const { return this->m_g; }
@@ -87,8 +90,13 @@ private:
 
 class RGBA {
 public:
-	constexpr RGBA(float in_r, float in_g, float in_b, float in_a) : m_r(in_r), m_g(in_g), m_b(in_b), m_a(in_a) {}
-	constexpr RGBA(const RGB& in_rgb, float in_a) : m_r(in_rgb.r()), m_g(in_rgb.g()), m_b(in_rgb.b()), m_a(in_a) {}
+	constexpr RGBA(float in_r, float in_g, float in_b, float in_a)
+	    : m_r(in_r), m_g(in_g), m_b(in_b), m_a(in_a) {}
+	constexpr RGBA(const RGB& in_rgb, float in_a)
+	    : m_r(in_rgb.r()), m_g(in_rgb.g()), m_b(in_rgb.b()), m_a(in_a) {
+		if (in_rgb.isNormalized() && m_a > 1.0f)
+			m_a *= ONE_OF_255;
+	}
 	constexpr RGBA() : m_r{}, m_g{}, m_b{}, m_a{} {}
 
 	constexpr inline float r() const { return m_r; }
@@ -165,8 +173,10 @@ public:
 private:
 	float m_r, m_g, m_b, m_a;
 };
+constexpr RGB::RGB(const RGBA& rgba)
+    : m_r(rgba.r()), m_g(rgba.g()), m_b(rgba.b()) {}
 
-RGB InvalidColor = RGB(-1, -1, -1);
+constexpr RGB InvalidColor = RGB(-1, -1, -1);
 constexpr RGB Black = RGB{};
 constexpr RGB White = RGB(255, 255, 255);
 
