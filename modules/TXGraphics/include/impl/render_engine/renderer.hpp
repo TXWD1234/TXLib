@@ -192,7 +192,7 @@ private:
 	void initBuffers_impl();
 
 	// section & metadata
-	// mote: each section is a different shader, which means one draw call
+	// note: each section is a different shader, which means one draw call
 
 	u32 addSection_impl(const ShaderProduct& sp);
 

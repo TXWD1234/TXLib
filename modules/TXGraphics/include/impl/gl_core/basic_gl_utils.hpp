@@ -13,7 +13,7 @@ namespace RenderEngine {
 using gid = u32;
 
 struct mat2 {
-	vec2 i, j;
+	vec2 i = { 1.0f, 0.0f }, j = { 0.0f, 1.0f };
 };
 
 inline mat2 findRotationMat(float degree) {

@@ -33,6 +33,11 @@ struct Nothing {
 	constexpr void operator()(Args&&...) const noexcept {}
 };
 
+struct Forwarder {
+	template <class T>
+	constexpr T&& operator()(T&& v) const noexcept { return std::forward<T>(v); }
+};
+
 template <auto V>
 struct nttp_holder {
 	using value_type = decltype(V);

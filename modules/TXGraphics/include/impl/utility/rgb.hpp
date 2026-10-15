@@ -5,6 +5,7 @@
 #include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/math.h"
+#include "tx/type_traits.hpp"
 
 namespace tx {
 
@@ -247,4 +248,16 @@ private:
 	std::vector<RGB> m_rainbow;
 	u32 index = -1;
 };
+
+
+template <std::invocable<RGB> Func>
+inline void generateRainbow(u32 range, Func&& f = Func{}) {
+	float increment = PI / range,
+	      third = PI / 3;
+	for (u32 i = 0; i < range; i++) {
+		f(RGB(std::abs(std::sinf(increment * i)),
+		      std::abs(std::sinf(increment * i + third)),
+		      std::abs(std::sinf(increment * i + third * 2))));
+	}
+}
 } // namespace tx
