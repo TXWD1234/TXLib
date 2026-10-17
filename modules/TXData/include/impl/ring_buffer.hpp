@@ -46,66 +46,47 @@ struct RingBufferState {
 	RingBufferState() = default;
 	// RingBufferState(T* ptr, u32 size, LogicalState logicState = LogicalState{}) : buffer(ptr, size), logic(logicState) {}
 };
+
+template <class T>
+using RingBufferBufferTrait = impl::overlay_single_buffer_trait<
+    T, impl::overlay_buffer_trait_realloc_policy_pow_two>;
 } // namespace details
 
 
 /**
  * internal implementation of data structure, shouldn't be instantiated by user
  */
-template <class T,
-          template <class> class StateProviderTemplate,
-          class BufferExpansionHandlerTraits>
+template <class T, template <class> class S, class E>
 class RingBufferOverlayBase
     : private impl::OverlayBaseInternal<
-          RingBufferOverlayBase<
-              T, StateProviderTemplate,
-              BufferExpansionHandlerTraits>,
-          impl::overlay_single_buffer_trait<
-              T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
+          RingBufferOverlayBase<T, S, E>,
+          details::RingBufferBufferTrait<T>>,
       public impl::OverlayBaseInterface<
-          RingBufferOverlayBase<
-              T, StateProviderTemplate,
-              BufferExpansionHandlerTraits>>,
+          RingBufferOverlayBase<T, S, E>>,
       protected impl::OverlayBaseIntrinsics<
-          RingBufferOverlayBase<
-              T, StateProviderTemplate,
-              BufferExpansionHandlerTraits>,
+          RingBufferOverlayBase<T, S, E>,
           details::RingBufferState<T>,
-          StateProviderTemplate<details::RingBufferState<T>>,
-          typename BufferExpansionHandlerTraits::
-              template type<impl::overlay_single_buffer_trait<
-                  T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
-          impl::overlay_single_buffer_trait<
-              T, impl::overlay_buffer_trait_realloc_policy_pow_two>> {
+          S<details::RingBufferState<T>>,
+          typename E::template type<details::RingBufferBufferTrait<T>>,
+          details::RingBufferBufferTrait<T>> {
 	friend impl::OverlayBaseInternal<
-	    RingBufferOverlayBase,
-	    impl::overlay_single_buffer_trait<
-	        T, impl::overlay_buffer_trait_realloc_policy_pow_two>>;
+	    RingBufferOverlayBase, details::RingBufferBufferTrait<T>>;
 	friend impl::OverlayBaseInterface<RingBufferOverlayBase>;
 	friend impl::OverlayBaseIntrinsics<
 	    RingBufferOverlayBase,
 	    details::RingBufferState<T>,
-	    StateProviderTemplate<details::RingBufferState<T>>,
-	    typename BufferExpansionHandlerTraits::
-	        template type<impl::overlay_single_buffer_trait<
-	            T, impl::overlay_buffer_trait_realloc_policy_pow_two>>,
-	    impl::overlay_single_buffer_trait<
-	        T, impl::overlay_buffer_trait_realloc_policy_pow_two>>;
+	    S<details::RingBufferState<T>>,
+	    typename E::template type<details::RingBufferBufferTrait<T>>,
+	    details::RingBufferBufferTrait<T>>;
 
 protected:
 	using State_impl = details::RingBufferState<T>;
-
-	using buffer_trait = impl::overlay_single_buffer_trait<
-	    T, impl::overlay_buffer_trait_realloc_policy_pow_two>;
-	using StateProvider = StateProviderTemplate<State_impl>;
-	using BufferExpansionHandler =
-	    typename BufferExpansionHandlerTraits::
-	        template type<buffer_trait>;
+	using buffer_trait = details::RingBufferBufferTrait<T>;
+	using StateProvider = S<State_impl>;
+	using BufferExpansionHandler = typename E::template type<buffer_trait>;
 	friend StateProvider;
 	friend BufferExpansionHandler;
 	friend details::OverlayBaseIntrinsicsAccessor<RingBufferOverlayBase>;
-	//static_assert(tx::invocable_r<StateProvider, State_impl&>);
-	//static_assert(std::invocable<RingBufferOverlayBase, T*&, u32, u32, u32>);
 
 public:
 	RingBufferOverlayBase(StateProvider&& stateProvider,
@@ -278,7 +259,9 @@ private:
 	// ================ Architectural Helpers ================
 
 	// exist purely for intellisense to know the return type
-	State_impl& state() { return m_state(); }
+	template <class Self>
+	tx::const_propagate<Self, State_impl>&
+	state(this Self&& self) { return self.m_state(); }
 
 	void expand_impl(u32 expansionCount = 1) {
 		this->expand(size(), expansionCount);
@@ -324,7 +307,7 @@ protected:
 	 * 
 	 * [Exposure of Policy Object]
 	 * - overlayGetStateProvider() // return by ref
-	 * - overlayGetBufferExpansionHandler() // return by value
+	 * - overlayGetBufferExpansionHandler() // return by ref
 	 * - overlaySetStateProvider() // support move
 	 * - overlaySetBufferExpansionHandler() // support move
 	 * 
