@@ -1,5 +1,5 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
-// Module: TXUtility
+// Module: TXFoundation
 
 #pragma once
 #include "tx/basic_types.hpp"
@@ -234,13 +234,29 @@ constexpr size_t arg_list_count(Args&&...) {
 
 
 
+
+
 // ================ ######## ================
 // **************** Concepts ****************
 // ================ ######## ================
 
 // turn type_traits into concepts
 template <class T, template <class...> class Trait, class... Args>
-concept satisfies = Trait<T, Args...>::value;
+concept satisfies_trait = Trait<T, Args...>::value;
+
+template <class T, class Pred>
+concept satisfies =
+    std::is_invocable_r_v<bool, Pred, std::type_identity<T>> &&
+    Pred{}(std::type_identity<T>{});
+template <class Pred, class... Ts>
+concept satisfies_all =
+    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
+    (Pred{}(std::type_identity<Ts>{}) && ...);
+template <class Pred, class... Ts>
+concept satisfies_any =
+    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
+    (Pred{}(std::type_identity<Ts>{}) || ...);
+
 
 // is instantiatin of
 template <typename T, template <typename...> class Template>
@@ -286,7 +302,7 @@ concept type_list_satisfy_any =
     (Pred{}(ArgLists{}) || ...);
 
 // infrastructure for invocable_multi
-namespace impl {
+namespace impl::details {
 template <class Func>
 using test_invocable =
     decltype([]<class... Args>(tx::type_list_t<Args...>) {
@@ -297,26 +313,26 @@ using test_invocable_r =
     decltype([]<class Ret, class... Args>(tx::type_list_t<Ret, Args...>) {
 	    return tx::invocable_r<Func, Ret, Args...>;
     });
-} // namespace impl
+} // namespace impl::details
 
 // invocable with multiple argument lists
 template <class Func, class... ArgLists>
 concept invocable_multi_and =
-    type_list_satisfy_all<impl::test_invocable<Func>, ArgLists...>;
+    type_list_satisfy_all<impl::details::test_invocable<Func>, ArgLists...>;
 // invocable with multiple argument lists
 template <class Func, class... ArgLists>
 concept invocable_multi_or =
-    type_list_satisfy_any<impl::test_invocable<Func>, ArgLists...>;
+    type_list_satisfy_any<impl::details::test_invocable<Func>, ArgLists...>;
 // invocable_r with multiple argument lists
 // return type is the first type in ArgList
 template <class Func, class... ArgLists>
 concept invocable_r_multi_and =
-    type_list_satisfy_all<impl::test_invocable_r<Func>, ArgLists...>;
+    type_list_satisfy_all<impl::details::test_invocable_r<Func>, ArgLists...>;
 // invocable_r with multiple argument lists
 // return type is the first type in ArgList
 template <class Func, class... ArgLists>
 concept invocable_r_multi_or =
-    type_list_satisfy_any<impl::test_invocable_r<Func>, ArgLists...>;
+    type_list_satisfy_any<impl::details::test_invocable_r<Func>, ArgLists...>;
 
 // iterator with value type
 template <class It, class T>

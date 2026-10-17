@@ -1,5 +1,5 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
-// Module: TXUtility
+// Module: TXFoundation
 
 #pragma once
 #include "tx/type_traits.hpp"
