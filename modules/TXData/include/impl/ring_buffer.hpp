@@ -18,7 +18,7 @@ namespace tx {
 
 namespace impl {
 namespace details {
-template <class T>
+template <class T, class IndexType>
 struct RingBufferState {
 	// default to null state
 	using BufferState_impl = impl::OverlayBaseBufferStateSingle<
@@ -39,7 +39,7 @@ struct RingBufferState {
 	BufferState_impl buffer;
 
 	struct LogicState_impl {
-		u32 begin = 0, end = 0;
+		IndexType begin = 0, end = 0;
 	} logic;
 
 	RingBufferState(T* ptr, u32 size) : buffer(ptr, size) {}
@@ -55,18 +55,21 @@ using RingBufferBufferTrait = impl::overlay_single_buffer_trait<
 
 /**
  * internal implementation of data structure, shouldn't be instantiated by user
+ * I (IndexType) exists only for special cases such as threading to modify the
+ * type of index in State_impl to atomic. It shouldn't be used in general cases
+ * as it's not propagated to anywhere else than State_impl's index type.
  */
-template <class T, template <class> class S, class E>
+template <class T, template <class> class S, class E, class I = u32>
 class RingBufferOverlayBase
     : private impl::OverlayBaseInternal<
-          RingBufferOverlayBase<T, S, E>,
+          RingBufferOverlayBase<T, S, E, I>,
           details::RingBufferBufferTrait<T>>,
       public impl::OverlayBaseInterface<
-          RingBufferOverlayBase<T, S, E>>,
+          RingBufferOverlayBase<T, S, E, I>>,
       protected impl::OverlayBaseIntrinsics<
-          RingBufferOverlayBase<T, S, E>,
-          details::RingBufferState<T>,
-          S<details::RingBufferState<T>>,
+          RingBufferOverlayBase<T, S, E, I>,
+          details::RingBufferState<T, I>,
+          S<details::RingBufferState<T, I>>,
           typename E::template type<details::RingBufferBufferTrait<T>>,
           details::RingBufferBufferTrait<T>> {
 	friend impl::OverlayBaseInternal<
@@ -74,13 +77,13 @@ class RingBufferOverlayBase
 	friend impl::OverlayBaseInterface<RingBufferOverlayBase>;
 	friend impl::OverlayBaseIntrinsics<
 	    RingBufferOverlayBase,
-	    details::RingBufferState<T>,
-	    S<details::RingBufferState<T>>,
+	    details::RingBufferState<T, I>,
+	    S<details::RingBufferState<T, I>>,
 	    typename E::template type<details::RingBufferBufferTrait<T>>,
 	    details::RingBufferBufferTrait<T>>;
 
 protected:
-	using State_impl = details::RingBufferState<T>;
+	using State_impl = details::RingBufferState<T, I>;
 	using buffer_trait = details::RingBufferBufferTrait<T>;
 	using StateProvider = S<State_impl>;
 	using BufferExpansionHandler = typename E::template type<buffer_trait>;
