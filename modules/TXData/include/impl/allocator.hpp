@@ -35,7 +35,7 @@ concept allocator_trait =
         typename Traits::allocator_type& alloc,
         typename Traits::size_type n,
         typename Traits::pointer ptr) {
-	    { Traits::allocate(alloc, n) } -> tx::satisfies<std::is_pointer>;
+	    { Traits::allocate(alloc, n) } -> tx::satisfies_trait<std::is_pointer>;
 	    Traits::deallocate(alloc, ptr, n);
     };
 
@@ -117,4 +117,34 @@ public:
 		base_traits::deallocate(typed_alloc, ptr, size);
 	}
 };
+
+namespace impl {
+template <class... Args>
+inline constexpr bool VerifyLastAllocArg =
+    requires {
+	    requires tx::type_list_count_v<tx::type_list_t<Args...>> > 0;
+	    requires tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
+    };
+
+// alloc_t
+template <class Fallback, class... Args>
+using ParseLastAllocArg = typename decltype([] {
+	if constexpr (impl::VerifyLastAllocArg<Args...>)
+		return std::type_identity<
+		    tx::type_list_back_t<tx::type_list_t<Args...>>>{};
+	else
+		return std::type_identity<Fallback>{};
+}())::type;
+
+// tx::type_list_t<remaining_args...>
+template <class... Args>
+using ForwardLastAllocArgRemainder = decltype([]() {
+	if constexpr (impl::VerifyLastAllocArg<Args...>) {
+		using list = tx::type_list_t<Args...>;
+		return tx::type_list_sublist_t<list, 0, tx::type_list_count_v<list> - 1>{};
+	} else {
+		return tx::type_list_t<Args...>{};
+	}
+}());
+} // namespace impl
 } // namespace tx

@@ -4,15 +4,17 @@
 #pragma once
 #include "impl/allocator.hpp"
 #include "tx/basic_types.hpp"
+#include <memory>
+#include <span>
 
 namespace tx {
 /**
  * @brief A basic RAII wrapper for heap memory
  */
-template <class T, tx::allocator Allocator>
+template <class T, tx::allocator Allocator = std::allocator<T>>
 struct BasicStorage {
 	using traits = tx::typed_allocator_traits<Allocator, T>;
-	BasicStorage(u32 size, Allocator alloc)
+	BasicStorage(u32 size, Allocator alloc = Allocator{})
 	    : data(traits::allocate(alloc, size)),
 	      size(size), allocator(alloc) {}
 	BasicStorage() {}
@@ -25,6 +27,7 @@ struct BasicStorage {
 		other.null_impl();
 	}
 	BasicStorage& operator=(BasicStorage&& other) {
+		if (this == &other) return *this;
 		destruct_impl();
 		data = other.data;
 		size = other.size;
@@ -32,6 +35,8 @@ struct BasicStorage {
 		other.null_impl();
 		return *this;
 	}
+
+	operator std::span<T>() const { return std::span<T>(data, data + size); }
 
 	T* data = nullptr;
 	u32 size = 0;
@@ -47,6 +52,6 @@ private:
 	}
 };
 /**
- * POCMA stubbed and potentially will not be implemented.
+ * note: allocator POCMA stubbed and potentially will not be implemented.
  */
 } // namespace tx
