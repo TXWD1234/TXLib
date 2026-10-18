@@ -110,14 +110,14 @@ public:
 
 	CoordMap getCoordMap() const {
 		CoordMap cm;
-		cm.reserve(static_cast<int>(line.dVec().length() * 2));
+		cm.reserve(static_cast<int>(length(line.dVec()) * 2));
 		gen_impl(ApplyToCoordMap_impl{ &cm });
 		cm.sort();
 		return cm;
 	}
 	CoordMap getCoordMap(const Coord& offset) const {
 		CoordMap cm;
-		cm.reserve(static_cast<int>(line.dVec().length() * 2));
+		cm.reserve(static_cast<int>(length(line.dVec()) * 2));
 		gen_impl(ApplyToCoordMapOffset_impl{ &cm, offset });
 		cm.sort();
 		return cm;

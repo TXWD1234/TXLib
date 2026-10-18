@@ -190,7 +190,7 @@ public:
 	}
 
 	const vec2& start() const { return m_start; }
-	vec2 end() const { return m_start.offset(m_dx, m_dy); }
+	vec2 end() const { return m_start + vec2(m_dx, m_dy); }
 	float dx() const { return m_dx; }
 	float dy() const { return m_dy; }
 	vec2 dVec() const { return vec2{ m_dx, m_dy }; }
@@ -206,7 +206,7 @@ public:
 	float findYviaX(float x) const { return findY(findTviaX(x)); }
 
 	void applyStartT(float t) {
-		m_start.offset(m_dx * t, m_dy * t);
+		m_start += vec2(m_dx * t, m_dy * t);
 		m_dx *= (1 - t);
 		m_dy *= (1 - t);
 	}

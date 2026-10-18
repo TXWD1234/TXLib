@@ -22,6 +22,7 @@ constexpr f32 dot(vec2 a, vec2 B) { return a.x * B.x + a.y * B.y; }
 constexpr f32 length(vec2 v) { return std::sqrt(sq(v.x) + sq(v.y)); }
 constexpr f32 lengthsq(vec2 v) { return dot(v, v); }
 constexpr vec2 normalize(vec2 v, f32 dist) { return vec2(v.x / dist, v.y / dist); }
+constexpr vec2 normalize(vec2 v) { return normalize(v, length(v)); }
 // [deprecated] ancient TXMath implementation for normalize, kept for compatibility
 constexpr vec2 unify(const vec2& in, float dist) {
 	if (dist == 0.0f) return vec2(0, 0);

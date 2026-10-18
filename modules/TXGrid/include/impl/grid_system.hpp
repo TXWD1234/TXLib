@@ -2,6 +2,7 @@
 // Module: TXGrid
 
 #pragma once
+#include "impl/geom_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "impl/coord_map.hpp"
 #include "impl/geometry.hpp"
@@ -68,13 +69,13 @@ public:
 		this->at(x, y) = val;
 	}
 	inline bool valid(const tx::Coord& pos) const {
-		return inRange_p(pos, dimension);
+		return inRangeQuad(pos, dimension);
 	}
 	// inline bool valid(int x, int y) const {
 	// 	return (x < this->Width && y < this->Height && x > -1 && y > -1);
 	// }
 	inline bool valid(int x, int y) const {
-		return inRange_p(Coord{ x, y }, dimension);
+		return inRangeQuad(Coord{ x, y }, dimension);
 	}
 	inline int getWidth() const { return dimension.x; }
 	inline int getHeight() const { return dimension.y; }
@@ -87,12 +88,12 @@ public:
 	inline void reinit(int in_sideLen) {
 		map.clear();
 		this->map.assign(sq(in_sideLen), T{});
-		dimension.set(in_sideLen, in_sideLen);
+		dimension = ivec2(in_sideLen, in_sideLen);
 	}
 	inline void reinit(int width, int height) {
 		map.clear();
 		this->map.assign(width * height, T{});
-		dimension.set(width, height);
+		dimension = ivec2(width, height);
 	}
 	inline void reinit(const Coord& in_dimension) {
 		map.clear();
@@ -111,8 +112,8 @@ public:
 
 		if constexpr (std::is_invocable_v<Func, T&, tx::Coord&>) {
 			tx::Coord cur{ 0, 0 };
-			for (; cur.y < dimension.y; cur.moveY(1)) {
-				for (; cur.x < dimension.x; cur.moveX(1)) {
+			for (; cur.y < dimension.y; cur.y++) {
+				for (; cur.x < dimension.x; cur.x++) {
 					func(at(cur), cur);
 				}
 				cur.x = 0;

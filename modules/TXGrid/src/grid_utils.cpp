@@ -73,10 +73,10 @@ float GridLine::findNextCoord_impl(Coord& current) const {
 	float nextxt = line.findTviaX(static_cast<float>(current.x + directionIncrement.x));
 	float nextyt = line.findTviaY(static_cast<float>(current.y + directionIncrement.y));
 	if (nextyt > nextxt) {
-		current.moveX(direction.x);
+		current.x += direction.x;
 		return nextxt;
 	} else if (nextyt < nextxt) {
-		current.moveY(direction.y);
+		current.y += direction.y;
 		return nextyt;
 	} else {
 		current += direction;

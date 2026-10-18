@@ -4,6 +4,7 @@
 #pragma once
 #include "tx/basic_types.hpp"
 #include "impl/geometry.hpp"
+#include "impl/geom_utils.hpp"
 #include <concepts>
 
 namespace tx {
@@ -11,7 +12,7 @@ namespace tx {
 template <std::invocable<const Coord&> Func>
 inline void applyGridRange(Func&& f, const Coord& bottomLeft, uint32_t width, uint32_t height) {
 	Coord cur = bottomLeft;
-	Coord end = bottomLeft.offset(width, height);
+	Coord end = bottomLeft + ivec2(width, height);
 	for (; cur.y < end.y; cur.y++) {
 		for (cur.x = bottomLeft.x; cur.x < end.x; cur.x++) {
 			f(cur);
@@ -49,7 +50,7 @@ public:
 	inline void apply(Func&& f) const {
 		u32 w = static_cast<u32>(std::floorf(m_bottomLeft.x + m_dimension.x) - std::floorf(m_bottomLeft.x)) + (isInt(m_dimension.x) ? 0 : 1),
 		    h = static_cast<u32>(std::floorf(m_bottomLeft.y + m_dimension.y) - std::floorf(m_bottomLeft.y)) + (isInt(m_dimension.y) ? 0 : 1);
-		applyGridRange(std::forward<Func>(f), toCoord(m_bottomLeft), w, h);
+		applyGridRange(std::forward<Func>(f), tx::toCoord(m_bottomLeft), w, h);
 	}
 
 	inline void move(vec2 movement) { m_bottomLeft += movement; }
@@ -57,8 +58,8 @@ public:
 	inline void moveY(float in) { m_bottomLeft.y += in; }
 
 	inline Rect offset(vec2 offset) const { return Rect{ m_bottomLeft + offset, m_dimension }; }
-	inline Rect offsetX(float in) const { return Rect{ m_bottomLeft.offsetX(in), m_dimension }; }
-	inline Rect offsetY(float in) const { return Rect{ m_bottomLeft.offsetY(in), m_dimension }; }
+	inline Rect offsetX(float in) const { return Rect{ m_bottomLeft + vec2(in, 0.0f), m_dimension }; }
+	inline Rect offsetY(float in) const { return Rect{ m_bottomLeft + vec2(0.0f, in), m_dimension }; }
 
 	inline void setPos(vec2 pos) { m_bottomLeft = pos; }
 	inline void setPos(float x, float y) {

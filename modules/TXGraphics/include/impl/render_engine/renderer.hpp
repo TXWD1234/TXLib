@@ -2,6 +2,7 @@
 // Module: TXGraphics
 
 #pragma once
+#include "impl/geom_utils.hpp"
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "impl/gl_core/draw_call_manager.hpp"
 #include "impl/gl_core/buffer.hpp"
@@ -126,8 +127,8 @@ public:
 
 	void drawLine(u32 sectionIndex, vec2 start, vec2 end, float thickness = 0.001f, u32 color = 0xFFFFFFFF) {
 		vec2 diff = end - start;
-		float len = diff.length();
-		if (len <= tx::epsilon) return;
+		f32 len = tx::length(diff);
+		if (tx::negligible(len)) return;
 		vec2 center = start + diff * 0.5f;
 		vec2 nuv = unify(diff, len);
 		mat2 rotation = { nuv, leftPerp(nuv) };
