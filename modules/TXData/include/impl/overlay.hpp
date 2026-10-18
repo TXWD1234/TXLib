@@ -498,6 +498,7 @@ private:
 
 public:
 	template <class... Args>
+	    requires std::constructible_from<State, Args...>
 	OverlayStateOwner(Args&&... args) : m_state(std::forward<Args>(args)...) {}
 
 public:

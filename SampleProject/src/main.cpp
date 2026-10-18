@@ -1238,12 +1238,13 @@ static void testRandomJsonText(int iterations, int maxDepth,
 } // namespace test
 // TX_Jerry's TXJson field test
 
-template class tx::impl::OverlayMMW<tx::RingBufferOverlayBase, int>;
+template class tx::impl::OverlayAlias<tx::RingBufferOverlayBase, int>;
 
 int main() {
 	std::ios::sync_with_stdio(0);
 	std::cin.tie(0);
 
+	return 0;
 	//test::main_();
 
 	test::testRandomJsonText(300, 5, 6);

@@ -7,6 +7,7 @@ CompileFlags:
     - -std=c++23
     - -Wall
     - -Wextra
+    - -fdelayed-template-parsing
 InlayHints:
   Enabled: Yes
   DeducedTypes: No       # Stops crashes on decltype(auto) / auto returns

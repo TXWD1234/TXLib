@@ -74,13 +74,13 @@ public:
 	using size_type = typename traits::size_type;
 
 public:
-	[[nodiscard]] static Byte* allocate(Allocator& alloc, size_type bytes) {
+	[[nodiscard]] static Byte* allocate(const Allocator& alloc, size_type bytes) {
 		alloc_t aligned_alloc(alloc);
 		return reinterpret_cast<Byte*>(traits::allocate(
 		    aligned_alloc, tx::divCeil(bytes, Alignment)));
 	}
 
-	static void deallocate(Allocator& alloc, Byte* ptr, size_type bytes) noexcept {
+	static void deallocate(const Allocator& alloc, Byte* ptr, size_type bytes) noexcept {
 		alloc_t aligned_alloc(alloc);
 		traits::deallocate(
 		    aligned_alloc,
@@ -107,12 +107,12 @@ public:
 
 public:
 	// passing the original Allocator directly is allowed
-	[[nodiscard]] static pointer allocate(Allocator& alloc, size_type size) {
+	[[nodiscard]] static pointer allocate(const Allocator& alloc, size_type size) {
 		alloc_t typed_alloc(alloc);
 		return base_traits::allocate(typed_alloc, size);
 	}
 
-	static void deallocate(Allocator& alloc, pointer ptr, size_type size) noexcept {
+	static void deallocate(const Allocator& alloc, pointer ptr, size_type size) noexcept {
 		alloc_t typed_alloc(alloc);
 		base_traits::deallocate(typed_alloc, ptr, size);
 	}
@@ -139,12 +139,11 @@ using ParseLastAllocArg = typename decltype([] {
 // tx::type_list_t<remaining_args...>
 template <class... Args>
 using ForwardLastAllocArgRemainder = decltype([]() {
-	if constexpr (impl::VerifyLastAllocArg<Args...>) {
-		using list = tx::type_list_t<Args...>;
+	using list = tx::type_list_t<Args...>;
+	if constexpr (impl::VerifyLastAllocArg<Args...>)
 		return tx::type_list_sublist_t<list, 0, tx::type_list_count_v<list> - 1>{};
-	} else {
-		return tx::type_list_t<Args...>{};
-	}
+	else
+		return list{};
 }());
 } // namespace impl
 } // namespace tx

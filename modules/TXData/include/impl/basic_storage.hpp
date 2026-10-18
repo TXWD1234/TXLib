@@ -14,10 +14,10 @@ namespace tx {
 template <class T, tx::allocator Allocator = std::allocator<T>>
 struct BasicStorage {
 	using traits = tx::typed_allocator_traits<Allocator, T>;
-	BasicStorage(u32 size, Allocator alloc = Allocator{})
+	BasicStorage(u32 size, const Allocator& alloc = Allocator{})
 	    : data(traits::allocate(alloc, size)),
 	      size(size), allocator(alloc) {}
-	BasicStorage() {}
+	BasicStorage() = default;
 	~BasicStorage() { destruct_impl(); }
 
 	BasicStorage(const BasicStorage&) = delete;
