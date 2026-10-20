@@ -70,6 +70,19 @@ struct protected_accessor : public Parent {
 	friend Consumer;
 };
 
+template <class T, class Pred>
+constexpr bool satisfies_v =
+    std::is_invocable_r_v<bool, Pred, std::type_identity<T>> &&
+    Pred{}(std::type_identity<T>{});
+template <class Pred, class... Ts>
+constexpr bool satisfies_all_v =
+    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
+    (Pred{}(std::type_identity<Ts>{}) && ...);
+template <class Pred, class... Ts>
+constexpr bool satisfies_any_v =
+    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
+    (Pred{}(std::type_identity<Ts>{}) || ...);
+
 
 // ################ Type List ################
 /**
@@ -206,6 +219,28 @@ struct type_list_back {
 template <tx::type_list List>
 using type_list_back_t = typename type_list_back<List>::type;
 
+template <tx::type_list List,
+          template <class...> class Transformer, class... TransformerArgs>
+using type_list_transform_t = decltype(List::apply(
+    []<class... Args>(tx::type_list_t<Args...>) {
+	    using transformed = tx::type_list_t<Transformer<Args, TransformerArgs...>...>;
+	    if constexpr (
+	        transformed::apply([]<class... TArgs>(tx::type_list_t<TArgs...>) {
+		        return satisfies_all_v<
+		            decltype([](auto trans) {
+			            return requires { typename decltype(trans)::type; };
+		            }),
+		            TArgs...>;
+	        }))
+		    return transformed::apply([]<class... TArgs>(tx::type_list_t<TArgs...>) {
+			    return tx::type_list_t<typename TArgs::type...>{};
+		    });
+	    return transformed{};
+    }));
+
+template <tx::type_list List, template <class...> class Template>
+using type_list_apply_t = typename List::template apply_t<Template>;
+
 template <std::size_t Index, class... Args>
     requires(Index < sizeof...(Args))
 constexpr decltype(auto) arg_list_at(Args&&... args) {
@@ -245,17 +280,11 @@ template <class T, template <class...> class Trait, class... Args>
 concept satisfies_trait = Trait<T, Args...>::value;
 
 template <class T, class Pred>
-concept satisfies =
-    std::is_invocable_r_v<bool, Pred, std::type_identity<T>> &&
-    Pred{}(std::type_identity<T>{});
+concept satisfies = satisfies_v<T, Pred>;
 template <class Pred, class... Ts>
-concept satisfies_all =
-    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
-    (Pred{}(std::type_identity<Ts>{}) && ...);
+concept satisfies_all = satisfies_all_v<Pred, Ts...>;
 template <class Pred, class... Ts>
-concept satisfies_any =
-    (std::is_invocable_r_v<bool, Pred, std::type_identity<Ts>> && ...) &&
-    (Pred{}(std::type_identity<Ts>{}) || ...);
+concept satisfies_any = satisfies_any_v<Pred, Ts...>;
 
 
 // is instantiatin of

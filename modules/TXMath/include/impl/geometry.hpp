@@ -137,6 +137,7 @@ constexpr Vec<D, T> operator-(Vec<D, T> v) {
 
 using vec2 = Vec<2, f32>;
 using ivec2 = Vec<2, i32>;
+using uvec2 = Vec<2, u32>;
 using Coord = ivec2;
 
 inline std::ostream& operator<<(std::ostream& in_cout, const vec2& in_vec2) {
