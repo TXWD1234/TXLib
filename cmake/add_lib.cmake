@@ -29,7 +29,7 @@ function(tx_add_lib)
 	set(REQUIRE_REMOTE_DOWNLOAD TRUE)
 
 	if(ARG_LOCAL_DIR) # use local dir
-		message(VERBOSE "add_lib.cmake [${LIB_NAME}]: Using local TXLib: ${ARG_LOCAL_DIR}")
+		message(VERBOSE "add_lib.cmake [${LIB_NAME}]: Using local repository: ${ARG_LOCAL_DIR}")
 		set(REQUIRE_REMOTE_DOWNLOAD FALSE)
 		if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}") # look for in project dir first (relative path)
 			set(${LIB_NAME}_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_LOCAL_DIR}")
