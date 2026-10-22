@@ -4,7 +4,7 @@ include_guard(GLOBAL)
 function(tx_set_compile_flags in_target scope)
 	target_compile_options(${in_target} ${scope}
 		-Wall -Wextra
-		-Wno-comment -Wno-unused-parameter
+		-Wno-comment -Wno-unused-parameter -Wno-unused-variable
     )
 
     # Check if we are in any Release-based configuration

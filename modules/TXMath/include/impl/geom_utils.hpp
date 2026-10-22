@@ -9,9 +9,10 @@
 
 namespace tx {
 
-inline ivec2 toCoord(vec2 in) {
-	return ivec2{ static_cast<i32>(std::floor(in.x)),
-		          static_cast<i32>(std::floor(in.y)) };
+template <std::integral T = i32>
+inline Vec<2, T> toCoord(vec2 in) {
+	return Vec<2, T>{ static_cast<T>(std::floor(in.x)),
+		              static_cast<T>(std::floor(in.y)) };
 }
 inline vec2 toVec2(ivec2 in) {
 	return vec2{ static_cast<f32>(in.x),

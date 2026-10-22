@@ -225,16 +225,18 @@ using type_list_transform_t = decltype(List::apply(
     []<class... Args>(tx::type_list_t<Args...>) {
 	    using transformed = tx::type_list_t<Transformer<Args, TransformerArgs...>...>;
 	    if constexpr (
+	        tx::type_list_count_v<List> != 0 &&
 	        transformed::apply([]<class... TArgs>(tx::type_list_t<TArgs...>) {
 		        return satisfies_all_v<
-		            decltype([](auto trans) {
-			            return requires { typename decltype(trans)::type; };
+		            decltype([]<class T>(std::type_identity<T>) {
+			            return requires { typename T::type; };
 		            }),
 		            TArgs...>;
-	        }))
+	        })) {
 		    return transformed::apply([]<class... TArgs>(tx::type_list_t<TArgs...>) {
 			    return tx::type_list_t<typename TArgs::type...>{};
 		    });
+	    }
 	    return transformed{};
     }));
 

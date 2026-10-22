@@ -111,10 +111,10 @@ public:
 	    double in_MaxAccumulatorMultiplier = 5.0)
 	    : updateCb(std::forward<U>(in_updateCallback)),
 	      renderCb(std::forward<R>(in_renderCallback)),
-	      m_valid(in_makeWindow(this->window)),
 	      FixedTickrate(in_FixedTickrate),
 	      TickIntervalTime(1.0 / FixedTickrate),
-	      MaxAccumulatorTime(TickIntervalTime * in_MaxAccumulatorMultiplier) {}
+	      MaxAccumulatorTime(TickIntervalTime * in_MaxAccumulatorMultiplier),
+	      m_valid(in_makeWindow(this->window)) {}
 
 	void run() {
 		// Main Loop
