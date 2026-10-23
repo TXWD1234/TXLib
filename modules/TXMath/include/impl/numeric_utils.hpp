@@ -77,4 +77,17 @@ constexpr inline T divCeil(T dividend, T divisor) {
 	T is_non_zero = (dividend != 0);
 	return is_non_zero + (dividend - is_non_zero) / divisor;
 }
+
+template <std::integral T>
+constexpr T powi(T base, u32 exp) noexcept {
+	T result = 1;
+	while (exp > 0) {
+		if (exp & 1) {
+			result *= base;
+		}
+		base *= base;
+		exp >>= 1;
+	}
+	return result;
+}
 } // namespace tx
