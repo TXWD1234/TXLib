@@ -88,6 +88,9 @@ u32 binarySearch(
 constexpr size_t CacheLineSize = 64;
 
 template <class T>
+constexpr size_t CacheLineCapacity = CacheLineSize / sizeof(T);
+
+template <class T>
 struct alignas(CacheLineSize) alignas(T) CacheLineStorage {
 	static constexpr size_t ElementCount =
 	    std::lcm(sizeof(T), CacheLineSize) / sizeof(T);
