@@ -71,6 +71,10 @@ template <std::unsigned_integral T>
 constexpr inline T nextPowTwo(T val) {
 	return std::bit_ceil(val);
 }
+template <std::unsigned_integral T>
+constexpr inline T lastPowTwo(T val) {
+	return std::bit_floor(val);
+}
 
 template <std::unsigned_integral T>
 constexpr inline T divCeil(T dividend, T divisor) {
