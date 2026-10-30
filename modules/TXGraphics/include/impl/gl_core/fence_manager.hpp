@@ -5,6 +5,8 @@
 #include "tx/type_traits.hpp"
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "impl/gl_core/fence.hpp"
+#include "impl/gl_core/buffer.hpp"
+#include "impl/gl_core/texture.hpp"
 #include <tuple>
 #include <deque>
 #include <concepts>
@@ -68,7 +70,7 @@ private:
 					    i();
 				    }
 			    }(buffers),
-			     ...);
+				 ...);
 		    },
 		    operationBuffer);
 	}
@@ -94,8 +96,8 @@ template <instantiation_of<FenceManagerBase> FMT>
 using FMSubmiter = FMAddOperation<FMT>; // this is just a alias of FMAddOperation
 
 using FenceManager = FenceManagerBase<
-    RingBufferObjectDeleter,
-    RingBufferObjectMarker,
+    impl::RingBufferObjectDeleter,
+    impl::RingBufferObjectMarker,
     TextureDeleter>;
 using FM = FenceManager;
 

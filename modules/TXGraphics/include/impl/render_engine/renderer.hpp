@@ -213,7 +213,7 @@ private:
 	template <class T>
 	void updateDynamicBuffer_impl(DBuffer_impl<T>& buffer) {
 		u32 size = buffer.stage.dataSize();
-		buffer.buffer.bo.push(
+		buffer.buffer.bo.stage(
 		    size, [&](std::span<T> input) {
 			    std::copy(buffer.stage.begin(), buffer.stage.end(), input.begin());
 		    },

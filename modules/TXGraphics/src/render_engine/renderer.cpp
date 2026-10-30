@@ -34,8 +34,8 @@ void Renderer::initBuffers_impl() {
 		instanceRotationBuffer     .buffer.id = initer.addAttribInstanced<mat2> ();
 		instanceColorBuffer        .buffer.id = initer.addAttribInstanced<u32>  ();
 	});
-	meshPositionBuffer.bo.alloc(6, SquareVertexPositions_CenterOrigin);
-	meshUVBuffer      .bo.alloc(6, SquareVertexUVs_CenterOrigin);
+	meshPositionBuffer.bo.alloc_impl(6, SquareVertexPositions_CenterOrigin);
+	meshUVBuffer      .bo.alloc_impl(6, SquareVertexUVs_CenterOrigin);
 	instancePositionBuffer     .buffer.bo.alloc();
 	instanceTextureHandleBuffer.buffer.bo.alloc();
 	instanceTextureIndexBuffer .buffer.bo.alloc();
@@ -79,12 +79,12 @@ bool Renderer::getStageBufferSectionMetaData_impl(u32 sectionIndex) {
 }
 
 bool Renderer::updateRingBufferOffset() {
-	ringBufferOffset = instancePositionBuffer.buffer.bo.getNext(FMSubmiter{ fm });
-	return ringBufferOffset == instanceTextureHandleBuffer.buffer.bo.getNext(FMSubmiter{ fm }) &&
-	       ringBufferOffset == instanceTextureIndexBuffer .buffer.bo.getNext(FMSubmiter{ fm }) &&
-	       ringBufferOffset == instanceScaleBuffer        .buffer.bo.getNext(FMSubmiter{ fm }) &&
-	       ringBufferOffset == instanceRotationBuffer     .buffer.bo.getNext(FMSubmiter{ fm }) &&
-	       ringBufferOffset == instanceColorBuffer        .buffer.bo.getNext(FMSubmiter{ fm });
+	ringBufferOffset = instancePositionBuffer.buffer.bo.commit(FMSubmiter{ fm });
+	return ringBufferOffset == instanceTextureHandleBuffer.buffer.bo.commit(FMSubmiter{ fm }) &&
+	       ringBufferOffset == instanceTextureIndexBuffer .buffer.bo.commit(FMSubmiter{ fm }) &&
+	       ringBufferOffset == instanceScaleBuffer        .buffer.bo.commit(FMSubmiter{ fm }) &&
+	       ringBufferOffset == instanceRotationBuffer     .buffer.bo.commit(FMSubmiter{ fm }) &&
+	       ringBufferOffset == instanceColorBuffer        .buffer.bo.commit(FMSubmiter{ fm });
 }
 
 void Renderer::addInstance_impl(u32 section, vec2 position, u64 textureHandle, float textureIndex, vec2 scale, mat2 rotation, u32 color) {

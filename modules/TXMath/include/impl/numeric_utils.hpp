@@ -30,7 +30,8 @@ template <class T>
     requires std::is_signed_v<T>
 constexpr inline T sign(T val) { return (val > T{ 0 }) - (val < T{ 0 }); }
 
-template <tx::numeric T>
+template <class T>
+    requires requires(T a) { a * a; }
 constexpr inline T sq(T in) { return in * in; }
 
 template <class T, T first, T... vals>
@@ -82,9 +83,9 @@ constexpr inline T divCeil(T dividend, T divisor) {
 	return is_non_zero + (dividend - is_non_zero) / divisor;
 }
 
-template <std::integral T>
+template <tx::numeric T>
 constexpr T powi(T base, u32 exp) noexcept {
-	T result = 1;
+	T result = T{ 1 };
 	while (exp > 0) {
 		if (exp & 1) {
 			result *= base;

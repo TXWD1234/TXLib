@@ -29,7 +29,7 @@ inline void VAMSetBuffer(VAM& vam, const BufferHandle<BufferT>& handle, u32 offs
 	vam.setBuffer(handle.id, handle.bo, offset);
 }
 template <class T, class SubmitMarker>
-    requires std::invocable<SubmitMarker, RingBufferObjectMarker&&>
+    requires std::invocable<SubmitMarker, impl::RingBufferObjectMarker&&>
 inline void VAMUpdateRingBuffer(VAM& vam, BufferHandle<RingBufferObject<T>>& handle, SubmitMarker&& submitMarker) {
 	vam.setBuffer(handle.id, handle.bo, handle.bo.getNext(std::forward<SubmitMarker>(submitMarker)));
 }
