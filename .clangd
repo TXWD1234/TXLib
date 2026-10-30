@@ -1,4 +1,5 @@
 CompileFlags:
+  CompilationDatabase: "SampleProject/build"
   Remove:
     - -fmodules-ts
     - -fmodule-mapper=*
@@ -15,22 +16,3 @@ InlayHints:
   Designators: Yes
   BlockEnd: Yes
   DefaultArguments: Yes
----
-If:
-  PathMatch: .*\.(c|cpp)
-CompileFlags:
-  CompilationDatabase: "SampleProject/build"
----
-If:
-  PathMatch: .*\.(h|hpp)
-CompileFlags:
-  Add:
-    - -xc++-header
-    - -I../../../TXFoundation/include
-    - -I../../../TXMath/include
-    - -I../../../TXData/include
-    - -I../../../TXUtility/include
-    - -I../../../TXJson/include
-    - -I../../../TXGrid/include
-    - -I../../../TXResource/include
-    - -I../../../TXGraphics/include

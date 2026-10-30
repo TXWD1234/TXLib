@@ -34,7 +34,6 @@ tx_txlib_module(
 		"gl_core/shader.cpp"
 		"gl_core/texture.cpp"
 
-		"render_engine/render_engine.cpp"
 		"render_engine/renderer_framework.cpp"
 		"render_engine/renderer.cpp"
 
