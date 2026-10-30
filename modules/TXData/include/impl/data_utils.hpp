@@ -7,6 +7,7 @@
 #include "tx/basic_types.hpp"
 #include "tx/exception.hpp"
 #include "tx/type_traits.hpp"
+#include <climits>
 #include <concepts>
 #include <memory>
 #include <cstring>
@@ -152,8 +153,8 @@ inline T as(const u8* ptr) {
 
 constexpr u32 ByteSize = 8;
 
-// @param size have to be power of 2
-template <std::integral T>
+// @param size must be power of 2
+template <std::unsigned_integral T>
 inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 	impl::assert_impl(
 	    [&] { return tx::isPowTwo(size); },
@@ -163,10 +164,20 @@ inline constexpr T findPowTwoWrappedPhysIndex(T index, T size) {
 		          size); });
 	return index & (size - (T)1);
 }
+template <std::unsigned_integral T>
+inline constexpr T findWrappedPhysIndex(T index, T size) {
+	return index % size;
+}
+template <std::signed_integral T>
+inline constexpr T findSignedWrappedPhysIndex(T index, T size) noexcept {
+	T rem = index % size;
+	T mask = rem >> (sizeof(T) * CHAR_BIT - 1); // rem < 0 ? 0xFFFFFFFF : 0x0
+	return rem + (size & mask);
+}
 
 template <class T, class... Args>
     requires std::constructible_from<T, Args...> &&
-             std::assignable_from<T&, T>
+	         std::assignable_from<T&, T>
 T& reconstruct(T& obj, Args&&... args) {
 	return (obj = T(std::forward<Args>(args)...));
 }
