@@ -262,10 +262,43 @@ constexpr size_t arg_list_count(Args&&...) {
 	return sizeof...(Args);
 }
 
+// ################ Argument Parsing ################
+// > *Welcome to the darkest corner of TXLib.*
+// Warning: This is completely a template abomination, use at your own risk.
 
+// ================ Last Argument ================
 
+namespace impl {
+// determind the presence of last argument
+template <class Pred, class... Args>
+constexpr bool verify_last_arg_v = requires {
+	requires tx::type_list_count_v<tx::type_list_t<Args...>> > 0;
+	requires Pred {}
+	(std::type_identity<tx::type_list_back_t<tx::type_list_t<Args...>>>{});
+};
 
+// acquire the type of the last argument
+template <class Fallback, class Pred, class... Args>
+using parse_last_arg_t = typename decltype([] {
+	if constexpr (impl::verify_last_arg_v<Pred, Args...>)
+		return std::type_identity<
+		    tx::type_list_back_t<tx::type_list_t<Args...>>>{};
+	else
+		return std::type_identity<Fallback>{};
+}())::type;
 
+// acquire the type list containing the remaining arguments after extracting
+// the last argument
+template <class Pred, class... Args>
+using foward_last_arg_remainder_t = decltype([] {
+	using list = tx::type_list_t<Args...>;
+	if constexpr (impl::verify_last_arg_v<Pred, Args...>)
+		return tx::type_list_sublist_t<
+		    list, 0, tx::type_list_count_v<list> - 1>{};
+	else
+		return list{};
+}());
+} // namespace impl
 
 
 
@@ -307,13 +340,18 @@ concept numeric = (std::integral<T> || std::floating_point<T>) &&
                   !std::same_as<T, bool>;
 
 // byte_like
-template <typename T>
+template <class T>
 concept byte_like = sizeof(T) == 1 &&
                     (std::integral<T> || std::same_as<T, std::byte>);
 
 // transparent
-template <typename T>
+template <class T>
 concept transparent = requires { typename T::is_transparent; };
+
+template <class T, class ET>
+concept array_type =
+    std::is_array_v<std::remove_reference_t<T>> &&
+    std::is_same_v<std::remove_extent_t<std::remove_reference_t<T>>, ET>;
 
 // std add on
 

@@ -3,21 +3,29 @@
 
 #pragma once
 #include "impl/data_foundation.hpp"
+#include "impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
-#include "impl/numeric_utils.hpp"
+#include <type_traits>
 
 namespace tx {
 // ################ Allocator Associated Concepts ################
 
 // allocator
 template <class Alloc>
-concept allocator = requires(
-    Alloc a, std::size_t n, typename Alloc::value_type* ptr) {
-	typename Alloc::value_type;
-	{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
-	{ a.deallocate(ptr, n) } -> std::same_as<void>;
+struct is_allocator {
+	static constexpr bool value = requires(
+	    Alloc a, std::size_t n, typename Alloc::value_type* ptr) {
+		typename Alloc::value_type;
+		{ a.allocate(n) } -> std::same_as<typename Alloc::value_type*>;
+		{ a.deallocate(ptr, n) } -> std::same_as<void>;
+	};
 };
+template <class Alloc>
+constexpr bool is_allocator_v = is_allocator<Alloc>::value;
+template <class Alloc>
+concept allocator = is_allocator_v<Alloc>;
+
 // instantiated allocator_trait
 // The value type of the Traits is not checked, only the validity of it being
 // an allocator traits
@@ -119,31 +127,26 @@ public:
 };
 
 namespace impl {
+namespace details {
+using allocator_last_arg_pred =
+    decltype([]<class U>(std::type_identity<U>) {
+	    return tx::allocator<U>;
+    });
+} // namespace details
+
 template <class... Args>
-inline constexpr bool VerifyLastAllocArg =
-    requires {
-	    requires tx::type_list_count_v<tx::type_list_t<Args...>> > 0;
-	    requires tx::allocator<tx::type_list_back_t<tx::type_list_t<Args...>>>;
-    };
+inline constexpr bool VerifyLastAllocArg = impl::verify_last_arg_v<
+    details::allocator_last_arg_pred, Args...>;
 
 // alloc_t
 template <class Fallback, class... Args>
-using ParseLastAllocArg = typename decltype([] {
-	if constexpr (impl::VerifyLastAllocArg<Args...>)
-		return std::type_identity<
-		    tx::type_list_back_t<tx::type_list_t<Args...>>>{};
-	else
-		return std::type_identity<Fallback>{};
-}())::type;
+using ParseLastAllocArg = impl::parse_last_arg_t<
+    Fallback, details::allocator_last_arg_pred, Args...>;
 
 // tx::type_list_t<remaining_args...>
 template <class... Args>
-using ForwardLastAllocArgRemainder = decltype([]() {
-	using list = tx::type_list_t<Args...>;
-	if constexpr (impl::VerifyLastAllocArg<Args...>)
-		return tx::type_list_sublist_t<list, 0, tx::type_list_count_v<list> - 1>{};
-	else
-		return list{};
-}());
+using ForwardLastAllocArgRemainder =
+    impl::foward_last_arg_remainder_t<
+        details::allocator_last_arg_pred, Args...>;
 } // namespace impl
 } // namespace tx
