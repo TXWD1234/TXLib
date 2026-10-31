@@ -4,6 +4,7 @@
 #pragma once
 #include "tx/build_config.hpp"
 #include "tx/type_traits.hpp"
+#include "tx/upset.hpp"
 #include <concepts>
 #include <source_location>
 #include <stdexcept>
@@ -11,6 +12,10 @@
 #include <format>
 
 namespace tx {
+
+// ===========================================
+// **************** Assertion ****************
+// ===========================================
 
 class exception : public std::runtime_error {
 public:
@@ -23,11 +28,16 @@ public:
 };
 
 namespace impl {
+template <size_t N>
 struct CompileTimeString {
-	std::string_view m_str;
-	template <std::convertible_to<std::string_view> T>
-	consteval CompileTimeString(T str) : m_str(str) {}
+	char str[N];
+	constexpr CompileTimeString(const char (&s)[N]) {
+		std::copy_n(s, N, str);
+	}
 };
+template <size_t N>
+CompileTimeString(const char (&s)[N]) -> CompileTimeString<N>;
+
 /**
  * # Assertion Documentation
  * 
@@ -77,10 +87,10 @@ constexpr void assert_impl(
 		}
 	}
 }
-template <tx::invocable_r<bool> Cond>
+template <tx::invocable_r<bool> Cond, size_t N>
 constexpr void assert_impl(
     Cond&& expr,
-    CompileTimeString msg,
+    CompileTimeString<N> msg,
     std::source_location loc = std::source_location::current()) {
 	if constexpr (config::enabled_debug && config::enabled_exception) {
 		if (!expr()) [[unlikely]] {
@@ -89,7 +99,7 @@ constexpr void assert_impl(
 			    loc.file_name(),
 			    loc.line(),
 			    loc.function_name(),
-			    msg.m_str));
+			    msg.str));
 		}
 	}
 }
@@ -155,5 +165,15 @@ inline auto overlay_object_valid(T* obj) {
 	};
 }
 } // namespace assert
+
+// ====================================================
+// **************** Type Trait Utility ****************
+// ====================================================
+
+template <CompileTimeString message, class...>
+struct exception_callback {
+	void operator()() { throw exception(message.str); }
+};
+
 } // namespace impl
 } // namespace tx
