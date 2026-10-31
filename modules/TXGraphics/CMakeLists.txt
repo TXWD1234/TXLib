@@ -10,6 +10,7 @@ tx_txlib_module(
 	PUBLIC_HEADERS
 		graphics.h
 	IMPL_HEADERS
+		"gl_core/gl_core.hpp"
 		"gl_core/basic_gl_utils.hpp"
 		"gl_core/buffer.hpp"
 		"gl_core/draw_call_manager.hpp"
@@ -28,7 +29,7 @@ tx_txlib_module(
 		"gl_core/shader.cpp"
 		"gl_core/texture.cpp"
 
-		"framework/framework.cpp"	
+		"framework/framework.cpp"
 )
 
 # tx_txlib_module(
