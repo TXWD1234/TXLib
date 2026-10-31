@@ -26,8 +26,7 @@ public:
 	      m_vamId(other.m_vamId),
 	      m_programId(other.m_programId),
 	      m_pipelineId(other.m_pipelineId),
-	      m_usePipeline(other.m_usePipeline),
-	      m_textures(std::move(other.m_textures)) {
+	      m_usePipeline(other.m_usePipeline) {
 		other.m_vamId = 0;
 		other.m_programId = 0;
 		other.m_pipelineId = 0;
@@ -41,7 +40,6 @@ public:
 			m_programId = other.m_programId;
 			m_pipelineId = other.m_pipelineId;
 			m_usePipeline = other.m_usePipeline;
-			m_textures = std::move(other.m_textures);
 			other.m_vamId = 0;
 			other.m_programId = 0;
 			other.m_pipelineId = 0;
@@ -115,12 +113,6 @@ public:
 		setShaderPipeline(pipeline);
 	}
 
-	// legacy
-	void setTexture(u32 port, const TextureArray_legacy& tex) {
-		if (port >= m_textures.size()) m_textures.resize(port + 1, 0);
-		m_textures[port] = tex.id();
-	}
-
 	void setVertexAttributeManager(const VAM& in_vam) {
 		m_vamId = in_vam.id();
 	}
@@ -148,12 +140,10 @@ private:
 	gid m_programId = 0;
 	gid m_pipelineId = 0;
 	bool m_usePipeline = false;
-	std::vector<gid> m_textures;
 
 	inline static thread_local gid currentBindingVAM = 0;
 	inline static thread_local gid currentBindingShaderPipeline = 0;
 	inline static thread_local gid currentBindingShaderProgram = 0;
-	inline static thread_local std::vector<gid> currentBindingTextures;
 
 	void bindVAM_impl() {
 		if (m_vamId && currentBindingVAM != m_vamId) {
@@ -180,25 +170,9 @@ private:
 		}
 	}
 
-	void bindTextures_impl() {
-		for (u32 i = 0; i < m_textures.size(); ++i) {
-			gid id = m_textures[i];
-			if (id != 0) {
-				if (i >= currentBindingTextures.size()) {
-					currentBindingTextures.resize(i + 1, 0);
-				}
-				if (currentBindingTextures[i] != id) {
-					gl::bindTextureUnit(i, id);
-					currentBindingTextures[i] = id;
-				}
-			}
-		}
-	}
-
 	void preDrawOperations_impl() {
 		bindVAM_impl();
 		bindShaders_impl();
-		bindTextures_impl();
 	}
 };
 using DCM = DrawCallManager;

@@ -58,7 +58,7 @@ public:
 	Coord getDimension(u32 dimensionId) const { return m_textures[dimensionId].dimension(); }
 
 private:
-	inline static const u32 TextureArraySize = 64;
+	static constexpr u32 TextureArraySize = 64;
 	fmT* fm = nullptr;
 
 	struct TexArr_impl {
