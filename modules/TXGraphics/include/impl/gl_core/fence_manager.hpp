@@ -16,9 +16,7 @@ namespace tx::RenderEngine {
 template <std::invocable<>... FuncTypes>
 class FenceManagerBase {
 public:
-	FenceManagerBase() {
-		operationQueue.emplace_back();
-	}
+	FenceManagerBase() { operationQueue.emplace_back(); }
 
 	~FenceManagerBase() {
 		Fence stallFence;
@@ -28,11 +26,8 @@ public:
 		}
 	}
 
-	// Disable Copy
 	FenceManagerBase(const FenceManagerBase&) = delete;
 	FenceManagerBase& operator=(const FenceManagerBase&) = delete;
-
-	// Move Semantics
 	FenceManagerBase(FenceManagerBase&&) noexcept = default;
 	FenceManagerBase& operator=(FenceManagerBase&&) noexcept = default;
 
@@ -45,7 +40,9 @@ public:
 
 	template <tx::any_of<FuncTypes...> T>
 	void addOperation(T&& operation) {
-		std::get<std::vector<std::decay_t<T>>>(operationQueue.back()).push_back(std::forward<T>(operation));
+		std::get<std::vector<std::decay_t<T>>>(
+		    operationQueue.back())
+		    .push_back(std::forward<T>(operation));
 	}
 
 private:

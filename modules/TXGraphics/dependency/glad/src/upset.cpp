@@ -79,6 +79,7 @@ void getShaderInfoLog(uint_t shader, sizei_t bufSize, sizei_t* length, char_t* i
 uint_t createProgram() { return glCreateProgram(); }
 void deleteProgram(uint_t program) { glDeleteProgram(program); }
 void attachShader(uint_t program, uint_t shader) { glAttachShader(program, shader); }
+void detachShader(uint_t program, uint_t shader) { glDetachShader(program, shader); }
 void linkProgram(uint_t program) { glLinkProgram(program); }
 void getProgramiv(uint_t program, enum_t pname, int_t* params) { glGetProgramiv(program, pname, params); }
 void getProgramInfoLog(uint_t program, sizei_t bufSize, sizei_t* length, char_t* infoLog) { glGetProgramInfoLog(program, bufSize, length, infoLog); }

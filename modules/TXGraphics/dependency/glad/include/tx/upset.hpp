@@ -74,6 +74,7 @@ void getShaderInfoLog(uint_t shader, sizei_t bufSize, sizei_t* length, char_t* i
 uint_t createProgram();
 void deleteProgram(uint_t program);
 void attachShader(uint_t program, uint_t shader);
+void detachShader(uint_t program, uint_t shader);
 void linkProgram(uint_t program);
 void getProgramiv(uint_t program, enum_t pname, int_t* params);
 void getProgramInfoLog(uint_t program, sizei_t bufSize, sizei_t* length, char_t* infoLog);
