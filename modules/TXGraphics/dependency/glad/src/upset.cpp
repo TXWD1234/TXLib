@@ -3,6 +3,7 @@
 
 #include "glad/glad.h"
 #include "tx/upset.hpp"
+#include <cstdint>
 #include <iostream>
 
 namespace gl {
@@ -104,5 +105,9 @@ void bindTextureUnit(uint_t unit, uint_t texture) { glBindTextureUnit(unit, text
 sync_t fenceSync(enum_t condition, bitfield_t flags) { return glFenceSync(condition, flags); }
 void deleteSync(sync_t sync) { glDeleteSync((GLsync)sync); }
 enum_t clientWaitSync(sync_t sync, bitfield_t flags, uint64_t timeout) { return glClientWaitSync((GLsync)sync, flags, timeout); }
+void bindBufferRange(enum_t target, uint_t index, uint_t buffer, intptr_t offset, sizeiptr_t size) { return glBindBufferRange(target, index, buffer, offset, size); }
+
+// misc
+void getIntegerv(enum_t pname, int_t* data) { glGetIntegerv(pname, data); }
 
 } // namespace gl

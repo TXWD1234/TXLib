@@ -19,6 +19,7 @@ tx_txlib_module(
 		"gl_core/shader.hpp"
 		"gl_core/texture.hpp"
 		"gl_core/vertex_attribute_manager.hpp"
+		"gl_core/uniform.hpp"
 
 		"utility/rgb.hpp"
 
@@ -45,6 +46,7 @@ tx_txlib_module(
 # 		"gl_core/texture.hpp"
 # 		"gl_core/utility.hpp"
 # 		"gl_core/vertex_attribute_manager.hpp"
+#		"gl_core/uniform.hpp"
 
 # 		"render_engine/log.hpp"
 # 		"render_engine/render_engine.hpp"

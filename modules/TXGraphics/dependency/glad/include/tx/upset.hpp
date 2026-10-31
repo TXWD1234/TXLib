@@ -99,6 +99,10 @@ void bindTextureUnit(uint_t unit, uint_t texture);
 sync_t fenceSync(enum_t condition, bitfield_t flags);
 void deleteSync(sync_t sync);
 enum_t clientWaitSync(sync_t sync, bitfield_t flags, uint64_t timeout);
+void bindBufferRange(enum_t target, uint_t index, uint_t buffer, intptr_t offset, sizeiptr_t size);
+
+// misc
+void getIntegerv(enum_t pname, int_t* data);
 
 namespace enums {
 inline constexpr enum_t DEPTH_BUFFER_BIT = 0x00000100;

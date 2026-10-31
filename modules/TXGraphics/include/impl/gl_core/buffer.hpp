@@ -168,6 +168,7 @@ public:
 	RingBufferObject(RingBufferObject&&) noexcept = default;
 	RingBufferObject& operator=(RingBufferObject&&) noexcept = default;
 
+	const BufferObject<T>& buffer() const { return m_buffer; }
 	operator const BufferObject<T>&() const { return m_buffer; }
 
 	// ================ Buffer Manipulation Interface ================
@@ -179,7 +180,7 @@ public:
 	template <class Func, std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
 	    requires std::invocable<Func, std::span<T>> ||
 		         std::invocable<Func, std::span<std::byte>>
-	void stage(u32 size, Func&& f, SubmitDeleter&& submitDeleter) {
+	void stage(u32 size, SubmitDeleter&& submitDeleter, Func&& f) {
 		if (!size) return;
 
 		m_preparedPart = IndexRange{ m_preparedPart.end(), size };
@@ -212,28 +213,27 @@ public:
 	void stage(std::span<T> dataBuffer, SubmitDeleter&& submitDeleter) {
 		stage(
 		    static_cast<u32>(dataBuffer.size()),
+		    std::forward<SubmitDeleter>(submitDeleter),
 		    [dataBuffer](std::span<T> mappedData) {
 			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
-		    },
-		    std::forward<SubmitDeleter>(submitDeleter));
+		    });
 	}
 	template <std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
 	void stage(std::span<const std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {
 		stage(
 		    static_cast<u32>(tx::divCeil(dataBuffer.size(), sizeof(T))),
+		    std::forward<SubmitDeleter>(submitDeleter),
 		    [dataBuffer](std::span<T> mappedData) {
 			    std::span<std::byte> mappedDataByte = std::as_writable_bytes(mappedData);
 			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedDataByte.begin());
-		    },
-		    std::forward<SubmitDeleter>(submitDeleter));
+		    });
 	}
 
 	// ================ Draw Call Associated Interface ================
 
 	// originally named: getNext
-	template <class Func>
-	    requires std::invocable<Func, impl::RingBufferObjectMarker&&>
-	[[nodiscard]] u32 commit(Func&& submitMarker) {
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
+	[[nodiscard]] u32 commit(SubmitMarker&& submitMarker) {
 		// new draw call
 		submitMarker(impl::RingBufferObjectMarker{
 		    m_preparedPart.offset, m_usageFence });

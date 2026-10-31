@@ -85,7 +85,6 @@ struct FMAddOperation {
 		fm.addOperation(std::forward<Func>(operation));
 	}
 };
-
 template <typename FMT>
 FMAddOperation(FMT&) -> FMAddOperation<FMT>;
 

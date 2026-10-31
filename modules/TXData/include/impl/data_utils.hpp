@@ -104,9 +104,17 @@ constexpr inline u8* nextAlign(u8* ptr) {
 	    (reinterpret_cast<uintptr_t>(ptr) + alignof(T) - 1) &
 	    ~(uintptr_t)(alignof(T) - 1));
 }
+constexpr inline u8* nextAlign(u8* ptr, u32 align) {
+	return reinterpret_cast<u8*>(
+	    (reinterpret_cast<uintptr_t>(ptr) + align - 1) &
+	    ~(uintptr_t)(align - 1));
+}
 template <class T>
 constexpr inline u32 nextAlign(u32 index) {
 	return (index + alignof(T) - 1) & ~(u32)(alignof(T) - 1);
+}
+constexpr inline u32 nextAlign(u32 index, u32 align) {
+	return (index + align - 1) & ~(align - 1);
 }
 
 struct IndexRange {
