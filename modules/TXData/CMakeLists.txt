@@ -22,6 +22,7 @@ tx_txlib_module(
 		"data_foundation.hpp"
 		"allocator.hpp"
 		"overlay.hpp"
+		"parted_view.hpp"
 	SOURCES
 		"parted_arr.cpp"
 )

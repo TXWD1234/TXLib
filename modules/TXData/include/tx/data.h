@@ -16,6 +16,7 @@
 #include "impl/packed_parted_array.hpp"
 #include "impl/hash_set.hpp"
 #include "impl/freelist.hpp"
+#include "impl/parted_view.hpp"
 
 /**
  * Terminology:

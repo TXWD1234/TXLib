@@ -14,6 +14,8 @@ namespace tx {
 template <class T, tx::allocator Allocator = std::allocator<T>>
 struct BasicStorage {
 	using traits = tx::typed_allocator_traits<Allocator, T>;
+	using value_type = T;
+
 	BasicStorage(u32 size, const Allocator& alloc = Allocator{})
 	    : data(traits::allocate(alloc, size)),
 	      size(size), allocator(alloc) {}
@@ -54,4 +56,19 @@ private:
 /**
  * note: allocator POCMA stubbed and potentially will not be implemented.
  */
+template <class T>
+struct BasicSpan {
+	BasicSpan(T* begin, T* end)
+	    : data(begin), size(static_cast<u32>(end - begin)) {}
+	BasicSpan(std::span<T> buffer)
+	    : data(buffer.data()), size(buffer.size()) {}
+	template <class A>
+	BasicSpan(const BasicStorage<T, A>& buffer)
+	    : data(buffer.data), size(buffer.size) {}
+
+	operator std::span<T>() const { return std::span<T>(data, data + size); }
+
+	T* data = nullptr;
+	u32 size = 0;
+};
 } // namespace tx
