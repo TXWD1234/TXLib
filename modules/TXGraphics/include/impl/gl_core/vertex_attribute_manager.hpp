@@ -20,10 +20,9 @@ public:
 
 	class Initializer;
 
-	VertexAttributeManager() {}
 	template <class InitFunc>
 	    requires std::invocable<InitFunc, Initializer&>
-	VertexAttributeManager(InitFunc f) {
+	VertexAttributeManager(InitFunc&& f) {
 		Initializer initer;
 		f(initer);
 		init_impl(std::move(initer));
@@ -108,16 +107,16 @@ public:
 
 		template <class T>
 		static void setBufferAttrib_impl(u32 vamId, u32 id, u32& attribId) {
-			using underlying = typename glAttributeParameter<T>::underlying;
+			using underlying_t = typename glAttributeParameter<T>::underlying;
 			u32 relativeOffset = 0;
 			for (u32 i = 0; i < glAttribCount<T>; i++) {
-				if constexpr (sizeof(underlying) <= 4) {
+				if constexpr (sizeof(underlying_t) <= 4) {
 					if constexpr (glAttributeParameter<T>::is_int) {
 						gl::vertexArrayAttribIFormat(vamId, attribId, glComponentCount<T>, glType<T>, relativeOffset);
 					} else {
 						gl::vertexArrayAttribFormat(vamId, attribId, glComponentCount<T>, glType<T>, gl::enums::FALSE, relativeOffset);
 					}
-				} else if constexpr (sizeof(underlying) == 8) {
+				} else if constexpr (sizeof(underlying_t) == 8) {
 					if constexpr (glAttributeParameter<T>::is_int) {
 						gl::vertexArrayAttribIFormat(vamId, attribId, glComponentCount<T> * 2, gl::enums::UNSIGNED_INT, relativeOffset); // Safe bindless mapping
 					} else {
@@ -128,7 +127,7 @@ public:
 				}
 				gl::enableVertexArrayAttrib(vamId, attribId);
 				gl::vertexArrayAttribBinding(vamId, attribId++, id);
-				relativeOffset += glComponentCount<T> * sizeof(underlying);
+				relativeOffset += glComponentCount<T> * sizeof(underlying_t);
 			}
 		}
 	};
@@ -160,7 +159,6 @@ private:
 	gid m_id = 0;
 	std::vector<BindingState> m_bindings;
 	bool m_useInstancing = 0;
-
 
 	void init_impl(Initializer&& initer) {
 		m_id = initer.m_id;

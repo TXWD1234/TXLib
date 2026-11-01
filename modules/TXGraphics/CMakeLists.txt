@@ -18,6 +18,7 @@ tx_txlib_module(
 		"gl_core/fence.hpp"
 		"gl_core/shader_manager.hpp"
 		"gl_core/shader.hpp"
+		"gl_core/shader_utils.hpp"
 		"gl_core/texture.hpp"
 		"gl_core/vertex_attribute_manager.hpp"
 		"gl_core/uniform.hpp"
