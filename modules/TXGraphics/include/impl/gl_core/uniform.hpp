@@ -23,7 +23,7 @@ inline u32 getUniformObjectAlignment() {
 	return alignment;
 }
 
-inline u32 getShaderStorageObjectAlignment() {
+inline u32 getShaderStorageOffsetAlignment() {
 	static const u32 alignment = [] {
 		i32 val = 0;
 		gl::getIntegerv(gl::enums::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &val);
@@ -164,8 +164,9 @@ template <class T>
     requires std::is_trivially_copyable_v<T>
 class ShaderStorageBufferObject {
 public:
-	ShaderStorageBufferObject(u32 objectCount = DefaultStorageCount)
-	    : m_buffer(objectCount, findObjectStorageCount_impl()) {}
+	ShaderStorageBufferObject(u32 bufferCount = DefaultBufferCount,
+	                          u32 bufferSize = DefaultBufferSize)
+	    : m_buffer(bufferCount, findObjectStorageCount_impl(bufferSize)) {}
 
 	ShaderStorageBufferObject(const ShaderStorageBufferObject& other) = delete;
 	ShaderStorageBufferObject& operator=(const ShaderStorageBufferObject& other) = delete;
@@ -181,7 +182,7 @@ public:
 		         std::invocable<Func, std::span<std::byte>>
 	void stage(u32 size, SubmitDeleter&& submitDeleter, Func&& f) {
 		m_buffer.stage(
-		    tx::nextAlign(size * sizeof(T), impl::details::getShaderStorageObjectAlignment()),
+		    tx::nextAlign(size * sizeof(T), impl::details::getShaderStorageOffsetAlignment()),
 		    std::forward<SubmitDeleter>(submitDeleter),
 		    [&](std::span<std::byte> data) {
 			    if constexpr (std::invocable<Func, std::span<T>>)
@@ -194,7 +195,7 @@ public:
 	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(
 		    tx::nextAlign(static_cast<u32>(dataBuffer.size() * sizeof(U)),
-			              impl::details::getShaderStorageObjectAlignment()),
+			              impl::details::getShaderStorageOffsetAlignment()),
 		    std::forward<SubmitDeleter>(submitDeleter),
 		    [dataBuffer](std::span<std::byte> mappedData) {
 			    if constexpr (std::same_as<U, const T>)
@@ -266,16 +267,17 @@ public:
 		bind(binding, std::forward<SubmitMarker>(submitMarker));
 	}
 
-private:
-	static constexpr u32 DefaultStorageCount = 4;
+public:
+	static constexpr u32 DefaultBufferSize = 8192;
+	static constexpr u32 DefaultBufferCount = 4;
 
 private:
 	RingBufferObject<std::byte> m_buffer;
 
-	static u32 findObjectStorageCount_impl() {
+	static u32 findObjectStorageCount_impl(u32 elementCount) {
 		return tx::nextAlign(
-		    static_cast<u32>(sizeof(T)),
-		    static_cast<u32>(impl::details::getShaderStorageObjectAlignment()));
+		    static_cast<u32>(elementCount * sizeof(T)),
+		    static_cast<u32>(impl::details::getShaderStorageOffsetAlignment()));
 	}
 };
 template <class T>

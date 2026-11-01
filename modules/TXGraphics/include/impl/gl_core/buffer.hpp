@@ -253,9 +253,11 @@ public:
 		return commit(std::forward<SubmitMarker>(submitMarker));
 	}
 
-private:
+public:
 	static constexpr u32 DefaultBufferSize = 8192;
 	static constexpr u32 DefaultBufferCount = 4;
+
+private:
 	u32 m_bufferSize = DefaultBufferSize, m_bufferCount = DefaultBufferCount;
 
 	template <class Func>
