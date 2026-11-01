@@ -9,6 +9,31 @@
 
 namespace tx {
 namespace RenderEngine {
+
+// Part of the Simple Pipeline
+// Basic vao id RAII wrapper
+struct SimpleVAO {
+	SimpleVAO() { gl::createVertexArrays(1, &id); }
+	~SimpleVAO() { uninit_impl(); }
+
+	SimpleVAO(const SimpleVAO& other) = delete;
+	SimpleVAO& operator=(const SimpleVAO& other) = delete;
+	SimpleVAO(SimpleVAO&& other) : id(other.id) { other.id = 0; };
+	SimpleVAO& operator=(SimpleVAO&& other) {
+		uninit_impl();
+		id = other.id;
+		other.id = 0;
+		return *this;
+	}
+
+	gid id = 0;
+
+private:
+	void uninit_impl() {
+		if (id) gl::deleteVertexArrays(1, &id);
+	}
+};
+
 // VAO Wrapper
 // SoA Design - One buffer per attribute
 class VertexAttributeManager {

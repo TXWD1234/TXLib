@@ -5,9 +5,33 @@
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "impl/gl_core/shader.hpp"
 #include "impl/gl_core/vertex_attribute_manager.hpp"
+#include "tx/upset.hpp"
 
 namespace tx {
 namespace RenderEngine {
+
+// designed for SSBO oriented, single shader draw calls with instancing
+// targeted to be as basic and as simple as possible
+class SimpleDrawCallManager {
+public:
+	SimpleDrawCallManager(const ShaderProgram& shader) {
+		gl::bindVertexArray(m_vao.id);
+		gl::useProgram(shader.id());
+	}
+
+public:
+	u32 begin = 0, count = 0, instanceCount = 0;
+	u32 drawMode = gl::enums::TRIANGLES;
+
+	void draw() {
+		gl::drawArraysInstanced(drawMode, begin, count, instanceCount);
+	}
+
+private:
+	SimpleVAO m_vao;
+};
+
+
 // since some objects such as tx::RE::RingBufferObject have resize method, it's internal gid might change.
 // therefore the set*() functions should be called before every draw call
 class DrawCallManager {
@@ -67,6 +91,8 @@ public:
 		drawArraysInstancedOffset_impl(begin, count, instanceBegin, instanceCount);
 	}
 
+
+
 	// ================ Configuration ================
 
 	void setBegin(u32 begin) { m_begin = begin; }
@@ -97,15 +123,17 @@ public:
 		m_vamId = in_vam.id();
 	}
 
+	void setDrawMode(u32 mode) { m_drawMode = mode; }
+
 private:
 	void drawArrays_impl(u32 begin, u32 count) const {
-		gl::drawArrays(gl::enums::TRIANGLES, begin, count);
+		gl::drawArrays(m_drawMode, begin, count);
 	}
 	void drawArraysInstanced_impl(u32 begin, u32 count, u32 instanceCount) const {
-		gl::drawArraysInstanced(gl::enums::TRIANGLES, begin, count, instanceCount);
+		gl::drawArraysInstanced(m_drawMode, begin, count, instanceCount);
 	}
 	void drawArraysInstancedOffset_impl(u32 begin, u32 count, u32 instanceBegin, u32 instanceCount) const {
-		gl::drawArraysInstancedBaseInstance(gl::enums::TRIANGLES, begin, count, instanceCount, instanceBegin);
+		gl::drawArraysInstancedBaseInstance(m_drawMode, begin, count, instanceCount, instanceBegin);
 	}
 
 	// draw call variables
@@ -114,6 +142,8 @@ private:
 
 	gid m_vamId = 0;
 	gid m_programId = 0;
+
+	u32 m_drawMode = gl::enums::TRIANGLES;
 
 	inline static thread_local gid currentBindingVAM = 0;
 	inline static thread_local gid currentBindingShaderProgram = 0;
