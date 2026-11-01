@@ -170,8 +170,7 @@ public:
 	RingBufferObject(RingBufferObject&&) noexcept = default;
 	RingBufferObject& operator=(RingBufferObject&&) noexcept = default;
 
-	const BufferObject<T>& buffer() const { return m_buffer; }
-	operator const BufferObject<T>&() const { return m_buffer; }
+	gid id() const { return m_buffer.id(); }
 
 	// ================ Buffer Manipulation Interface ================
 

@@ -9,6 +9,7 @@
 #include "tx/upset.hpp"
 #include <algorithm>
 #include <cstring>
+#include <span>
 
 namespace tx::RenderEngine {
 
@@ -40,8 +41,7 @@ public:
 	UniformBufferObject(UniformBufferObject&& other) = default;
 	UniformBufferObject& operator=(UniformBufferObject&& other) = default;
 
-	const BufferObject<T>& buffer() const { return m_buffer.buffer(); }
-	operator const BufferObject<T>&() const { return m_buffer; }
+	gid id() const { return m_buffer.id(); }
 
 	// ================ Buffer Management ================
 
@@ -78,7 +78,7 @@ public:
 	void bind(u32 binding, SubmitMarker&& submitMarker) {
 		gl::bindBufferRange(
 		    gl::enums::UNIFORM_BUFFER,
-		    binding, m_buffer.buffer().id(),
+		    binding, m_buffer.id(),
 		    commit(std::forward<SubmitMarker>(submitMarker)),
 		    sizeof(T));
 	}
@@ -115,7 +115,7 @@ using UBO = UniformBufferObject<T>;
 template <class T>
 struct UniformObject : public T {
 public:
-	const UniformBufferObject<T>& buffer() const { return m_buffer; }
+	gid id() const { return m_buffer.id(); }
 
 	template <std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
 	void stage(SubmitDeleter&& submitDeleter) {
@@ -167,8 +167,7 @@ public:
 	ShaderStorageBufferObject(ShaderStorageBufferObject&& other) = default;
 	ShaderStorageBufferObject& operator=(ShaderStorageBufferObject&& other) = default;
 
-	const BufferObject<u8>& buffer() const { return m_buffer.buffer(); }
-	operator const BufferObject<u8>&() const { return m_buffer; }
+	gid id() const { return m_buffer.id(); }
 
 	// ================ Buffer Management ================
 
@@ -189,10 +188,15 @@ public:
 	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
 	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(
-		    static_cast<u32>(dataBuffer.size() * sizeof(U)),
+		    tx::nextAlign(static_cast<u32>(dataBuffer.size() * sizeof(U)),
+			              impl::details::ShaderStorageObjectAlignment),
 		    std::forward<SubmitDeleter>(submitDeleter),
-		    [dataBuffer](std::span<std::remove_const_t<U>> mappedData) {
-			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
+		    [dataBuffer](std::span<std::byte> mappedData) {
+			    if constexpr (std::same_as<U, const T>)
+				    std::copy(std::as_bytes(dataBuffer).begin(),
+					          std::as_bytes(dataBuffer).end(), mappedData.begin());
+			    else
+				    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
 		    });
 	}
 
@@ -224,11 +228,16 @@ public:
 
 	// ================ Draw Call ================
 
+	void bind(u32 binding, IndexRange range) {
+		gl::bindBufferRange(gl::enums::SHADER_STORAGE_BUFFER,
+		                    binding, m_buffer.id(),
+		                    range.offset, range.size);
+	}
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
 	void bind(u32 binding, SubmitMarker&& submitMarker) {
 		IndexRange range = m_buffer.commit(std::forward<SubmitMarker>(submitMarker));
 		gl::bindBufferRange(gl::enums::SHADER_STORAGE_BUFFER,
-		                    binding, m_buffer.buffer().id(),
+		                    binding, m_buffer.id(),
 		                    range.offset, range.size);
 	}
 
@@ -256,7 +265,7 @@ private:
 	static constexpr u32 DefaultStorageCount = 4;
 
 private:
-	RingBufferObject<u8> m_buffer;
+	RingBufferObject<std::byte> m_buffer;
 
 	static u32 findObjectStorageCount_impl() {
 		return tx::nextAlign(
