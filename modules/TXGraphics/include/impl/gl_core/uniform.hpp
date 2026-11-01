@@ -19,6 +19,12 @@ const u32 UniformObjectAlignment = [] {
 	    gl::enums::UNIFORM_BUFFER_OFFSET_ALIGNMENT, &alignment);
 	return static_cast<u32>(alignment);
 }();
+const u32 ShaderStorageObjectAlignment = [] {
+	i32 alignment;
+	gl::getIntegerv(
+	    gl::enums::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
+	return static_cast<u32>(alignment);
+}();
 } // namespace impl::details
 
 
@@ -148,4 +154,116 @@ public:
 private:
 	UniformBufferObject<T> m_buffer;
 };
+
+template <class T>
+    requires std::is_trivially_copyable_v<T>
+class ShaderStorageBufferObject {
+public:
+	ShaderStorageBufferObject(u32 objectCount = DefaultStorageCount)
+	    : m_buffer(objectCount, findObjectStorageCount_impl()) {}
+
+	ShaderStorageBufferObject(const ShaderStorageBufferObject& other) = delete;
+	ShaderStorageBufferObject& operator=(const ShaderStorageBufferObject& other) = delete;
+	ShaderStorageBufferObject(ShaderStorageBufferObject&& other) = default;
+	ShaderStorageBufferObject& operator=(ShaderStorageBufferObject&& other) = default;
+
+	const BufferObject<u8>& buffer() const { return m_buffer.buffer(); }
+	operator const BufferObject<u8>&() const { return m_buffer; }
+
+	// ================ Buffer Management ================
+
+	template <class Func, std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	    requires std::invocable<Func, std::span<T>> ||
+		         std::invocable<Func, std::span<std::byte>>
+	void stage(u32 size, SubmitDeleter&& submitDeleter, Func&& f) {
+		m_buffer.stage(
+		    tx::nextAlign(size * sizeof(T), impl::details::ShaderStorageObjectAlignment),
+		    std::forward<SubmitDeleter>(submitDeleter),
+		    [&](std::span<std::byte> data) {
+			    if constexpr (std::invocable<Func, std::span<T>>)
+				    f(std::span<T>(reinterpret_cast<T*>(data.data()), size));
+			    else { f(data.subspan(0, size * sizeof(T))); }
+		    });
+	}
+	template <class U, std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
+		m_buffer.stage(
+		    static_cast<u32>(dataBuffer.size() * sizeof(U)),
+		    std::forward<SubmitDeleter>(submitDeleter),
+		    [dataBuffer](std::span<std::remove_const_t<U>> mappedData) {
+			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
+		    });
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
+	IndexRange commit(SubmitMarker&& submitMarker) {
+		return m_buffer.commit(std::forward<SubmitMarker>(submitMarker));
+	}
+
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class Func>
+	    requires std::invocable<Func, std::span<T>> ||
+		         std::invocable<Func, std::span<std::byte>>
+	[[nodiscard]] tx::IndexRange push(
+	    u32 size, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker, Func&& f) {
+		stage(size, std::forward<SubmitDeleter>(submitDeleter), std::forward<Func>(f));
+		return commit(std::forward<SubmitMarker>(submitMarker));
+	}
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class U>
+	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	[[nodiscard]] tx::IndexRange push(
+	    std::span<U> dataBuffer, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));
+		return commit(std::forward<SubmitMarker>(submitMarker));
+	}
+
+	// ================ Draw Call ================
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
+	void bind(u32 binding, SubmitMarker&& submitMarker) {
+		IndexRange range = m_buffer.commit(std::forward<SubmitMarker>(submitMarker));
+		gl::bindBufferRange(gl::enums::SHADER_STORAGE_BUFFER,
+		                    binding, m_buffer.buffer().id(),
+		                    range.offset, range.size);
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class Func>
+	    requires std::invocable<Func, std::span<T>> ||
+		         std::invocable<Func, std::span<std::byte>>
+	void sync(u32 size, u32 binding, SubmitDeleter&& submitDeleter,
+	          SubmitMarker&& submitMarker, Func&& f) {
+		stage(size, std::forward<SubmitDeleter>(submitDeleter), std::forward<Func>(f));
+		bind(binding, std::forward<SubmitMarker>(submitMarker));
+	}
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class U>
+	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	void sync(std::span<U> dataBuffer, u32 binding, SubmitDeleter&& submitDeleter,
+	          SubmitMarker&& submitMarker) {
+		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));
+		bind(binding, std::forward<SubmitMarker>(submitMarker));
+	}
+
+private:
+	static constexpr u32 DefaultStorageCount = 4;
+
+private:
+	RingBufferObject<u8> m_buffer;
+
+	static u32 findObjectStorageCount_impl() {
+		return tx::nextAlign(
+		    static_cast<u32>(sizeof(T)),
+		    static_cast<u32>(impl::details::ShaderStorageObjectAlignment));
+	}
+};
+template <class T>
+using SSBO = ShaderStorageBufferObject<T>;
 } // namespace tx::RenderEngine
