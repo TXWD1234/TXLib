@@ -14,18 +14,23 @@
 namespace tx::RenderEngine {
 
 namespace impl::details {
-const u32 UniformObjectAlignment = [] {
-	i32 alignment;
-	gl::getIntegerv(
-	    gl::enums::UNIFORM_BUFFER_OFFSET_ALIGNMENT, &alignment);
-	return static_cast<u32>(alignment);
-}();
-const u32 ShaderStorageObjectAlignment = [] {
-	i32 alignment;
-	gl::getIntegerv(
-	    gl::enums::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
-	return static_cast<u32>(alignment);
-}();
+inline u32 getUniformObjectAlignment() {
+	static const u32 alignment = [] {
+		i32 val = 0;
+		gl::getIntegerv(gl::enums::UNIFORM_BUFFER_OFFSET_ALIGNMENT, &val);
+		return static_cast<u32>(val);
+	}();
+	return alignment;
+}
+
+inline u32 getShaderStorageObjectAlignment() {
+	static const u32 alignment = [] {
+		i32 val = 0;
+		gl::getIntegerv(gl::enums::SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &val);
+		return static_cast<u32>(val);
+	}();
+	return alignment;
+}
 } // namespace impl::details
 
 
@@ -100,12 +105,12 @@ private:
 private:
 	RingBufferObject<Storage> m_buffer;
 
-	// division will not truncate to 0 because UniformObjectAlignment must be
+	// division will not truncate to 0 because getUniformObjectAlignment() must be
 	// either 64 or 256, according to reality
 	static u32 findObjectStorageCount_impl() {
 		return tx::nextAlign(
 		           static_cast<u32>(sizeof(T)),
-		           static_cast<u32>(impl::details::UniformObjectAlignment)) /
+		           static_cast<u32>(impl::details::getUniformObjectAlignment())) /
 		       DefaultStorageSize;
 	}
 };
@@ -176,7 +181,7 @@ public:
 		         std::invocable<Func, std::span<std::byte>>
 	void stage(u32 size, SubmitDeleter&& submitDeleter, Func&& f) {
 		m_buffer.stage(
-		    tx::nextAlign(size * sizeof(T), impl::details::ShaderStorageObjectAlignment),
+		    tx::nextAlign(size * sizeof(T), impl::details::getShaderStorageObjectAlignment()),
 		    std::forward<SubmitDeleter>(submitDeleter),
 		    [&](std::span<std::byte> data) {
 			    if constexpr (std::invocable<Func, std::span<T>>)
@@ -189,7 +194,7 @@ public:
 	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(
 		    tx::nextAlign(static_cast<u32>(dataBuffer.size() * sizeof(U)),
-			              impl::details::ShaderStorageObjectAlignment),
+			              impl::details::getShaderStorageObjectAlignment()),
 		    std::forward<SubmitDeleter>(submitDeleter),
 		    [dataBuffer](std::span<std::byte> mappedData) {
 			    if constexpr (std::same_as<U, const T>)
@@ -270,7 +275,7 @@ private:
 	static u32 findObjectStorageCount_impl() {
 		return tx::nextAlign(
 		    static_cast<u32>(sizeof(T)),
-		    static_cast<u32>(impl::details::ShaderStorageObjectAlignment));
+		    static_cast<u32>(impl::details::getShaderStorageObjectAlignment()));
 	}
 };
 template <class T>

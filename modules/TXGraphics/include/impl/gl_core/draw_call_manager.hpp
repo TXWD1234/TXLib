@@ -30,7 +30,7 @@ public:
 private:
 	SimpleVAO m_vao;
 };
-
+using SDCM = SimpleDrawCallManager;
 
 // since some objects such as tx::RE::RingBufferObject have resize method, it's internal gid might change.
 // therefore the set*() functions should be called before every draw call

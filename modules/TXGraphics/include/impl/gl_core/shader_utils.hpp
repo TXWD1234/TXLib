@@ -18,25 +18,25 @@ struct DefaultLogFunc {
 
 template <std::invocable<std::string_view> LogFunc = impl::details::DefaultLogFunc>
 struct ShaderLogCallback {
-	ShaderLogCallback(std::string_view name, LogFunc&& logFunc)
+	ShaderLogCallback(std::string_view name, LogFunc logFunc)
 	    : m_name(name), m_logFund(std::move(logFunc)) {}
 	std::string_view m_name;
 	[[no_unique_address]] LogFunc m_logFund;
 	void operator()(bool success, std::string_view log) {
 		LogFunc{}(std::format(
-		    "Compiling {}:\n{}{}", m_name, log,
+		    "Compiling {}...\n{}{}\n", m_name, log,
 		    success ? "Done." : std::format("Failed to compile {}.", m_name)));
 	}
 };
 template <std::invocable<std::string_view> LogFunc = impl::details::DefaultLogFunc>
 struct ProgramLogCallback {
-	ProgramLogCallback(std::string_view name, LogFunc&& logFunc)
+	ProgramLogCallback(std::string_view name, LogFunc logFunc)
 	    : m_name(name), m_logFund(std::move(logFunc)) {}
 	std::string_view m_name;
 	[[no_unique_address]] LogFunc m_logFund;
 	void operator()(bool success, std::string_view log) {
 		LogFunc{}(std::format(
-		    "Linking {}:\n{}{}", m_name, log,
+		    "Linking {}...\n{}{}\n", m_name, log,
 		    success ? "Done." : std::format("Failed to link {}.", m_name)));
 	}
 };
@@ -67,8 +67,8 @@ inline std::optional<ShaderProgram> buildShader(
     std::string_view vertName = "vertex shader",
     std::string_view fragName = "fragment shader",
     LogFunc&& logFunc = LogFunc{}) {
-	buildShader(StaticShaderSource(vertSrc), StaticShaderSource(fragSrc),
-	            vertName, fragName, std::forward<LogFunc>(logFunc));
+	return buildShader(StaticShaderSource(vertSrc), StaticShaderSource(fragSrc),
+	                   vertName, fragName, std::forward<LogFunc>(logFunc));
 }
 
 
