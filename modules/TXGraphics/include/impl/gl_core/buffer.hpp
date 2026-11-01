@@ -6,9 +6,11 @@
 #include "impl/gl_core/basic_gl_utils.hpp"
 #include "impl/gl_core/fence.hpp"
 #include "tx/basic_types.hpp"
+#include "tx/upset.hpp"
 #include <memory>
 #include <concepts>
 #include <span>
+#include <type_traits>
 
 namespace tx::RenderEngine {
 namespace impl {
@@ -177,7 +179,7 @@ public:
 	// the ring buffer.
 	// Therefore a VAMSetBuffer must be called after invoking this function.
 	// originally named: push
-	template <class Func, std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
+	template <class Func, std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
 	    requires std::invocable<Func, std::span<T>> ||
 		         std::invocable<Func, std::span<std::byte>>
 	void stage(u32 size, SubmitDeleter&& submitDeleter, Func&& f) {
@@ -209,23 +211,14 @@ public:
 			f(std::span<T>(m_buffer.data() + m_preparedPart.offset, size));
 		}
 	}
-	template <std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
-	void stage(std::span<T> dataBuffer, SubmitDeleter&& submitDeleter) {
+	template <class U, std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
+	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		stage(
 		    static_cast<u32>(dataBuffer.size()),
 		    std::forward<SubmitDeleter>(submitDeleter),
-		    [dataBuffer](std::span<T> mappedData) {
+		    [dataBuffer](std::span<std::remove_const_t<U>> mappedData) {
 			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedData.begin());
-		    });
-	}
-	template <std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
-	void stage(std::span<const std::byte> dataBuffer, SubmitDeleter&& submitDeleter) {
-		stage(
-		    static_cast<u32>(tx::divCeil(dataBuffer.size(), sizeof(T))),
-		    std::forward<SubmitDeleter>(submitDeleter),
-		    [dataBuffer](std::span<T> mappedData) {
-			    std::span<std::byte> mappedDataByte = std::as_writable_bytes(mappedData);
-			    std::copy(dataBuffer.begin(), dataBuffer.end(), mappedDataByte.begin());
 		    });
 	}
 
@@ -233,11 +226,32 @@ public:
 
 	// originally named: getNext
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
-	[[nodiscard]] u32 commit(SubmitMarker&& submitMarker) {
+	[[nodiscard]] tx::IndexRange commit(SubmitMarker&& submitMarker) {
 		// new draw call
 		submitMarker(impl::RingBufferObjectMarker{
 		    m_preparedPart.offset, m_usageFence });
-		return m_preparedPart.offset;
+		return m_preparedPart;
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class Func>
+	    requires std::invocable<Func, std::span<T>> ||
+		         std::invocable<Func, std::span<std::byte>>
+	[[nodiscard]] tx::IndexRange push(
+	    u32 size, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker, Func&& f) {
+		stage(size, std::forward<SubmitDeleter>(submitDeleter), std::forward<Func>(f));
+		return commit(std::forward<SubmitMarker>(submitMarker));
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
+	          class U>
+	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	[[nodiscard]] tx::IndexRange push(
+	    std::span<U> dataBuffer, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));
+		return commit(std::forward<SubmitMarker>(submitMarker));
 	}
 
 private:
@@ -267,10 +281,10 @@ using RBO = RingBufferObject<T>;
 template <class SubmitMarker, class First, class... Rest>
     requires std::invocable<SubmitMarker, impl::RingBufferObjectMarker&&>
 u32 getRingBufferOffset(SubmitMarker&& submitMarker, RingBufferObject<First>& first, RingBufferObject<Rest>&... rest) {
-	u32 expected = first.commit(submitMarker);
+	u32 expected = first.commit(submitMarker).offset;
 	u32 result = expected;
 	if constexpr (sizeof...(Rest) > 0) {
-		((rest.commit(submitMarker) != expected ? (result = InvalidU32) : 0), ...);
+		((rest.commit(submitMarker).offset != expected ? (result = InvalidU32) : 0), ...);
 	}
 	return result;
 }
@@ -282,4 +296,9 @@ void writeRingBuffer(RingBufferObject<T>& buffer, SubmitDeleter&& submitDeleter,
 	modifier(stagingBuffer);
 	buffer.stage(std::span<T>(stagingBuffer), std::forward<SubmitDeleter>(submitDeleter));
 }
+
+
+
+
+
 } // namespace tx::RenderEngine

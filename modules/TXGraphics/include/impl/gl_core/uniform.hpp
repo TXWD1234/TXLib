@@ -39,7 +39,7 @@ public:
 
 	// ================ Buffer Management ================
 
-	template <std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
+	template <std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
 	void stage(const T& object, SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(
 		    findObjectStorageCount_impl(),
@@ -53,8 +53,17 @@ public:
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
 	[[nodiscard]] u32 commit(SubmitMarker&& submitMarker) {
 		return m_buffer.commit(
-		           std::forward<SubmitMarker>(submitMarker)) *
+		                   std::forward<SubmitMarker>(submitMarker))
+		           .offset *
 		       DefaultStorageSize;
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	[[nodiscard]] u32 push(
+	    const T& object, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		stage(object, std::forward<SubmitDeleter>(submitDeleter));
+		return commit(std::forward<SubmitMarker>(submitMarker));
 	}
 
 	// ================ Draw Call ================
@@ -68,6 +77,13 @@ public:
 		    sizeof(T));
 	}
 
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	void sync(const T& object, u32 binding, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		stage(object, std::forward<SubmitDeleter>(submitDeleter));
+		bind(binding, std::forward<SubmitMarker>(submitMarker));
+	}
+
 private:
 	static constexpr u32 DefaultStorageSize = 64;
 	static constexpr u32 DefaultStorageCount = 4;
@@ -78,6 +94,8 @@ private:
 private:
 	RingBufferObject<Storage> m_buffer;
 
+	// division will not truncate to 0 because UniformObjectAlignment must be
+	// either 64 or 256, according to reality
 	static u32 findObjectStorageCount_impl() {
 		return tx::nextAlign(
 		           static_cast<u32>(sizeof(T)),
@@ -93,7 +111,7 @@ struct UniformObject : public T {
 public:
 	const UniformBufferObject<T>& buffer() const { return m_buffer; }
 
-	template <std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
+	template <std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
 	void stage(SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(*this, std::forward<SubmitDeleter>(submitDeleter));
 	}
@@ -104,11 +122,27 @@ public:
 		return m_buffer.commit(std::forward<SubmitMarker>(submitMarker));
 	}
 
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	[[nodiscard]] u32 push(
+	    SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		stage(*this, std::forward<SubmitDeleter>(submitDeleter));
+		return commit(std::forward<SubmitMarker>(submitMarker));
+	}
+
 	u32 m_binding = 0;
 
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
 	void bind(SubmitMarker&& submitMarker) {
 		m_buffer.bind(m_binding, std::forward<SubmitMarker>(submitMarker));
+	}
+
+	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
+	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
+	void sync(SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
+		m_buffer.sync(*this, m_binding,
+		              std::forward<SubmitDeleter>(submitDeleter),
+		              std::forward<SubmitMarker>(submitMarker));
 	}
 
 private:
