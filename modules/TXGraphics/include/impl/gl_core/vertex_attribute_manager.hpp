@@ -13,7 +13,10 @@ namespace RenderEngine {
 // Part of the Simple Pipeline
 // Basic vao id RAII wrapper
 struct SimpleVAO {
-	SimpleVAO() { gl::createVertexArrays(1, &id); }
+	SimpleVAO() {
+		gl::createVertexArrays(1, &id);
+		gl::enableVertexArrayAttrib(id, 0);
+	}
 	~SimpleVAO() { uninit_impl(); }
 
 	SimpleVAO(const SimpleVAO& other) = delete;
