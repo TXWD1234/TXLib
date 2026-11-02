@@ -424,7 +424,7 @@ public:
 		Entry operator*() const {
 			return Entry{ impl::json::stringPoolExtract_impl(
 				              m_data, impl::json::getU32(m_data, m_index)),
-				          JsonValue(m_data, m_index + sizeof(ValueU32_impl)) };
+			              JsonValue(m_data, m_index + sizeof(ValueU32_impl)) };
 		}
 
 		iterator& operator++() {
@@ -633,8 +633,8 @@ private:
 		return JsonDocument(
 		    m_result, m_connState.rootIndex,
 		    [m_allocator = m_allocator,
-		     m_result = m_result,
-		     m_resultSize = m_resultSize]() mutable {
+			 m_result = m_result,
+			 m_resultSize = m_resultSize]() mutable {
 			    alloc64bytes_traits::deallocate(
 			        m_allocator, m_result, m_resultSize);
 		    });
@@ -770,10 +770,10 @@ private:
 		              parent->m_allocator,
 		              tx::nextPowTwo(parent->m_stringPoolMetaSize))),
 		      m_interningTable(m_interningBuffer,
-		                       tx::nextPowTwo(parent->m_stringPoolMetaSize),
-		                       &m_state.interningTableState,
-		                       InterningTableHash{ m_stringPool },
-		                       InterningTableEqual{ m_stringPool }) {}
+			                   tx::nextPowTwo(parent->m_stringPoolMetaSize),
+			                   &m_state.interningTableState,
+			                   InterningTableHash{ m_stringPool },
+			                   InterningTableEqual{ m_stringPool }) {}
 		~Tokenizer_impl() {
 			allocEntry_traits::deallocate(
 			    m_parent->m_allocator, m_interningBuffer,
@@ -924,7 +924,6 @@ private:
 		void stepCur_impl(char val) {
 			if (cur() != val) {
 				// DevNote: Error
-				impl::assert_impl([] { return false; }, "Error");
 			}
 			m_state.str++;
 		}
@@ -1084,7 +1083,7 @@ private:
 					break;
 				default:
 					// DevNote: Error
-					impl::assert_impl([] { return false; }, "Error");
+
 					break;
 				}
 			}
@@ -1124,7 +1123,7 @@ private:
 					break;
 				default:
 					// DevNote: Error
-					impl::assert_impl([] { return false; }, "Error");
+
 					break;
 				}
 			}
@@ -1181,7 +1180,6 @@ private:
 					tokenPush_impl<ValueBoolean_impl>()->val = false;
 				} else {
 					// DevNote: Error
-					impl::assert_impl([] { return false; }, "Error");
 				}
 				m_record.bnnsc++;
 			}

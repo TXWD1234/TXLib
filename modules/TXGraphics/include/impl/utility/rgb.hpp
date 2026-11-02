@@ -93,10 +93,12 @@ class RGBA {
 public:
 	constexpr RGBA(float in_r, float in_g, float in_b, float in_a)
 	    : m_r(in_r), m_g(in_g), m_b(in_b), m_a(in_a) {}
-	constexpr RGBA(const RGB& in_rgb, float in_a)
+	constexpr RGBA(const RGB& in_rgb, float in_a = 255.0f)
 	    : m_r(in_rgb.r()), m_g(in_rgb.g()), m_b(in_rgb.b()), m_a(in_a) {
 		if (in_rgb.isNormalized() && m_a > 1.0f)
-			m_a *= ONE_OF_255;
+			m_a /= 255.0f;
+		if (!in_rgb.isNormalized() && m_a <= 1.0f)
+			m_a *= 255.0f;
 	}
 	constexpr RGBA() : m_r{}, m_g{}, m_b{}, m_a{} {}
 

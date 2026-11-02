@@ -141,17 +141,17 @@ public:
 		return commit(std::forward<SubmitMarker>(submitMarker));
 	}
 
-	u32 m_binding = 0;
+	u32 binding = 0;
 
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker>
 	void bind(SubmitMarker&& submitMarker) {
-		m_buffer.bind(m_binding, std::forward<SubmitMarker>(submitMarker));
+		m_buffer.bind(binding, std::forward<SubmitMarker>(submitMarker));
 	}
 
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
 	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
 	void sync(SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
-		m_buffer.sync(*this, m_binding,
+		m_buffer.sync(*this, binding,
 		              std::forward<SubmitDeleter>(submitDeleter),
 		              std::forward<SubmitMarker>(submitMarker));
 	}

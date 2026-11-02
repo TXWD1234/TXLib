@@ -109,5 +109,6 @@ void bindBufferRange(enum_t target, uint_t index, uint_t buffer, intptr_t offset
 
 // misc
 void getIntegerv(enum_t pname, int_t* data) { glGetIntegerv(pname, data); }
+void viewPort(int_t x, int_t y, sizei_t width, sizei_t height) { glViewport(x, y, width, height); }
 
 } // namespace gl

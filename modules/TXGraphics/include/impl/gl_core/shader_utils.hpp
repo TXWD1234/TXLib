@@ -47,7 +47,7 @@ inline std::optional<ShaderProgram> buildShader(
     impl::shader_source auto fragSrc,
     std::string_view vertName = "vertex shader",
     std::string_view fragName = "fragment shader",
-    LogFunc&& logFunc = LogFunc{}) {
+    LogFunc logFunc = LogFunc{}) {
 	VertexShader vert(vertSrc, ShaderLogCallback<LogFunc>{ vertName, logFunc });
 	if (!vert.valid()) return std::nullopt;
 	FragmentShader frag(fragSrc, ShaderLogCallback<LogFunc>{ fragName, logFunc });

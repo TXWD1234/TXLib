@@ -87,10 +87,9 @@ constexpr void assert_impl(
 		}
 	}
 }
-template <tx::invocable_r<bool> Cond, size_t N>
+template <CompileTimeString Message, tx::invocable_r<bool> Cond>
 constexpr void assert_impl(
     Cond&& expr,
-    CompileTimeString<N> msg,
     std::source_location loc = std::source_location::current()) {
 	if constexpr (config::enabled_debug && config::enabled_exception) {
 		if (!expr()) [[unlikely]] {
@@ -99,7 +98,7 @@ constexpr void assert_impl(
 			    loc.file_name(),
 			    loc.line(),
 			    loc.function_name(),
-			    msg.str));
+			    Message.str));
 		}
 	}
 }
