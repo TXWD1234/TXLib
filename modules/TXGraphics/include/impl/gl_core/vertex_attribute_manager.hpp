@@ -13,21 +13,7 @@ namespace RenderEngine {
 // Part of the Simple Pipeline
 // Basic vao id RAII wrapper
 struct SimpleVAO {
-	SimpleVAO() {
-		gl::createVertexArrays(1, &id);
-
-		// AMD Mesa Workaround: Prevent draw call from being dropped / segfaulting
-		gl::createBuffers(1, &dummy_vbo);
-		u8 dummy_data = 0;
-		gl::namedBufferStorage(dummy_vbo, 1, &dummy_data, 0); // 0 = Static flags
-
-		gl::enableVertexArrayAttrib(id, 0);
-		gl::vertexArrayAttribFormat(id, 0, 1, gl::enums::UNSIGNED_BYTE, gl::enums::FALSE, 0);
-		gl::vertexArrayAttribBinding(id, 0, 0);
-
-		// Stride 0 is critical: forces the GPU to read the same 1 byte safely for all vertices
-		gl::vertexArrayVertexBuffer(id, 0, dummy_vbo, 0, 0);
-	}
+	SimpleVAO() { gl::createVertexArrays(1, &id); }
 	~SimpleVAO() { uninit_impl(); }
 
 	SimpleVAO(const SimpleVAO& other) = delete;
@@ -41,7 +27,6 @@ struct SimpleVAO {
 	}
 
 	gid id = 0;
-	gid dummy_vbo = 0;
 
 private:
 	void uninit_impl() {
