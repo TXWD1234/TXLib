@@ -14,6 +14,7 @@ tx_module_registry_register(
 tx_module_registry_register(
 	TXData "TXData"
 	TXFoundation
+	TXMath
 )
 tx_module_registry_register(
 	TXUtility "TXUtility"
