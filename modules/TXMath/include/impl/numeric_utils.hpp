@@ -4,7 +4,6 @@
 #pragma once
 #include "tx/type_traits.hpp"
 #include <type_traits>
-#include <numeric>
 #include <concepts>
 #include <algorithm>
 #include <cmath>

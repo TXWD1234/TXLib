@@ -2,7 +2,7 @@
 // Module: TXMath
 
 #pragma once
-#include "impl/numeric_utils.hpp"
+#include "tx/basic_types.hpp"
 #include <cmath>
 #include <iostream>
 
@@ -134,10 +134,15 @@ constexpr Vec<D, T> operator-(Vec<D, T> v) {
 	return v;
 }
 
-
+inline namespace primitives {
 using vec2 = Vec<2, f32>;
 using ivec2 = Vec<2, i32>;
 using uvec2 = Vec<2, u32>;
+
+using vec3 = Vec<3, f32>;
+using ivec3 = Vec<3, i32>;
+using uvec3 = Vec<3, u32>;
+} // namespace primitives
 using Coord = ivec2;
 
 inline std::ostream& operator<<(std::ostream& in_cout, const vec2& in_vec2) {
