@@ -2,8 +2,8 @@
 // Module: TXJson
 
 #pragma once
-#include "impl/basic_utils.hpp"
-#include "impl/json/types.hpp"
+#include "tx/impl/basic_utils.hpp"
+#include "tx/impl/json/types.hpp"
 
 namespace tx {
 /**

@@ -2,9 +2,9 @@
 // Module: TXGraphics
 
 #pragma once
-#include "impl/gl_core/gl_core.hpp"
-#include "impl/framework/framework.hpp"
-#include "impl/utility/rgb.hpp"
+#include "tx/impl/gl_core/gl_core.hpp"
+#include "tx/impl/framework/framework.hpp"
+#include "tx/impl/utility/rgb.hpp"
 
 namespace tx {
 namespace RE = RenderEngine;

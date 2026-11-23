@@ -1,7 +1,7 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXResource
 
-#include "impl/io_file.hpp"
+#include "tx/impl/io_file.hpp"
 #include <cstddef>
 #include <format>
 #include <fstream>

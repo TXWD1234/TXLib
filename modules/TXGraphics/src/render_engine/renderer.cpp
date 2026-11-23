@@ -1,7 +1,7 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXGraphics
 
-#include "impl/render_engine/renderer.hpp"
+#include "tx/impl/render_engine/renderer.hpp"
 
 namespace tx::RenderEngine {
 

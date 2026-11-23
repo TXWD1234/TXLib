@@ -1,7 +1,7 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXData
 
-#include "impl/parted_array.hpp"
+#include "tx/impl/parted_array.hpp"
 
 namespace tx {
 

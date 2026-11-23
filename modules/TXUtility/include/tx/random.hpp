@@ -3,7 +3,7 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
-#include "impl/sorted_array.hpp"
+#include "tx/impl/sorted_array.hpp"
 #include <concepts>
 #include <random>
 

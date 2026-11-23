@@ -102,7 +102,7 @@ function(tx_txlib_module)
 
 	# add source files
 	list(TRANSFORM ARG_PUBLIC_HEADERS PREPEND "${TXLib_MODULE_DIR}/include/tx/")
-	list(TRANSFORM ARG_IMPL_HEADERS   PREPEND "${TXLib_MODULE_DIR}/include/impl/")
+	list(TRANSFORM ARG_IMPL_HEADERS   PREPEND "${TXLib_MODULE_DIR}/include/tx/impl/")
 	foreach(FILE IN LISTS ARG_PUBLIC_HEADERS) # PUBLIC_HEADERS
 		if(NOT EXISTS ${FILE})
 			tx_error_log("${TXLib_MODULE_NAME}" "Cannot find source file (PUBLIC_HEADERS):" "  ${FILE}")

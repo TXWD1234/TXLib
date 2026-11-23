@@ -2,8 +2,8 @@
 // Module: TXJson
 
 #pragma once
-#include "impl/kvmap.hpp"
-#include "impl/json/types.hpp"
+#include "tx/impl/kvmap.hpp"
+#include "tx/impl/json/types.hpp"
 
 namespace tx {
 

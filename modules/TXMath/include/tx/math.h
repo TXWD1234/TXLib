@@ -2,8 +2,8 @@
 // Module: TXMath
 
 #pragma once
-#include "impl/numeric_utils.hpp"
-#include "impl/geom_util_classes.hpp"
-#include "impl/geom_utils.hpp"
-#include "impl/geometry.hpp"
-#include "impl/math_line.hpp"
+#include "tx/impl/numeric_utils.hpp"
+#include "tx/impl/geom_util_classes.hpp"
+#include "tx/impl/geom_utils.hpp"
+#include "tx/impl/geometry.hpp"
+#include "tx/impl/math_line.hpp"

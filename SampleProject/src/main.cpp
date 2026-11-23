@@ -1,8 +1,8 @@
 #include "Project.hpp"
-#include "impl/hash_set.hpp"
-#include "impl/numeric_utils.hpp"
-#include "impl/overlay.hpp"
-#include "impl/ring_buffer.hpp"
+#include "tx/impl/hash_set.hpp"
+#include "tx/impl/numeric_utils.hpp"
+#include "tx/impl/overlay.hpp"
+#include "tx/impl/ring_buffer.hpp"
 #include "tx/exception.hpp"
 #include "tx/json.h"
 #include <algorithm>

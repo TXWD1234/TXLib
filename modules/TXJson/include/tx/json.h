@@ -2,12 +2,12 @@
 // Module: TXJson
 
 #pragma once
-#include "impl/allocator.hpp"
-#include "impl/data_utils.hpp"
-#include "impl/hash_set.hpp"
-#include "impl/packed_parted_array.hpp"
-#include "impl/value_group.hpp"
-#include "impl/numeric_utils.hpp"
+#include "tx/impl/allocator.hpp"
+#include "tx/impl/data_utils.hpp"
+#include "tx/impl/hash_set.hpp"
+#include "tx/impl/packed_parted_array.hpp"
+#include "tx/impl/value_group.hpp"
+#include "tx/impl/numeric_utils.hpp"
 #include "tx/basic_types.hpp"
 #include "tx/type_traits.hpp"
 #include <cstddef>

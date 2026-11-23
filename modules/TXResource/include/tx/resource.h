@@ -2,5 +2,5 @@
 // Module: TXResource
 
 #pragma once
-#include "impl/io_file.hpp"
-#include "impl/image.hpp"
+#include "tx/impl/io_file.hpp"
+#include "tx/impl/image.hpp"

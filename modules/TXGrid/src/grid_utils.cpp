@@ -1,7 +1,7 @@
 // Copyright (c) 2025 TXLib. Licensed under the MIT License.
 // Module: TXGrid
 
-#include "impl/grid_utils.hpp"
+#include "tx/impl/grid_utils.hpp"
 
 namespace tx {
 
