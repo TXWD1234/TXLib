@@ -12,11 +12,11 @@ namespace tx {
 template <std::integral T = i32>
 inline Vec<2, T> toCoord(vec2 in) {
 	return Vec<2, T>{ static_cast<T>(std::floor(in.x)),
-		              static_cast<T>(std::floor(in.y)) };
+	                  static_cast<T>(std::floor(in.y)) };
 }
 inline vec2 toVec2(ivec2 in) {
 	return vec2{ static_cast<f32>(in.x),
-		         static_cast<f32>(in.y) };
+	             static_cast<f32>(in.y) };
 }
 
 constexpr f32 dot(vec2 a, vec2 B) { return a.x * B.x + a.y * B.y; }

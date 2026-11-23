@@ -3,23 +3,43 @@
 
 #pragma once
 #include "tx/basic_types.hpp"
+#include <array>
 #include <cmath>
-#include <iostream>
+#include <concepts>
+#include <ostream>
 
 namespace tx {
 
 // ################ Vector Implementation ################
+
+namespace impl::details {
+template <class From, class To>
+struct primitives_conversion {
+	static constexpr To execute(From v) { return static_cast<To>(v); }
+};
+template <>
+struct primitives_conversion<f32, i32> {
+	static constexpr i32 execute(f32 v) { return static_cast<i32>(std::floor(v)); }
+};
+} // namespace impl::details
 
 template <size_t D, class T = f32>
 class Vec {
 	static_assert(D >= 1, "tx::Vec: D must be >= 1");
 
 public:
-	template <std::convertible_to<T>... Ts>
-	    requires(sizeof...(Ts) == D)
+	template <std::same_as<T>... Ts>
+	    requires(sizeof...(Ts) == D && D > 1)
 	constexpr Vec(Ts... scalars) : data{ static_cast<T>(scalars)... } {}
-	constexpr Vec(T s) { data.fill(s); };
+	constexpr explicit Vec(T s) { data.fill(s); };
 	constexpr Vec() = default;
+
+	template <std::convertible_to<T> U>
+	constexpr explicit Vec(const Vec<D, U>& other) {
+		for (u32 i = 0; i < D; i++)
+			data[i] = impl::details::primitives_conversion<U, T>::
+			    execute(other[i]);
+	}
 
 public:
 	template <class Self>
@@ -43,6 +63,11 @@ public:
 	constexpr explicit Vec(T s) : x(s), y(s) {}
 	constexpr Vec() = default;
 
+	template <std::convertible_to<T> U>
+	constexpr explicit Vec(Vec<2, U> other)
+	    : x(impl::details::primitives_conversion<U, T>::execute(other.x)),
+	      y(impl::details::primitives_conversion<U, T>::execute(other.y)) {}
+
 	template <class Self>
 	[[nodiscard]] constexpr auto&
 	operator[](this Self&& self, size_t index) {
@@ -61,6 +86,12 @@ public:
 	constexpr Vec(T x_, T y_, T z_) : x(x_), y(y_), z(z_) {}
 	constexpr explicit Vec(T s) : x(s), y(s), z(s) {}
 	constexpr Vec() = default;
+
+	template <std::convertible_to<T> U>
+	constexpr explicit Vec(Vec<3, U> other)
+	    : x(impl::details::primitives_conversion<U, T>::execute(other.x)),
+	      y(impl::details::primitives_conversion<U, T>::execute(other.y)),
+	      z(impl::details::primitives_conversion<U, T>::execute(other.z)) {}
 
 	template <class Self>
 	[[nodiscard]] constexpr auto&
@@ -104,14 +135,14 @@ constexpr Vec<D, T>& operator*=(Vec<D, T>& a, const Vec<D, T>& b) {
 	impl::iterateIndexSequence<D>([&](size_t i) { a[i] *= b[i]; });
 	return a;
 }
-template <size_t D, class T>
-constexpr Vec<D, T>& operator*=(Vec<D, T>& a, T s) {
-	impl::iterateIndexSequence<D>([&](size_t i) { a[i] *= s; });
+template <size_t D, class T, std::convertible_to<T> U>
+constexpr Vec<D, T>& operator*=(Vec<D, T>& a, U s) {
+	impl::iterateIndexSequence<D>([&](size_t i) { a[i] *= static_cast<T>(s); });
 	return a;
 }
-template <size_t D, class T>
-constexpr Vec<D, T>& operator/=(Vec<D, T>& a, T s) {
-	impl::iterateIndexSequence<D>([&](size_t i) { a[i] /= s; });
+template <size_t D, class T, std::convertible_to<T> U>
+constexpr Vec<D, T>& operator/=(Vec<D, T>& a, U s) {
+	impl::iterateIndexSequence<D>([&](size_t i) { a[i] /= static_cast<T>(s); });
 	return a;
 }
 
@@ -121,12 +152,12 @@ template <size_t D, class T>
 constexpr Vec<D, T> operator-(Vec<D, T> a, const Vec<D, T>& b) { return a -= b; }
 template <size_t D, class T>
 constexpr Vec<D, T> operator*(Vec<D, T> a, const Vec<D, T>& b) { return a *= b; }
-template <size_t D, class T>
-constexpr Vec<D, T> operator*(Vec<D, T> a, T b) { return a *= b; }
-template <size_t D, class T>
-constexpr Vec<D, T> operator*(T b, Vec<D, T> a) { return a *= b; }
-template <size_t D, class T>
-constexpr Vec<D, T> operator/(Vec<D, T> a, T b) { return a /= b; }
+template <size_t D, class T, std::convertible_to<T> U>
+constexpr Vec<D, T> operator*(Vec<D, T> a, U b) { return a *= b; }
+template <size_t D, class T, std::convertible_to<T> U>
+constexpr Vec<D, T> operator*(U b, Vec<D, T> a) { return a *= b; }
+template <size_t D, class T, std::convertible_to<T> U>
+constexpr Vec<D, T> operator/(Vec<D, T> a, U b) { return a /= b; }
 
 template <size_t D, class T>
 constexpr Vec<D, T> operator-(Vec<D, T> v) {
@@ -157,15 +188,15 @@ inline std::ostream& operator<<(std::ostream& in_cout, const Coord& in_coord) {
 // ################ Constants ################
 // clang-format off
 
-constexpr const vec2 IHat(1.0f, 0.0f);
-constexpr const vec2 JHat(0.0f, 1.0f);
-constexpr const vec2 Origin(0.0f, 0.0f);
-constexpr const vec2 InvalidVec(NAN, NAN);
+constexpr vec2 IHat      {1.0f, 0.0f};
+constexpr vec2 JHat      {0.0f, 1.0f};
+constexpr vec2 Origin    {0.0f, 0.0f};
+constexpr vec2 InvalidVec{NAN , NAN };
 
-constexpr vec2 TopRight = { 1.0, 1.0 };
-constexpr vec2 TopLeft = { -1.0, 1.0 };
-constexpr vec2 BottomLeft = { -1.0, -1.0 };
-constexpr vec2 BottomRight = { 1.0, -1.0 };
+constexpr vec2 TopRight   {  1.0f,  1.0f };
+constexpr vec2 TopLeft    { -1.0f,  1.0f };
+constexpr vec2 BottomLeft { -1.0f, -1.0f };
+constexpr vec2 BottomRight{  1.0f, -1.0f };
 
 constexpr vec2 directionVec[] = {
     {  1.0f,  0.0f },
