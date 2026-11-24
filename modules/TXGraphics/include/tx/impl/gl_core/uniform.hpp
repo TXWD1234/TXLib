@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <span>
+#include <type_traits>
 
 namespace tx::RenderEngine {
 
@@ -191,7 +192,8 @@ public:
 		    });
 	}
 	template <class U, std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter>
-	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	    requires std::same_as<std::remove_cvref_t<U>, T> ||
+		         std::same_as<std::remove_cvref_t<U>, std::byte>
 	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		m_buffer.stage(
 		    tx::nextAlign(static_cast<u32>(dataBuffer.size() * sizeof(U)),
@@ -225,7 +227,8 @@ public:
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
 	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
 	          class U>
-	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	    requires std::same_as<std::remove_cvref_t<U>, T> ||
+		         std::same_as<std::remove_cvref_t<U>, std::byte>
 	[[nodiscard]] tx::IndexRange push(
 	    std::span<U> dataBuffer, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
 		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));
@@ -260,7 +263,8 @@ public:
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
 	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
 	          class U>
-	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	    requires std::same_as<std::remove_cvref_t<U>, T> ||
+		         std::same_as<std::remove_cvref_t<U>, std::byte>
 	void sync(std::span<U> dataBuffer, u32 binding, SubmitDeleter&& submitDeleter,
 	          SubmitMarker&& submitMarker) {
 		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));

@@ -211,7 +211,8 @@ public:
 		}
 	}
 	template <class U, std::invocable<impl::RingBufferObjectDeleter> SubmitDeleter>
-	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	    requires std::same_as<std::remove_cvref_t<U>, T> ||
+		         std::same_as<std::remove_cvref_t<U>, std::byte>
 	void stage(std::span<U> dataBuffer, SubmitDeleter&& submitDeleter) {
 		stage(
 		    static_cast<u32>(dataBuffer.size()),
@@ -246,7 +247,8 @@ public:
 	template <std::invocable<impl::RingBufferObjectMarker&&> SubmitMarker,
 	          std::invocable<impl::RingBufferObjectDeleter&&> SubmitDeleter,
 	          class U>
-	    requires std::same_as<U, const T> || std::same_as<U, const std::byte>
+	    requires std::same_as<std::remove_cvref_t<U>, T> ||
+		         std::same_as<std::remove_cvref_t<U>, std::byte>
 	[[nodiscard]] tx::IndexRange push(
 	    std::span<U> dataBuffer, SubmitDeleter&& submitDeleter, SubmitMarker&& submitMarker) {
 		stage(dataBuffer, std::forward<SubmitDeleter>(submitDeleter));
