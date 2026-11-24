@@ -8,6 +8,7 @@
 #include "tx/impl/gl_core/fence_manager.hpp"
 #include "tx/impl/gl_core/fence.hpp"
 #include "tx/impl/gl_core/shader.hpp"
+#include "tx/impl/gl_core/shader_utils.hpp"
 #include "tx/impl/gl_core/texture.hpp"
 #include "tx/impl/gl_core/vertex_attribute_manager.hpp"
 #include "tx/impl/gl_core/uniform.hpp"

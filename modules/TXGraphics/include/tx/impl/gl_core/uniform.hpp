@@ -200,7 +200,7 @@ public:
 			              impl::details::getShaderStorageOffsetAlignment()),
 		    std::forward<SubmitDeleter>(submitDeleter),
 		    [dataBuffer](std::span<std::byte> mappedData) {
-			    if constexpr (std::same_as<U, const T>)
+			    if constexpr (std::same_as<std::remove_cvref_t<U>, T>)
 				    std::copy(std::as_bytes(dataBuffer).begin(),
 					          std::as_bytes(dataBuffer).end(), mappedData.begin());
 			    else

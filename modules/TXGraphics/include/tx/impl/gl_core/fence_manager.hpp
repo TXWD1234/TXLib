@@ -31,7 +31,7 @@ public:
 	FenceManagerBase(FenceManagerBase&&) noexcept = default;
 	FenceManagerBase& operator=(FenceManagerBase&&) noexcept = default;
 
-	// call this before draw call
+	// call this immediately after draw call
 	void update() {
 		fenceQueue.emplace_back();
 		operationQueue.emplace_back();

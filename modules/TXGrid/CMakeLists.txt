@@ -4,13 +4,13 @@
 tx_txlib_module(
 	LIB_TYPE STATIC
 	PUBLIC_HEADERS
-		grid.h
+		"grid.h"
 	IMPL_HEADERS
-		grid_system.hpp
-		grid_utils.hpp
-		coord_map.hpp
+		"grid_system.hpp"
+		"grid_utils.hpp"
+		"coord_map.hpp"
 	SOURCES
-		grid_system.cpp
-		grid_utils.cpp
-		coord_map.cpp
+		"grid_system.cpp"
+		"grid_utils.cpp"
+		"coord_map.cpp"
 )

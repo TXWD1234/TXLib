@@ -12,23 +12,41 @@ namespace RenderEngine {
 
 // designed for SSBO oriented, single shader draw calls with instancing
 // targeted to be as basic and as simple as possible
+// a manager instance is corresponding to one single shader; however
+// multi-shader can be achieved with multiple instances
 class SimpleDrawCallManager {
 public:
-	SimpleDrawCallManager(const ShaderProgram& shader) {
-		gl::bindVertexArray(m_vao.id);
-		gl::useProgram(shader.id());
-	}
+	SimpleDrawCallManager(const ShaderProgram& shader)
+	    : shaderId(shader.id()) { bindVAO_impl(); }
 
 public:
 	u32 begin = 0, count = 0, instanceCount = 0;
 	u32 drawMode = gl::enums::TRIANGLES;
+	gid shaderId = 0;
 
 	void draw() {
+		bindShader_impl(shaderId);
 		gl::drawArraysInstanced(drawMode, begin, count, instanceCount);
 	}
 
 private:
-	SimpleVAO m_vao;
+	// dummy
+	static void bindVAO_impl() {
+		static SimpleVAO vao = []() {
+			SimpleVAO _{};
+			gl::bindVertexArray(_.id);
+			return _;
+		}();
+	}
+
+private:
+	inline static gid CurrentBoundShader = 0;
+	static void bindShader_impl(gid id) {
+		if (CurrentBoundShader != id) {
+			gl::useProgram(id);
+			CurrentBoundShader = id;
+		}
+	}
 };
 using SDCM = SimpleDrawCallManager;
 
