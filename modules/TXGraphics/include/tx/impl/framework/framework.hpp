@@ -8,6 +8,7 @@
 #include "tx/impl/gl_core/basic_gl_utils.hpp"
 #include <GLFW/glfw3.h>
 #include <chrono>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <iostream>
@@ -97,61 +98,70 @@ public:
 	FullscreenConfig fullscreen;
 };
 
+struct FrameworkConfig {
+	f64 Tickrate = 60.0;
+	f64 AccumulatorCeiling = 5.0;
+};
+
 template <u32 mode, std::invocable UpdateCallback, std::invocable RenderCallback>
 class Framework {
 public:
-	Framework() {}
-	template <std::invocable U, std::invocable R,
-	          std::invocable<GLFWwindow*&> GLFWWindowInitializer = MakeWindow>
+	template <std::invocable<GLFWwindow*&> GLFWWindowInitializer = MakeWindow>
 	Framework(
-	    U&& in_updateCallback,
-	    R&& in_renderCallback,
-	    GLFWWindowInitializer in_makeWindow = MakeWindow{},
-	    double in_FixedTickrate = 60.0,
-	    double in_MaxAccumulatorMultiplier = 5.0)
-	    : updateCb(std::forward<U>(in_updateCallback)),
-	      renderCb(std::forward<R>(in_renderCallback)),
-	      FixedTickrate(in_FixedTickrate),
-	      TickIntervalTime(1.0 / FixedTickrate),
-	      MaxAccumulatorTime(TickIntervalTime * in_MaxAccumulatorMultiplier),
-	      m_valid(in_makeWindow(this->window)) {}
+	    UpdateCallback&& updateCallback,
+	    RenderCallback&& renderCallback,
+	    GLFWWindowInitializer makeWindow = MakeWindow{},
+	    FrameworkConfig config = FrameworkConfig{})
+	    : updateCb(std::move(updateCallback)),
+	      renderCb(std::move(renderCallback)),
+	      m_config(config) {
+		if (!makeWindow(m_window))
+			throw std::runtime_error("Failed to make window.");
+	}
+	~Framework() = default;
+
+	// default 60.0
+	void setTickrate(f64 tickRate) {
+		m_config.Tickrate = tickRate;
+	}
+	f64 getTickrate() { return m_config.Tickrate; }
 
 	void run() {
 		// Main Loop
 		std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();
-		double accumulator = 0.0;
+		f64 accumulator = 0.0;
 
 		std::chrono::steady_clock::time_point lastStatTime = std::chrono::steady_clock::now();
 
-		while (!glfwWindowShouldClose(this->window)) {
+		while (!glfwWindowShouldClose(m_window)) {
 			if constexpr (mode & Mode::FixTickRate) {
 				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-				double tick_duration = std::chrono::duration<double>(now - last).count();
+				f64 tick_duration = std::chrono::duration<f64>(now - last).count();
 				accumulator += tick_duration;
 				last = now;
-				if (accumulator > this->MaxAccumulatorTime)
-					accumulator = this->MaxAccumulatorTime;
-				while (accumulator >= this->TickIntervalTime) {
-					this->updateCb();
+				if (accumulator > tickFindAccCeil_impl())
+					accumulator = tickFindAccCeil_impl();
+				while (accumulator >= tickFindInterval_impl()) {
+					updateCb();
 
 					ups++;
-					accumulator -= this->TickIntervalTime;
+					accumulator -= tickFindInterval_impl();
 				}
 			} else {
-				this->updateCb();
+				updateCb();
 				ups++;
 			}
 
 			gl::clear(gl::enums::COLOR_BUFFER_BIT);
 
-			this->renderCb();
+			renderCb();
 			fps++;
 
-			glfwSwapBuffers(this->window);
+			glfwSwapBuffers(m_window);
 			glfwPollEvents();
 
 			std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
-			if (std::chrono::duration<double>(currentTime - lastStatTime).count() >= 1.0) {
+			if (std::chrono::duration<f64>(currentTime - lastStatTime).count() >= 1.0) {
 				if constexpr (mode & Mode::PrintFrameRate) {
 					std::cout << "FPS: " << fps << " | UPS: " << ups << std::endl;
 				}
@@ -161,24 +171,29 @@ public:
 			}
 		}
 	}
-	~Framework() {
-	}
 
-	GLFWwindow* getWindow() { return this->window; }
-	bool valid() const { return m_valid; }
+	GLFWwindow* getWindow() { return m_window; }
 	u32 getFPS() const { return fps; }
 	u32 getUPS() const { return ups; }
 
 private:
-	GLFWwindow* window = nullptr;
+	GLFWwindow* m_window = nullptr;
 	UpdateCallback updateCb;
 	RenderCallback renderCb;
-	double FixedTickrate = 60.0;
-	double TickIntervalTime; // seconds
-	double MaxAccumulatorTime;
-	u32 fps, ups;
 
-	bool m_valid = 1;
+	FrameworkConfig m_config;
+
+	u32 fps = 0, ups = 0;
+
+private:
+	// ================ Helper ================
+
+	f64 tickFindInterval_impl() {
+		return 1.0 / m_config.Tickrate;
+	}
+	f64 tickFindAccCeil_impl() {
+		return tickFindInterval_impl() * m_config.AccumulatorCeiling;
+	}
 };
 
 } // namespace RenderEngine
