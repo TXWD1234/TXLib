@@ -140,6 +140,11 @@ constexpr Vec<D, T>& operator*=(Vec<D, T>& a, U s) {
 	impl::iterateIndexSequence<D>([&](size_t i) { a[i] *= static_cast<T>(s); });
 	return a;
 }
+template <size_t D, class T>
+constexpr Vec<D, T>& operator/=(Vec<D, T>& a, const Vec<D, T>& b) {
+	impl::iterateIndexSequence<D>([&](size_t i) { a[i] /= b[i]; });
+	return a;
+}
 template <size_t D, class T, std::convertible_to<T> U>
 constexpr Vec<D, T>& operator/=(Vec<D, T>& a, U s) {
 	impl::iterateIndexSequence<D>([&](size_t i) { a[i] /= static_cast<T>(s); });
@@ -156,8 +161,11 @@ template <size_t D, class T, std::convertible_to<T> U>
 constexpr Vec<D, T> operator*(Vec<D, T> a, U b) { return a *= b; }
 template <size_t D, class T, std::convertible_to<T> U>
 constexpr Vec<D, T> operator*(U b, Vec<D, T> a) { return a *= b; }
+template <size_t D, class T>
+constexpr Vec<D, T> operator/(Vec<D, T> a, const Vec<D, T>& b) { return a /= b; }
 template <size_t D, class T, std::convertible_to<T> U>
 constexpr Vec<D, T> operator/(Vec<D, T> a, U b) { return a /= b; }
+
 
 template <size_t D, class T>
 constexpr Vec<D, T> operator-(Vec<D, T> v) {
